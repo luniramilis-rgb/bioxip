@@ -24,9 +24,10 @@ class Store:
     def upsert_documents(self, rows: list[dict]) -> tuple[int, int]:
         if not rows:
             return 0, 0
-        payload = [
-            {k: v for k, v in row.items() if v is not None} for row in rows
-        ]
+        deduped: dict[tuple, dict] = {}
+        for row in rows:
+            deduped[(row.get("doc_type"), row.get("identity_key"))] = row
+        payload = list(deduped.values())
         started = datetime.now(timezone.utc)
         resp = self.client.post(
             f"{self.base}/documents",
