@@ -1,7 +1,7 @@
 /* hasil live — window.BIOXIP_SEARCH */
 
 window.BIOXIP_SEARCH = {
-  async run(q, filters = {}, page = 1) {
+  async run(q, filters = {}, page = 1, cursors = null) {
     const params = new URLSearchParams();
     params.set("q", q);
     if (filters.types && filters.types.length) params.set("types", filters.types.join(","));
@@ -10,6 +10,8 @@ window.BIOXIP_SEARCH = {
     if (filters.sort && filters.sort !== "relevance") params.set("sort", filters.sort);
     if (filters.perPage && filters.perPage !== 20) params.set("per_page", String(filters.perPage));
     params.set("page", String(page));
+    if (cursors && cursors.epmcCursor) params.set("epmc_cursor", cursors.epmcCursor);
+    if (cursors && cursors.ctToken) params.set("ct_token", cursors.ctToken);
 
     const resp = await fetch(`/api/search?${params.toString()}`);
     if (!resp.ok) throw new Error(`search gagal: ${resp.status}`);

@@ -2,7 +2,8 @@ import { expandQuery } from "../_dictionary.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 const CT = "https://clinicaltrials.gov/api/v2/studies";
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 10000;
+const MAX_WANT = 500;
 
 export async function onRequestGet(context) {
   try {
@@ -13,49 +14,53 @@ export async function onRequestGet(context) {
     const types = parseTypes(url.searchParams.get("types"));
     const oa = url.searchParams.get("oa") === "true";
     const indonesia = url.searchParams.get("indonesia") === "true";
-    const page = clamp(Math.max(1, Number(url.searchParams.get("page")) || 1), 1, 100);
-    const perPage = clamp(Number(url.searchParams.get("per_page")) || 20, 1, 250);
+    const page = clamp(Math.max(1, Number(url.searchParams.get("page")) || 1), 1, 5);
+    const perPage = clamp(Number(url.searchParams.get("per_page")) || 20, 1, 100);
     const sort = ["relevance", "date", "citations"].includes(url.searchParams.get("sort"))
       ? url.searchParams.get("sort")
       : "relevance";
+    const epmcCursor = url.searchParams.get("epmc_cursor") || "*";
+    const ctToken = url.searchParams.get("ct_token") || null;
 
     const query = expandQuery(raw);
-
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
     const needTrial = !types || types.includes("trial");
 
     const calls = [];
-    if (needLit) calls.push(fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage }));
-    if (needTrial) calls.push(fetchTrials(query, { oa, indonesia, types, sort, limit: perPage }));
+    if (needLit) {
+      calls.push(fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor }));
+    }
+    if (needTrial) {
+      calls.push(fetchTrials(query, { oa, indonesia, types, sort, limit: perPage, token: ctToken }));
+    }
 
-    const settled = await Promise.allSettled(
-      calls.map((promise) => withTimeout(promise, TIMEOUT_MS)),
-    );
+    const settled = await Promise.allSettled(calls.map((p) => withTimeout(p, TIMEOUT_MS)));
 
     const results = [];
     let total = 0;
     const notes = [];
+    const pagination = {};
     for (const item of settled) {
       if (item.status === "fulfilled") {
         results.push(...item.value.results);
         total += item.value.total;
+        Object.assign(pagination, item.value.pagination);
       } else {
         notes.push(item.reason instanceof Error ? item.reason.message : "sumber tidak merespons");
       }
     }
 
     results.sort(rankBy(sort));
-
-    const totalUnique = results.length;
-    const paged = results.slice((page - 1) * perPage, page * perPage);
+    const paged = results.slice(0, perPage);
 
     return json({
       query: raw,
-      total: Math.max(total, totalUnique),
-      limit: perPage,
-      offset: (page - 1) * perPage,
+      total: Math.max(total, results.length),
       mode: "live",
+      page,
+      limit: perPage,
       notes,
+      pagination,
       facets: facetsOf(paged),
       results: paged,
     });
@@ -70,15 +75,22 @@ async function fetchEpmc(query, filters) {
     format: "json",
     resultType: "core",
     pageSize: String(filters.limit),
+    cursorMark: filters.cursor || "*",
   });
   if (filters.sort === "date") params.set("sort", "P_PDATE_D desc");
   const resp = await fetch(`${EPMC}?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!resp.ok) throw new Error(`europepmc ${resp.status}`);
   const data = await resp.json();
   const hits = data.resultList?.result || [];
+  const nextCursor = data.nextCursorMark;
+  const hasMore = hits.length === filters.limit && nextCursor && nextCursor !== filters.cursor;
   return {
     total: Number(data.hitCount || 0),
     results: hits.map(mapEpmcHit),
+    pagination: {
+      epmcCursor: hasMore ? nextCursor : null,
+      epmcHasMore: Boolean(hasMore),
+    },
   };
 }
 
@@ -88,13 +100,20 @@ async function fetchTrials(query, filters) {
     pageSize: String(filters.limit),
     countTotal: "true",
   });
+  if (filters.token) params.set("pageToken", filters.token);
   const resp = await fetch(`${CT}?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!resp.ok) throw new Error(`clinicaltrials ${resp.status}`);
   const data = await resp.json();
   const studies = data.studies || [];
+  const nextToken = data.nextPageToken || null;
+  const hasMore = Boolean(nextToken);
   return {
     total: Number(data.totalCount || 0),
     results: studies.map(mapTrial),
+    pagination: {
+      ctToken: hasMore ? nextToken : null,
+      ctHasMore: hasMore,
+    },
   };
 }
 

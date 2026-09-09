@@ -2,6 +2,9 @@
   const S = window.BIOXIP_SEARCH;
   const view = document.getElementById("view");
   const TOPICS = window.BIOXIP_TOPICS || [];
+  const MAX_PAGES = 5;
+
+  const nav = { key: null, pages: [], cursors: null, upstream: 0 };
 
   function brand() {
     document.querySelectorAll("[data-brand]").forEach((el) => {
@@ -50,14 +53,10 @@
       if (!resp.ok) throw new Error();
       const data = await resp.json();
       const list = (data.sources || []).map((s) => s.name).join(", ");
-      host.innerHTML = `<span class="muted">Mode live — menjelajah langsung: ${thisEscape(list)}</span>`;
+      host.innerHTML = `<span class="muted">Mode live — menjelajah langsung: ${esc(list)}</span>`;
     } catch {
       host.innerHTML = '<span class="muted">Sumber belum tersedia.</span>';
     }
-  }
-
-  function thisEscape(value) {
-    return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
 
   function searchFormHandler() {
@@ -115,32 +114,80 @@
     return filters;
   }
 
+  function navKey(q, filters) {
+    return `${q}|${filters.types.join(",")}|${filters.oa}|${filters.indonesia}|${filters.sort}|${filters.perPage}`;
+  }
+
   async function runSearch() {
     const url = new URLSearchParams(location.hash.split("?")[1] || "");
     const q = url.get("q") || "";
     if (!q) return;
     const filters = currentFilters(url);
-    const page = 1;
-    const host = document.getElementById("results");
-    host.innerHTML = '<p class="muted">Menelusuri sumber langsung…</p>';
-    try {
-      const data = await S.run(q, filters, page);
-      const results = data.results || [];
-      const upstream = Number(data.total || 0);
-      const shownLine =
-        results.length && upstream > results.length
-          ? `Total ${upstream.toLocaleString("id-ID")} hasil di sumber — menampilkan ${results.length} teratas.`
-          : `${upstream.toLocaleString("id-ID")} hasil di sumber.`;
-      host.innerHTML = `<p class="muted">${S.escape(shownLine)}</p>`;
-      host.insertAdjacentHTML(
-        "beforeend",
-        results.map((doc) => S.renderResult(doc)).join("") ||
-          '<p class="muted">Tidak ada hasil. Coba kata lain atau filter lebih sedikit.</p>'
-      );
-      host.insertAdjacentHTML("beforeend", S.renderNote(data));
-    } catch (error) {
-      host.innerHTML = `<p class="muted">${S.escape(error.message)}</p>`;
+    const page = Math.min(Math.max(1, Number(url.get("page")) || 1), MAX_PAGES);
+    const key = navKey(q, filters);
+    if (nav.key !== key) {
+      nav.key = key;
+      nav.pages = [];
+      nav.cursors = null;
+      nav.upstream = 0;
     }
+
+    const host = document.getElementById("results");
+    if (nav.pages.length < page) {
+      host.innerHTML = `<p class="muted">Menelusuri halaman ${page}…</p>`;
+      try {
+        const data = await S.run(q, filters, page, nav.cursors);
+        nav.upstream = Number(data.total || 0);
+        nav.cursors = data.pagination || null;
+        nav.pages.push({ items: data.results || [], note: data.notes || [] });
+      } catch (error) {
+        host.innerHTML = `<p class="muted">${S.escape(error.message)}</p>`;
+        return;
+      }
+    }
+
+    const current = nav.pages[page - 1];
+    const items = current.items;
+    const loadedRows = nav.pages.reduce((sum, p) => sum + p.items.length, 0);
+    const upstream = nav.upstream;
+    const shownText =
+      items.length && upstream > loadedRows
+        ? `Total ${upstream.toLocaleString("id-ID")} hasil di sumber — ${loadedRows.toLocaleString("id-ID")} sudah dimuat.`
+        : `${upstream.toLocaleString("id-ID")} hasil di sumber.`;
+
+    host.innerHTML = `<p class="muted">${S.escape(shownText)}</p>`;
+    host.insertAdjacentHTML(
+      "beforeend",
+      items.map((doc) => S.renderResult(doc)).join("") ||
+        '<p class="muted">Tidak ada hasil. Coba kata lain atau filter lebih sedikit.</p>'
+    );
+    host.insertAdjacentHTML("beforeend", S.renderNote(current));
+    renderPager(q, filters, page);
+  }
+
+  function renderPager(q, filters, page) {
+    const host = document.getElementById("pager");
+    const hasMore = Boolean(nav.cursors?.epmcHasMore || nav.cursors?.ctHasMore);
+    const canNext = nav.pages.length < MAX_PAGES && hasMore;
+    let out = `<span class="muted">Halaman ${page}${canNext || page > 1 ? ` dari maks ${MAX_PAGES}` : ""}</span>`;
+    if (page > 1) out += `<a href="${hashFor(q, filters, page - 1)}">‹ Sebelumnya</a>`;
+    if (canNext) out += `<a href="${hashFor(q, filters, page + 1)}">Berikutnya ›</a>`;
+    if (!canNext && page >= MAX_PAGES && nav.cursors?.epmcHasMore) {
+      out += `<span class="muted"> (batas demo 500 hasil)</span>`;
+    }
+    host.innerHTML = out;
+  }
+
+  function hashFor(q, filters, page) {
+    const params = new URLSearchParams();
+    params.set("q", q);
+    if (filters.oa) params.set("oa", "true");
+    if (filters.indonesia) params.set("indonesia", "true");
+    if (filters.sort && filters.sort !== "relevance") params.set("sort", filters.sort);
+    if (filters.types && filters.types.length) filters.types.forEach((t) => params.set(`f-${t}`, "true"));
+    if (filters.perPage && filters.perPage !== 20) params.set("per_page", String(filters.perPage));
+    if (page > 1) params.set("page", String(page));
+    return `#/search?${params.toString()}`;
   }
 
   function sourcesHTML() {
@@ -212,12 +259,6 @@
         navigator.clipboard?.writeText(copy.dataset.copy).catch(() => {});
         return;
       }
-      const chip = event.target.closest("[data-sort]");
-      if (chip) {
-        const url = new URLSearchParams(location.hash.split("?")[1] || "");
-        url.set("sort", chip.dataset.sort);
-        location.hash = `#/search?${url.toString()}`;
-      }
     });
 
     document.addEventListener("change", (event) => {
@@ -231,7 +272,7 @@
       current.delete("f-paper");
       current.delete("f-preprint");
       current.delete("f-trial");
-      current.delete("per_page");
+      current.delete("page");
       const values = {
         "f-oa": "oa",
         "f-indonesia": "indonesia",
@@ -249,6 +290,10 @@
       else current.delete("sort");
       location.hash = `#/search?${current.toString()}`;
     });
+  }
+
+  function esc(value) {
+    return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
 
   brand();
