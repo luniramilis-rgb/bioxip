@@ -1,10 +1,10 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 from itertools import islice
 
 import typer
 
-from harvester.config import PAGE_SIZE
+from harvester.config import MAX_PAGES_FULL, PAGE_SIZE
 from harvester.dedupe import to_rows_epmc, to_rows_trials
 from harvester.models import EpmcHit, TrialRecord
 from harvester.providers import clinicaltrials, europepmc
@@ -29,7 +29,7 @@ def epmc(start_year: int = 2000, end_year: int | None = None) -> None:
     fetched = inserted = updated = 0
     try:
         for year in range(start_year, end_year + 1):
-            hits = asyncio.run(europepmc.fetch_hits(europepmc.year_query(year), PAGE_SIZE))
+            hits = asyncio.run(europepmc.fetch_hits(europepmc.year_query(year), PAGE_SIZE, MAX_PAGES_FULL))
             rows = to_rows_epmc([EpmcHit(**h) for h in hits])
             for batch in _chunks(rows):
                 ins, upd = store.upsert_documents(batch)

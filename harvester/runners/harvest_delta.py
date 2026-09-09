@@ -4,7 +4,7 @@ from itertools import islice
 
 import typer
 
-from harvester.config import DELTA_LOOKBACK_DAYS, PAGE_SIZE
+from harvester.config import DELTA_LOOKBACK_DAYS, MAX_PAGES_DELTA, PAGE_SIZE
 from harvester.dedupe import to_rows_epmc, to_rows_trials
 from harvester.models import EpmcHit, TrialRecord
 from harvester.providers import clinicaltrials, europepmc, neliti_oai, openalex
@@ -39,7 +39,7 @@ def europepmc_delta(provider: str = "europepmc") -> None:
     fetched = inserted = updated = 0
     try:
         query = europepmc.delta_query(since.isoformat(), now.date().isoformat())
-        hits = asyncio.run(europepmc.fetch_hits(query, PAGE_SIZE))
+        hits = asyncio.run(europepmc.fetch_hits(query, PAGE_SIZE, MAX_PAGES_DELTA))
         rows = to_rows_epmc([EpmcHit(**h) for h in hits])
         if rows:
             enrich_batch = [r for r in rows[:150] if r.get("doi")]
