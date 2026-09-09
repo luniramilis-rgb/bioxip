@@ -8,8 +8,8 @@ window.BIOXIP_SEARCH = {
     if (filters.oa) params.set("oa", "true");
     if (filters.indonesia) params.set("indonesia", "true");
     if (filters.sort && filters.sort !== "relevance") params.set("sort", filters.sort);
+    if (filters.perPage && filters.perPage !== 20) params.set("per_page", String(filters.perPage));
     params.set("page", String(page));
-    params.set("per_page", "20");
 
     const resp = await fetch(`/api/search?${params.toString()}`);
     if (!resp.ok) throw new Error(`search gagal: ${resp.status}`);

@@ -93,13 +93,22 @@
           <option value="date" ${url.get("sort") === "date" ? "selected" : ""}>Tanggal</option>
           <option value="citations" ${url.get("sort") === "citations" ? "selected" : ""}>Sitasi</option>
         </select></label>
+        <label>Tampil <select id="f-per">
+          ${[20, 50, 100].map((n) => `<option value="${n}" ${Number(url.get("per_page")) === n ? "selected" : ""}>${n}</option>`).join("")}
+        </select></label>
       </div>
       <div id="results"></div>
       <div id="pager"></div>`;
   }
 
   function currentFilters(url) {
-    const filters = { oa: url.get("oa") === "true", indonesia: url.get("indonesia") === "true", sort: url.get("sort") || "relevance", types: [] };
+    const filters = {
+      oa: url.get("oa") === "true",
+      indonesia: url.get("indonesia") === "true",
+      sort: url.get("sort") || "relevance",
+      perPage: Number(url.get("per_page")) || 20,
+      types: [],
+    };
     ["paper", "preprint", "trial"].forEach((t) => {
       if (url.get(`f-${t}`) === "true") filters.types.push(t);
     });
@@ -212,7 +221,7 @@
     });
 
     document.addEventListener("change", (event) => {
-      const ids = ["f-oa", "f-indonesia", "f-paper", "f-preprint", "f-trial", "f-sort"];
+      const ids = ["f-oa", "f-indonesia", "f-paper", "f-preprint", "f-trial", "f-sort", "f-per"];
       if (!ids.includes(event.target.id)) return;
       const current = new URLSearchParams(location.hash.split("?")[1] || "");
       const q = current.get("q");
@@ -222,7 +231,7 @@
       current.delete("f-paper");
       current.delete("f-preprint");
       current.delete("f-trial");
-      current.delete("page");
+      current.delete("per_page");
       const values = {
         "f-oa": "oa",
         "f-indonesia": "indonesia",
@@ -233,6 +242,8 @@
       for (const [id, param] of Object.entries(values)) {
         if (document.getElementById(id)?.checked) current.set(param, "true");
       }
+      const perEl = document.getElementById("f-per");
+      if (perEl && Number(perEl.value) !== 20) current.set("per_page", perEl.value);
       const sortEl = document.getElementById("f-sort");
       if (sortEl && sortEl.value !== "relevance") current.set("sort", sortEl.value);
       else current.delete("sort");

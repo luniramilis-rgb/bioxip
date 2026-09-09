@@ -2,8 +2,7 @@ import { expandQuery } from "../_dictionary.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 const CT = "https://clinicaltrials.gov/api/v2/studies";
-const TIMEOUT_MS = 6000;
-const SIZE = 25;
+const TIMEOUT_MS = 8000;
 
 export async function onRequestGet(context) {
   try {
@@ -15,7 +14,7 @@ export async function onRequestGet(context) {
     const oa = url.searchParams.get("oa") === "true";
     const indonesia = url.searchParams.get("indonesia") === "true";
     const page = clamp(Math.max(1, Number(url.searchParams.get("page")) || 1), 1, 100);
-    const perPage = clamp(Number(url.searchParams.get("per_page")) || SIZE, 1, 50);
+    const perPage = clamp(Number(url.searchParams.get("per_page")) || 20, 1, 250);
     const sort = ["relevance", "date", "citations"].includes(url.searchParams.get("sort"))
       ? url.searchParams.get("sort")
       : "relevance";
@@ -26,8 +25,8 @@ export async function onRequestGet(context) {
     const needTrial = !types || types.includes("trial");
 
     const calls = [];
-    if (needLit) calls.push(fetchEpmc(query, { oa, indonesia, types, sort, perPage }));
-    if (needTrial) calls.push(fetchTrials(query, { oa, indonesia, types, sort, perPage }));
+    if (needLit) calls.push(fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage }));
+    if (needTrial) calls.push(fetchTrials(query, { oa, indonesia, types, sort, limit: perPage }));
 
     const settled = await Promise.allSettled(
       calls.map((promise) => withTimeout(promise, TIMEOUT_MS)),
@@ -70,7 +69,7 @@ async function fetchEpmc(query, filters) {
     query: epmcQuery(query, filters),
     format: "json",
     resultType: "core",
-    pageSize: String(SIZE),
+    pageSize: String(filters.limit),
   });
   if (filters.sort === "date") params.set("sort", "P_PDATE_D desc");
   const resp = await fetch(`${EPMC}?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -86,7 +85,7 @@ async function fetchEpmc(query, filters) {
 async function fetchTrials(query, filters) {
   const params = new URLSearchParams({
     "query.term": query,
-    pageSize: String(SIZE),
+    pageSize: String(filters.limit),
     countTotal: "true",
   });
   const resp = await fetch(`${CT}?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
