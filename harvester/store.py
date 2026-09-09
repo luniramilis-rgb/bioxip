@@ -3,7 +3,12 @@ from typing import Optional
 
 import httpx
 
-from harvester.config import SUPABASE_SERVICE_ROLE, SUPABASE_URL, TIMEOUT
+from harvester.config import (
+    STORE_ABSTRACTS,
+    SUPABASE_SERVICE_ROLE,
+    SUPABASE_URL,
+    TIMEOUT,
+)
 
 
 class Store:
@@ -24,6 +29,8 @@ class Store:
     def upsert_documents(self, rows: list[dict]) -> tuple[int, int]:
         if not rows:
             return 0, 0
+        if not STORE_ABSTRACTS:
+            rows = [{k: v for k, v in row.items() if k != "abstract"} for row in rows]
         deduped: dict[tuple, dict] = {}
         for row in rows:
             deduped[(row.get("doc_type"), row.get("identity_key"))] = row

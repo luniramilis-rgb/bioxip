@@ -54,7 +54,7 @@ window.BIOXIP_SEARCH = {
       <h2>${this.escape(doc.title)}</h2>
       <p class="muted">${this.escape(authors || "-")}</p>
       <p class="meta">${this.escape(doc.journal || "")}${doc.year ? " · " + doc.year : ""} · ${doc.source} · ${doc.citation_count || 0} sitasi</p>
-      <p>${this.escape(this.renderSnippet(doc.abstract, ""))}</p>
+      ${doc.abstract ? `<p>${this.escape(this.renderSnippet(doc.abstract, ""))}</p>` : ""}
       <p class="actions">
         ${localHint}
         ${doc.url ? `<a class="btn ghost" target="_blank" rel="noopener" href="${this.safeUrl(doc.url)}">Sumber asli</a>` : ""}
@@ -75,7 +75,6 @@ window.BIOXIP_SEARCH = {
           ${doc.source === "clinicaltrials" && doc.meta && doc.meta.phase && doc.meta.phase.length ? " · " + doc.meta.phase.join(",") : ""}
         </p>
         <p class="muted">${this.escape(authors || "-")}</p>
-        <p>${this.escape(this.renderSnippet(doc.abstract, ""))}</p>
         <p class="actions">
           ${doc.oa && doc.oa.pdf_url ? `<a class="btn small" target="_blank" rel="noopener" href="${this.safeUrl(doc.oa.pdf_url)}">PDF</a>` : ""}
           ${doc.url ? `<a class="btn small ghost" target="_blank" rel="noopener" href="${this.safeUrl(doc.url)}">Buka sumber</a>` : ""}

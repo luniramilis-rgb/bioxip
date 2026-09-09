@@ -21,3 +21,4 @@ RETRY_BACKOFF = 4.0
 DELTA_LOOKBACK_DAYS = int(os.getenv("DELTA_LOOKBACK_DAYS", "7"))
 MAX_PAGES_FULL = int(os.getenv("MAX_PAGES_FULL", "300"))
 MAX_PAGES_DELTA = int(os.getenv("MAX_PAGES_DELTA", "300"))
+STORE_ABSTRACTS = os.getenv("STORE_ABSTRACTS", "false").lower() == "true"
