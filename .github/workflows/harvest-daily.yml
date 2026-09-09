@@ -1,0 +1,25 @@
+name: Harvest harian
+
+on:
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
+      OPENALEX_MAIL: ${{ secrets.OPENALEX_MAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install .
+      - name: Delta Europe PMC
+        run: python -m harvester.runners.harvest_delta europepmc-delta
+      - name: Delta ClinicalTrials.gov
+        run: python -m harvester.runners.harvest_delta clinicaltrials-delta
