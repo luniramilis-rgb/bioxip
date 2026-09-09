@@ -7,7 +7,7 @@ const DATA_SOURCES = [
   {
     id: "chembl",
     name: "ChEMBL",
-    endpoint: "https://www.ebi.ac.uk/chembl/api/data/molecule/search?q={query}",
+    endpoint: "https://www.ebi.ac.uk/chembl/api/data/molecule/search?q={query}&format=json",
   },
   {
     id: "opentargets",
