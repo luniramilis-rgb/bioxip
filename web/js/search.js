@@ -1,5 +1,3 @@
-export {};
-
 /* hasil live — window.BIOXIP_SEARCH */
 
 window.BIOXIP_SEARCH = {
