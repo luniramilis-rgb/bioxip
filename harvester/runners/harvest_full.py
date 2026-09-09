@@ -25,7 +25,7 @@ def _chunks(items, size: int = CHUNK):
 def epmc(start_year: int = 2000, end_year: int | None = None) -> None:
     end_year = end_year or datetime.now().year
     store = Store()
-    run_id = store.start_run("europepmc", "full", f"{start_year}-{end_year}")
+    run_id = store.start_run("europepmc", "full", None)
     fetched = inserted = updated = 0
     try:
         for year in range(start_year, end_year + 1):
@@ -39,6 +39,7 @@ def epmc(start_year: int = 2000, end_year: int | None = None) -> None:
             print(f"{year}: {len(hits)} hit, total fetched={fetched}", flush=True)
             asyncio.run(asyncio.sleep(1))
         store.finish_run(run_id, "success", fetched, inserted, updated)
+        store.set_cursor("europepmc", "last_full_at", datetime.now().isoformat())
     except Exception as exc:
         store.finish_run(run_id, "error", fetched, inserted, updated, {"error": str(exc)})
         raise
@@ -49,7 +50,7 @@ def epmc(start_year: int = 2000, end_year: int | None = None) -> None:
 @app.command()
 def trials(min_year: int = 2000) -> None:
     store = Store()
-    run_id = store.start_run("clinicaltrials", "full", f"{min_year}-now")
+    run_id = store.start_run("clinicaltrials", "full", None)
     fetched = inserted = updated = 0
     try:
         query = clinicaltrials.posted_query(min_year)
@@ -61,6 +62,7 @@ def trials(min_year: int = 2000) -> None:
             updated += upd
             fetched += len(batch)
         store.finish_run(run_id, "success", fetched, inserted, updated)
+        store.set_cursor("clinicaltrials", "last_full_at", datetime.now().isoformat())
     except Exception as exc:
         store.finish_run(run_id, "error", fetched, inserted, updated, {"error": str(exc)})
         raise

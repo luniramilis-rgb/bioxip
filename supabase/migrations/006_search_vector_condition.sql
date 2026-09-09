@@ -1,27 +1,3 @@
-create table term_map (
-  id_term  text primary key,
-  en_terms text not null,
-  kind     text not null default 'mesh'
-);
-
-insert into term_map (id_term, en_terms, kind) values
-  ('diabetes', 'diabetes OR diabetes mellitus OR type 2 diabetes', 'disease'),
-  ('kanker paru', 'lung cancer OR lung neoplasms OR nonsmall cell lung cancer', 'disease'),
-  ('kanker payudara', 'breast cancer OR breast neoplasms', 'disease'),
-  ('tuberkulosis', 'tuberculosis OR TB OR mycobacterium tuberculosis', 'disease'),
-  ('demam berdarah', 'dengue OR dengue fever OR dengue hemorrhagic fever', 'disease'),
-  ('stunting', 'stunting OR child growth disorders OR malnutrition', 'disease'),
-  ('malaria', 'malaria OR plasmodium', 'disease'),
-  ('hipertensi', 'hypertension OR high blood pressure OR blood pressure', 'disease'),
-  ('stroke', 'stroke OR cerebrovascular accident OR cerebral infarction', 'disease'),
-  ('hiv', 'hiv OR human immunodeficiency virus', 'disease'),
-  ('imunisasi', 'immunization OR vaccination OR vaccines', 'intervention'),
-  ('obat', 'drug OR medication OR pharmaceutical', 'intervention'),
-  ('vaksin', 'vaccine OR vaccination', 'intervention'),
-  ('kehamilan', 'pregnancy OR antenatal OR maternal', 'disease'),
-  ('asi', 'breastfeeding OR breast milk OR lactation', 'intervention'),
-  ('anemia', 'anemia OR anaemia OR iron deficiency', 'disease');
-
 create or replace function fn_bioxip_search(
   p_query      text,
   p_types      text[] default null,
