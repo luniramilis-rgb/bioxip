@@ -1,18 +1,47 @@
-import { json, select } from "./_db.js";
+const SOURCES = [
+  {
+    id: "europepmc",
+    name: "Europe PMC",
+    covers: "PubMed, bioRxiv, medRxiv, PMC (full-text open access), preprint",
+    url: "https://europepmc.org/",
+  },
+  {
+    id: "clinicaltrials",
+    name: "ClinicalTrials.gov",
+    covers: "Registry uji klinis global (desain, fase, kondisi, status)",
+    url: "https://clinicaltrials.gov/",
+  },
+  {
+    id: "pubchem",
+    name: "PubChem",
+    covers: "Senyawa kimia (struktur, properti, bioassay) — live lookup",
+    url: "https://pubchem.ncbi.nlm.nih.gov/",
+  },
+  {
+    id: "chembl",
+    name: "ChEMBL",
+    covers: "Molekul bioaktif & bioaktivitas — live lookup",
+    url: "https://www.ebi.ac.uk/chembl/",
+  },
+  {
+    id: "opentargets",
+    name: "Open Targets",
+    covers: "Target-disease association — live lookup",
+    url: "https://platform.opentargets.org/",
+  },
+];
 
-export async function onRequestGet(context) {
-  try {
-    const { env } = context;
-    const stats = await select(env, "source_stats", {
-      select: "source,doc_type,total,active,last_updated",
-      limit: "100",
-    });
-    const runs = await select(env, "latest_harvest_runs", {
-      select: "provider,kind,status,started_at,finished_at,fetched,inserted,updated",
-      limit: "20",
-    });
-    return json({ sources: stats, harvest: runs });
-  } catch (error) {
-    return json({ error: error.message }, 500);
-  }
+export async function onRequestGet() {
+  return json({
+    mode: "live",
+    note: "bioXip berjalan live: setiap pencarian menjangkau langsung seluruh koleksi upstream tanpa index lokal.",
+    sources: SOURCES,
+  });
+}
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }

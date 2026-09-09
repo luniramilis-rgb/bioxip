@@ -1,47 +1,221 @@
-import { json, rpc } from "./_db.js";
+import { expandQuery } from "../_dictionary.js";
 
-const TYPES = new Set(["paper", "preprint", "trial", "local"]);
-const SORTS = new Set(["relevance", "date", "citations"]);
+const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
+const CT = "https://clinicaltrials.gov/api/v2/studies";
+const TIMEOUT_MS = 6000;
+const SIZE = 25;
 
 export async function onRequestGet(context) {
   try {
-    const { env } = context;
     const url = new URL(context.request.url);
-    const q = (url.searchParams.get("q") || "").trim();
-    if (!q) {
-      return json({ error: "param q wajib" }, 400);
+    const raw = (url.searchParams.get("q") || "").trim();
+    if (!raw) return json({ error: "param q wajib" }, 400);
+
+    const types = parseTypes(url.searchParams.get("types"));
+    const oa = url.searchParams.get("oa") === "true";
+    const indonesia = url.searchParams.get("indonesia") === "true";
+    const page = clamp(Math.max(1, Number(url.searchParams.get("page")) || 1), 1, 100);
+    const perPage = clamp(Number(url.searchParams.get("per_page")) || SIZE, 1, 50);
+    const sort = ["relevance", "date", "citations"].includes(url.searchParams.get("sort"))
+      ? url.searchParams.get("sort")
+      : "relevance";
+
+    const query = expandQuery(raw);
+
+    const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
+    const needTrial = !types || types.includes("trial");
+
+    const calls = [];
+    if (needLit) calls.push(fetchEpmc(query, { oa, indonesia, types, sort, perPage }));
+    if (needTrial) calls.push(fetchTrials(query, { oa, indonesia, types, sort, perPage }));
+
+    const settled = await Promise.allSettled(
+      calls.map((promise) => withTimeout(promise, TIMEOUT_MS)),
+    );
+
+    const results = [];
+    let total = 0;
+    const notes = [];
+    for (const item of settled) {
+      if (item.status === "fulfilled") {
+        results.push(...item.value.results);
+        total += item.value.total;
+      } else {
+        notes.push(item.reason instanceof Error ? item.reason.message : "sumber tidak merespons");
+      }
     }
 
-    const rawTypes = (url.searchParams.get("types") || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => TYPES.has(s));
+    results.sort(rankBy(sort));
 
-    const args = {
-      p_query: q.slice(0, 300),
-      p_types: rawTypes.length ? rawTypes : null,
-      p_year_min: intOrNull(url.searchParams.get("year_min")),
-      p_year_max: intOrNull(url.searchParams.get("year_max")),
-      p_oa: url.searchParams.get("oa") === "true",
-      p_indonesia: url.searchParams.get("indonesia") === "true",
-      p_sort: SORTS.has(url.searchParams.get("sort")) ? url.searchParams.get("sort") : "relevance",
-      p_limit: clamp(intOrNull(url.searchParams.get("per_page")) ?? 20, 1, 50),
-      p_offset: clamp(intOrNull(url.searchParams.get("page")) ?? 1, 1, 100000) - 1,
-    };
+    const totalUnique = results.length;
+    const paged = results.slice((page - 1) * perPage, page * perPage);
 
-    const data = await rpc(env, "fn_bioxip_search", args);
-    return json(data);
+    return json({
+      query: raw,
+      total: Math.max(total, totalUnique),
+      limit: perPage,
+      offset: (page - 1) * perPage,
+      mode: "live",
+      notes,
+      facets: facetsOf(paged),
+      results: paged,
+    });
   } catch (error) {
     return json({ error: error.message }, 500);
   }
 }
 
-function intOrNull(value) {
-  if (value === null || value === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.trunc(n) : null;
+async function fetchEpmc(query, filters) {
+  const params = new URLSearchParams({
+    query: epmcQuery(query, filters),
+    format: "json",
+    resultType: "core",
+    pageSize: String(SIZE),
+  });
+  if (filters.sort === "date") params.set("sort", "P_PDATE_D desc");
+  const resp = await fetch(`${EPMC}?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!resp.ok) throw new Error(`europepmc ${resp.status}`);
+  const data = await resp.json();
+  const hits = data.resultList?.result || [];
+  return {
+    total: Number(data.hitCount || 0),
+    results: hits.map(mapEpmcHit),
+  };
+}
+
+async function fetchTrials(query, filters) {
+  const params = new URLSearchParams({
+    "query.term": query,
+    pageSize: String(SIZE),
+    countTotal: "true",
+  });
+  const resp = await fetch(`${CT}?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!resp.ok) throw new Error(`clinicaltrials ${resp.status}`);
+  const data = await resp.json();
+  const studies = data.studies || [];
+  return {
+    total: Number(data.totalCount || 0),
+    results: studies.map(mapTrial),
+  };
+}
+
+function epmcQuery(raw, filters) {
+  let q = raw;
+  if (filters.oa) q = `${q} AND OPEN_ACCESS:y`;
+  if (filters.indonesia) q = `${q} AND AFF:"Indonesia"`;
+  if (filters.types && !filters.types.includes("paper") && filters.types.includes("preprint")) {
+    q = `${q} AND PUB_TYPE:"preprint"`;
+  }
+  if (filters.types && filters.types.includes("paper") && !filters.types.includes("preprint")) {
+    q = `${q} AND PUB_TYPE:"journal article"`;
+  }
+  return q;
+}
+
+function mapEpmcHit(hit) {
+  const isPreprint = hit.source === "PPR" || (hit.pubTypeList?.pubType || []).some((t) =>
+    String(t).toLowerCase().includes("preprint"),
+  );
+  const authors = (hit.authorList?.author || []).map((a) => {
+    const parts = String(a.fullName || "").trim().split(/\s+/);
+    return { given: parts[0] || "", family: parts.slice(1).join(" ") };
+  });
+  const pdf = (hit.fullTextUrlList?.urls || []).find(
+    (u) => String(u.documentStyle || "").toLowerCase() === "pdf",
+  );
+  const doi = hit.doi ? `doi:${hit.doi.toLowerCase()}` : null;
+  const identity = doi || (hit.pmid ? `pmid:${hit.pmid}` : `epmc:${hit.source}:${hit.id}`);
+  return {
+    id: `epmc|${identity}`,
+    doc_type: isPreprint ? "preprint" : "paper",
+    title: hit.title || "",
+    authors,
+    journal: hit.journalInfo?.journal?.title || null,
+    year: Number(hit.pubYear) || null,
+    published_on: hit.firstPublicationDate || null,
+    doi: hit.doi || null,
+    url: `https://europepmc.org/article/${hit.source}/${hit.id}`,
+    source: "europepmc",
+    oa: { is_oa: String(hit.isOpenAccess || "") === "Y", pdf_url: pdf?.url || null, provider: "europepmc" },
+    citation_count: Number(hit.citedByCount) || 0,
+    external_ids: { pmid: hit.pmid || null, pmcid: hit.pmcid || null, doi: hit.doi || null },
+  };
+}
+
+function mapTrial(study) {
+  const proto = study.protocolSection || {};
+  const ident = proto.identificationModule || {};
+  const status = proto.statusModule || {};
+  const design = proto.designModule || {};
+  const cond = proto.conditionsModule || {};
+  const posted = status.studyFirstPostDateStruct?.date || null;
+  const phase = design.phases || [];
+  return {
+    id: `ct|${ident.nctId}`,
+    doc_type: "trial",
+    title: ident.briefTitle || "",
+    authors: [],
+    journal: null,
+    year: posted ? Number(String(posted).slice(0, 4)) : null,
+    published_on: posted,
+    doi: null,
+    url: `https://clinicaltrials.gov/study/${ident.nctId}`,
+    source: "clinicaltrials",
+    oa: { is_oa: false, provider: "clinicaltrials" },
+    citation_count: 0,
+    meta: { phase, status: status.overallStatus, conditions: cond.conditions || [], nct_id: ident.nctId },
+    external_ids: { nctid: ident.nctId },
+  };
+}
+
+function rankBy(sort) {
+  if (sort === "date") {
+    return (a, b) => String(b.published_on || "").localeCompare(String(a.published_on || ""));
+  }
+  if (sort === "citations") {
+    return (a, b) => (b.citation_count || 0) - (a.citation_count || 0);
+  }
+  const order = { paper: 0, trial: 1, preprint: 2 };
+  return (a, b) => {
+    const ta = order[a.doc_type] ?? 3;
+    const tb = order[b.doc_type] ?? 3;
+    return ta - tb;
+  };
+}
+
+function facetsOf(rows) {
+  const type = {};
+  const source = {};
+  let oaCount = 0;
+  for (const r of rows) {
+    type[r.doc_type] = (type[r.doc_type] || 0) + 1;
+    source[r.source] = (source[r.source] || 0) + 1;
+    if (r.oa?.is_oa) oaCount++;
+  }
+  return { type, source, oa: oaCount };
+}
+
+function parseTypes(value) {
+  if (!value) return null;
+  const allowed = new Set(["paper", "preprint", "trial"]);
+  const types = value.split(",").map((s) => s.trim()).filter((s) => allowed.has(s));
+  return types.length ? types : null;
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]);
 }
 
 function clamp(n, min, max) {
   return Math.min(Math.max(n, min), max);
+}
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }

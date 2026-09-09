@@ -10,32 +10,17 @@
     document.title = `${window.BIOXIP.name} — ${window.BIOXIP.taglineID}`;
   }
 
-  function setHeader(q) {
-    const url = new URLSearchParams(location.hash.split("?")[1] || "");
-    const box = document.getElementById("q");
-    if (box && box.value === "") box.value = q;
-    if (url.get("indonesia") === "true") {
-      const el = document.getElementById("f-indonesia");
-      if (el) el.checked = true;
-    }
-    if (url.get("oa") === "true") {
-      const el = document.getElementById("f-oa");
-      if (el) el.checked = true;
-    }
-  }
-
   function homeHTML() {
     return `
       <section class="hero">
         <h1>Literatur medis dunia,<br/>untuk peneliti Indonesia.</h1>
-        <p class="muted">Cari paper, preprint, dan uji klinis internasional dengan Bahasa Indonesia.</p>
+        <p class="muted">Pencarian langsung ke Europe PMC (PubMed, preprint), ClinicalTrials.gov, PubChem, ChEMBL &amp; Open Targets.</p>
         <form id="search-form" class="searchbox">
           <input id="q" name="q" type="search" autocomplete="off"
                  placeholder="mis. obat diabetes untuk PCOS" aria-label="Pertanyaan riset" />
           <button type="submit">Cari</button>
         </form>
         <div class="quick">
-          <button class="btn ghost" data-sort="date">Terbaru dulu</button>
           <label class="check"><input type="checkbox" id="f-oa" /> Open Access saja</label>
           <label class="check"><input type="checkbox" id="f-indonesia" /> Penelitian Indonesia</label>
         </div>
@@ -45,8 +30,8 @@
         <div id="topics" class="topics"></div>
       </section>
       <section>
-        <h2>Indeks kami</h2>
-        <div id="stats" class="stats"><span class="muted">Memuat statistik…</span></div>
+        <h2>Sumber yang dijelajahi</h2>
+        <div id="stats" class="stats"><span class="muted">Memuat…</span></div>
       </section>`;
   }
 
@@ -64,11 +49,15 @@
       const resp = await fetch("/api/sources");
       if (!resp.ok) throw new Error();
       const data = await resp.json();
-      const total = (data.sources || []).reduce((sum, s) => sum + Number(s.active || 0), 0);
-      host.innerHTML = `<strong>${total.toLocaleString("id-ID")}</strong> dokumen aktif terindeks`;
+      const list = (data.sources || []).map((s) => s.name).join(", ");
+      host.innerHTML = `<span class="muted">Mode live — menjelajah langsung: ${thisEscape(list)}</span>`;
     } catch {
-      host.innerHTML = '<span class="muted">Statistik belum tersedia.</span>';
+      host.innerHTML = '<span class="muted">Sumber belum tersedia.</span>';
     }
+  }
+
+  function thisEscape(value) {
+    return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
 
   function searchFormHandler() {
@@ -79,8 +68,8 @@
       const q = document.getElementById("q").value.trim();
       if (!q) return;
       const params = new URLSearchParams();
-      if (document.getElementById("f-oa").checked) params.set("oa", "true");
-      if (document.getElementById("f-indonesia").checked) params.set("indonesia", "true");
+      if (document.getElementById("f-oa")?.checked) params.set("oa", "true");
+      if (document.getElementById("f-indonesia")?.checked) params.set("indonesia", "true");
       location.hash = `#/search?q=${encodeURIComponent(q)}&${params.toString()}`;
     });
   }
@@ -105,95 +94,73 @@
           <option value="citations" ${url.get("sort") === "citations" ? "selected" : ""}>Sitasi</option>
         </select></label>
       </div>
-      <div id="filters-tip" class="muted"></div>
       <div id="results"></div>
       <div id="pager"></div>`;
+  }
+
+  function currentFilters(url) {
+    const filters = { oa: url.get("oa") === "true", indonesia: url.get("indonesia") === "true", sort: url.get("sort") || "relevance", types: [] };
+    ["paper", "preprint", "trial"].forEach((t) => {
+      if (url.get(`f-${t}`) === "true") filters.types.push(t);
+    });
+    return filters;
   }
 
   async function runSearch() {
     const url = new URLSearchParams(location.hash.split("?")[1] || "");
     const q = url.get("q") || "";
     if (!q) return;
-    setHeader(q);
-    const filters = {
-      oa: url.get("oa") === "true",
-      indonesia: url.get("indonesia") === "true",
-      sort: url.get("sort") || "relevance",
-      types: [],
-    };
-    ["paper", "preprint", "trial"].forEach((t) => {
-      if (url.get(`f-${t}`) === "true") filters.types.push(t);
-    });
-    const page = Math.max(1, Number(url.get("page")) || 1);
+    const filters = currentFilters(url);
+    const page = 1;
     const host = document.getElementById("results");
-    host.innerHTML = '<p class="muted">Mencari…</p>';
+    host.innerHTML = '<p class="muted">Menelusuri sumber langsung…</p>';
     try {
       const data = await S.run(q, filters, page);
-      host.innerHTML = `<p class="muted">${Number(data.total || 0).toLocaleString("id-ID")} hasil untuk "${S.escape(q)}"</p>`;
+      const results = data.results || [];
+      const upstream = Number(data.total || 0);
+      const shownLine =
+        results.length && upstream > results.length
+          ? `Total ${upstream.toLocaleString("id-ID")} hasil di sumber — menampilkan ${results.length} teratas.`
+          : `${upstream.toLocaleString("id-ID")} hasil di sumber.`;
+      host.innerHTML = `<p class="muted">${S.escape(shownLine)}</p>`;
       host.insertAdjacentHTML(
         "beforeend",
-        (data.results || []).map((doc) => S.resultHTML(doc)).join("") ||
+        results.map((doc) => S.renderResult(doc)).join("") ||
           '<p class="muted">Tidak ada hasil. Coba kata lain atau filter lebih sedikit.</p>'
       );
-      pager(q, filters, data.total || 0, page);
+      host.insertAdjacentHTML("beforeend", S.renderNote(data));
     } catch (error) {
       host.innerHTML = `<p class="muted">${S.escape(error.message)}</p>`;
     }
   }
 
-  function pager(q, filters, total, page) {
-    const host = document.getElementById("pager");
-    const pages = Math.ceil(total / 20);
-    if (pages <= 1) {
-      host.innerHTML = "";
-      return;
-    }
-    let out = "";
-    if (page > 1) out += `<a href="${hashFor(q, filters, page - 1)}">‹ Sebelumnya</a>`;
-    if (page < pages) out += `<a href="${hashFor(q, filters, page + 1)}">Berikutnya ›</a>`;
-    host.innerHTML = out;
-  }
-
-  function hashFor(q, filters, page) {
-    const params = new URLSearchParams();
-    params.set("q", q);
-    if (filters.oa) params.set("oa", "true");
-    if (filters.indonesia) params.set("indonesia", "true");
-    if (filters.sort && filters.sort !== "relevance") params.set("sort", filters.sort);
-    if (filters.types && filters.types.length) {
-      filters.types.forEach((t) => params.set(`f-${t}`, "true"));
-    }
-    params.set("page", String(page));
-    return `#/search?${params.toString()}`;
-  }
-
   function sourcesHTML() {
-    return `<h1>Sumber data</h1><p class="muted">Kami mengindex metadata publikasi terbuka dan menautkan ke sumber aslinya.</p><div id="stats"></div>`;
+    return `<h1>Sumber data</h1><p class="muted">bioXip berjalan live: setiap pencarian menjelajah langsung koleksi upstream. Tidak ada salinan index lokal; tautan selalu ke sumber asli.</p><div id="stats"></div>`;
   }
 
   function legalHTML() {
     return `<h1>Kebijakan</h1>
       <p><a href="#/legal/sumber">Sumber data &amp; lisensi</a></p>
       <p><a href="#/legal/privasi">Privasi</a></p>
-      <p><a href="#/legal/hakcipta">Hak cipta &amp; DMCA</a></p>`;
+      <p><a href="#/legal/hakcipta">Hak cipta</a></p>`;
   }
 
   function legalDetail(slug) {
     const texts = {
       sumber: [
         "Sumber data & lisensi",
-        "bioXip menampilkan metadata dan abstrak dari Europe PMC (PubMed, bioRxiv, medRxiv, PMC), ClinicalTrials.gov, dan OpenAlex. Konten ditautkan ke sumber asli. Penggunaan tunduk pada ketentuan masing-masing penyedia. Jangan menyimpan atau mendistribusikan full-text non-open-access.",
+        "bioXip menampilkan hasil langsung dari Europe PMC (PubMed, bioRxiv, medRxiv, PMC), ClinicalTrials.gov, PubChem, ChEMBL, dan Open Targets. Konten ditautkan ke sumber asli; pengguna tunduk pada ketentuan masing-masing penyedia.",
       ],
       privasi: [
         "Privasi",
-        "Kami tidak memerlukan akun untuk mencari. Query dicatat secara agregat untuk meningkatkan kualitas. Kami tidak menjual data pribadi.",
+        "Tidak ada akun yang diperlukan untuk mencari. Query diproses langsung oleh penyedia sumber; kami tidak menyimpan riwayat pribadi.",
       ],
       hakcipta: [
-        "Hak cipta & DMCA",
-        "bioXip tidak meng-hosting artikel. Semua hak cipta artikel tetap pada pemegangnya. Laporan pelanggaran: lihat halaman kontak.",
+        "Hak cipta",
+        "bioXip tidak meng-hosting artikel. Hak cipta tetap pada pemegangnya. Laporan pelanggaran tersedia via halaman kontak.",
       ],
     };
-    const entry = texts[slug] || [slug, "Dokumen ini akan dilengkapi."];
+    const entry = texts[slug] || [slug, "Dokumen akan dilengkapi."];
     return `<h1>${entry[0]}</h1><p>${entry[1]}</p>`;
   }
 
@@ -201,10 +168,8 @@
     const raw = location.hash.slice(2) || "";
     const [pathPart, queryPart] = raw.split("?");
     const path = pathPart.split("/").filter(Boolean);
-    document.getElementById("drawer").hidden = true;
-    const q = (queryPart ? new URLSearchParams(queryPart).get("q") : "") || "";
 
-    if (path.length === 0 || path[0] === "") {
+    if (path.length === 0) {
       view.innerHTML = homeHTML();
       topicChips();
       stats();
@@ -233,16 +198,6 @@
 
   function globalEvents() {
     document.addEventListener("click", (event) => {
-      const open = event.target.closest("[data-open]");
-      if (open) {
-        event.preventDefault();
-        S.openDrawer(open.dataset.open);
-        return;
-      }
-      if (event.target.closest("[data-close-drawer]")) {
-        document.getElementById("drawer").hidden = true;
-        return;
-      }
       const copy = event.target.closest("[data-copy]");
       if (copy) {
         navigator.clipboard?.writeText(copy.dataset.copy).catch(() => {});
@@ -267,20 +222,21 @@
       current.delete("f-paper");
       current.delete("f-preprint");
       current.delete("f-trial");
-      if (document.getElementById("f-oa")?.checked) current.set("oa", "true");
-      if (document.getElementById("f-indonesia")?.checked) current.set("indonesia", "true");
-      if (document.getElementById("f-paper")?.checked) current.set("f-paper", "true");
-      if (document.getElementById("f-preprint")?.checked) current.set("f-preprint", "true");
-      if (document.getElementById("f-trial")?.checked) current.set("f-trial", "true");
+      current.delete("page");
+      const values = {
+        "f-oa": "oa",
+        "f-indonesia": "indonesia",
+        "f-paper": "f-paper",
+        "f-preprint": "f-preprint",
+        "f-trial": "f-trial",
+      };
+      for (const [id, param] of Object.entries(values)) {
+        if (document.getElementById(id)?.checked) current.set(param, "true");
+      }
       const sortEl = document.getElementById("f-sort");
       if (sortEl && sortEl.value !== "relevance") current.set("sort", sortEl.value);
       else current.delete("sort");
-      current.delete("page");
       location.hash = `#/search?${current.toString()}`;
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") document.getElementById("drawer").hidden = true;
     });
   }
 
