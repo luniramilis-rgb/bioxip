@@ -181,19 +181,23 @@ function buildExtractive(raw, pico, studies) {
     const sentences = splitSentences(study.abstract);
     const scored = sentences
       .map((sentence) => ({ sentence, score: scoreSentence(sentence, phrases) }))
-      .filter((item) => item.sentence.length >= 50 && item.score > 0)
+      .filter((item) => item.sentence.length >= 60 && item.score >= 3)
       .sort((a, b) => b.score - a.score);
-    const picked = scored.slice(0, study.study_type.includes("Uji klinis") ? 1 : 2);
+    const isTrial = /uji klinis/i.test(study.study_type);
+    const picked = scored.slice(0, isTrial ? 1 : 2);
     for (const item of picked) {
       blocks.push({ text: item.sentence, cites: [study.ref], study_type: study.study_type });
     }
-    if (blocks.length >= 10) break;
+    if (blocks.length >= 8) break;
   }
 
   if (!blocks.length) {
-    for (const study of studies.slice(0, 3)) {
-      const first = splitSentences(study.abstract)[0];
-      if (first && first.length >= 40) blocks.push({ text: first, cites: [study.ref], study_type: study.study_type });
+    for (const study of studies.slice(0, 4)) {
+      blocks.push({
+        text: `Studi terkait: ${study.title}`,
+        cites: [study.ref],
+        study_type: study.study_type,
+      });
     }
   }
 
@@ -202,8 +206,29 @@ function buildExtractive(raw, pico, studies) {
     `Tidak ada AI generatif yang dipakai di sini: ringkasan ini dikutip langsung dari kalimat ` +
     `abstrak ${studies.length} studi teratas (${formatCounts(counts)}). Setiap poin menautkan ke studinya.`;
 
-  return { intro, blocks: blocks.slice(0, 10) };
+  return { intro, blocks: blocks.slice(0, 8) };
 }
+
+const ADMIN_PATTERNS = [
+  "follow-up",
+  "will be",
+  "end of study",
+  "phone call",
+  "consent",
+  "inclusion criteria",
+  "exclusion criteria",
+  "eligible",
+  "enrolled",
+  "randomi[sz]ed to",
+  "registered",
+  "clinicaltrials.gov",
+  "ethics committee",
+  "written informed",
+  "primary endpoint is",
+  "this study aims",
+  "we describe",
+  "protocol",
+];
 
 function splitSentences(text) {
   return clean(text)
@@ -218,9 +243,12 @@ function scoreSentence(sentence, phrases) {
   for (const phrase of phrases) {
     if (phrase && lower.includes(phrase)) score += 2;
   }
-  const outcomes = ["effective", "efficacy", "significant", "reduced", "improved", "lower", "higher", "risk", "mortality", "safety", "outcome", "compared", "no difference", "non-inferior"];
+  const outcomes = ["effective", "efficacy", "significant", "reduced", "improved", "lower", "higher", "risk", "mortality", "safety", "outcome", "compared", "no difference", "non-inferior", "associated with", "results"];
   for (const word of outcomes) {
     if (lower.includes(word)) score += 1;
+  }
+  for (const pattern of ADMIN_PATTERNS) {
+    if (new RegExp(pattern).test(lower)) score -= 3;
   }
   return score;
 }
