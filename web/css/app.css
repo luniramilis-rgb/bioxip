@@ -255,6 +255,37 @@ h2 { margin-top: 1.6rem; font-size: 1.2rem; }
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+.balance-badge {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.balance-badge[data-state="empty"] { background: #fbeccb; color: #8a5a00; }
+.balance-badge[data-state="ready"] { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.balance-badge[data-state="expired"],
+.balance-badge[data-state="error"] { background: #f7d9d5; color: #9b2c1f; }
+
+.ai-panel { margin: 0.8rem 0 1.2rem; }
+.ai-panel .locked,
+.locked {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  background: var(--card);
+}
+#ai-text p { margin: 0.5rem 0; }
+.ai-cites { padding-left: 1.3rem; }
+.ai-cites li { margin: 0.35rem 0; }
+
+table.ledger { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table.ledger th, table.ledger td { border-bottom: 1px solid var(--line); padding: 0.5rem 0.4rem; text-align: left; }
+table.ledger td.pos { color: var(--accent); font-weight: 600; }
+table.ledger td.neg { color: #9b2c1f; font-weight: 600; }
+
 .chip.sev-high { background: #f7d9d5; color: #9b2c1f; }
 .chip.sev-moderate { background: #fbeccb; color: #8a5a00; }
 .chip.sev-low { background: var(--chip); color: var(--muted); }

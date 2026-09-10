@@ -118,10 +118,15 @@
   function resultsHTML() {
     const url = new URLSearchParams(location.hash.split("?")[1] || "");
     const q = url.get("q") || "";
+    const mode = url.get("mode") === "ai" ? "ai" : "search";
     return `
+      <div class="segmented" role="tablist" aria-label="Mode">
+        <button role="tab" class="${mode === "search" ? "active" : ""}" data-mode="search">Cari bukti · gratis</button>
+        <button role="tab" class="${mode === "ai" ? "active" : ""}" data-mode="ai">Tanya AI · saldo</button>
+      </div>
       <form id="search-form" class="searchbox compact">
         <input id="q" name="q" type="search" value="${S.escape(q)}" autocomplete="off" />
-        <button type="submit">Cari</button>
+        <button type="submit">${mode === "ai" ? "Siapkan AI" : "Cari"}</button>
       </form>
       <div class="quick">
         <label class="check"><input type="checkbox" id="f-oa" ${url.get("oa") === "true" ? "checked" : ""} /> OA</label>
@@ -138,8 +143,14 @@
           ${[20, 50, 100].map((n) => `<option value="${n}" ${Number(url.get("per_page")) === n ? "selected" : ""}>${n}</option>`).join("")}
         </select></label>
       </div>
+      ${mode === "ai" ? window.BIOXIP_AI.panelHTML() : ""}
       <div id="results"></div>
       <div id="pager"></div>`;
+  }
+
+  function currentMode() {
+    const url = new URLSearchParams(location.hash.split("?")[1] || "");
+    return url.get("mode") === "ai" ? "ai" : "search";
   }
 
   function currentFilters(url) {
@@ -276,7 +287,18 @@
     } else if (path[0] === "search") {
       view.innerHTML = resultsHTML();
       searchFormHandler();
-      runSearch();
+      if (currentMode() === "ai") {
+        const q = new URLSearchParams(queryPart || "").get("q") || "";
+        window.BIOXIP_AI.prepare(q, view);
+      } else {
+        runSearch();
+      }
+    } else if (path[0] === "saldo") {
+      view.innerHTML = window.BIOXIP_SALDO.pageHTML();
+      window.BIOXIP_SALDO.load();
+      window.BIOXIP_CREDITS.refreshBadge();
+    } else if (path[0] === "harga") {
+      view.innerHTML = hargaHTML();
     } else if (path[0] === "answer") {
       const A = window.BIOXIP_ANSWER;
       const q = new URLSearchParams(queryPart || "").get("q") || "";
@@ -315,6 +337,16 @@
 
   function globalEvents() {
     document.addEventListener("click", (event) => {
+      const modeButton = event.target.closest("[data-mode]");
+      if (modeButton) {
+        const current = new URLSearchParams(location.hash.split("?")[1] || "");
+        const mode = modeButton.dataset.mode;
+        if (mode === "ai") current.set("mode", "ai");
+        else current.delete("mode");
+        current.delete("page");
+        location.hash = `#/search?${current.toString()}`;
+        return;
+      }
       const copy = event.target.closest("[data-copy]");
       if (copy) {
         copyText(copy.dataset.copy);
@@ -368,8 +400,30 @@
     if (!path.length) return "home";
     if (path[0] === "search" || path[0] === "topic") return "home";
     if (path[0] === "interactions") return "drug";
-    if (["answer", "drug", "sources", "legal"].includes(path[0])) return path[0];
+    if (path[0] === "harga") return "saldo";
+    if (["answer", "drug", "saldo", "sources", "legal"].includes(path[0])) return path[0];
     return "home";
+  }
+
+  function hargaHTML() {
+    const paket = [50_000, 100_000, 150_000, 500_000];
+    return `
+      <section class="answer-head">
+        <h1>Paket saldo</h1>
+        <p class="muted">Saldo dalam Rupiah, tanpa kedaluwarsa, tanpa bonus (1:1). Pencarian & data gratis; saldo hanya untuk AI.</p>
+      </section>
+      <section class="answer-card">
+        <h3>Pilih paket</h3>
+        <ul class="answer-list">
+          ${paket.map((amount) => `<li><strong>${esc(window.BIOXIP_CREDITS.formatIdr(amount))}</strong></li>`).join("")}
+        </ul>
+        <p class="muted">Pembayaran QRIS, Virtual Account, dan e-wallet (Xendit) sedang disiapkan.</p>
+        <p class="actions"><a class="btn small ghost" href="#/saldo">Lihat saldo & riwayat</a></p>
+      </section>
+      <section class="answer-card">
+        <h3>Cara biaya dihitung</h3>
+        <p class="muted">Biaya per permintaan AI dihitung dari tarif DeepSeek (input cache hit/miss + output) dikali markup 12×, dibulatkan ke atas ke Rp1 dengan minimum Rp100. Estimasi selalu tampil sebelum Anda menekan tombol Tanya AI.</p>
+      </section>`;
   }
 
   function markNav(name) {
@@ -432,5 +486,8 @@
   registerServiceWorker();
   globalEvents();
   window.addEventListener("hashchange", route);
-  loadTopics().finally(route);
+  loadTopics().finally(() => {
+    route();
+    window.BIOXIP_CREDITS?.refreshBadge?.();
+  });
 })();

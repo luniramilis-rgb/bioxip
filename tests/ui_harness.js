@@ -105,6 +105,14 @@ const INTER_PAYLOAD = {
 };
 
 async function fetchStub(url) {
+  if (url.includes("/api/credits/") || url.includes("/api/ai/")) {
+    return {
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "unauthorized" }),
+      text: async () => JSON.stringify({ error: "unauthorized" }),
+    };
+  }
   const body = url.includes("/api/answer")
     ? ANSWER_PAYLOAD
     : url.includes("/api/search")
@@ -139,7 +147,7 @@ sandbox.globalThis = sandbox;
 
 vm.createContext(sandbox);
 
-const files = ["js/brand.js", "js/topics.js", "js/search.js", "js/answer.js", "js/drug.js", "js/interactions.js", "js/app.js"];
+const files = ["js/brand.js", "js/topics.js", "js/search.js", "js/answer.js", "js/drug.js", "js/interactions.js", "js/credits.js", "js/ai.js", "js/saldo.js", "js/app.js"];
 for (const file of files) {
   const code = fs.readFileSync(path.join(ROOT, file), "utf8");
   vm.runInContext(code, sandbox, { filename: file });
@@ -184,6 +192,26 @@ async function dispatchHash(hash) {
   results.push(["interactions: obat diperiksa", inter.includes("Metronidazol") && inter.includes("RxCUI")]);
   results.push(["interactions: pasangan terkurasi + severity", inter.includes("Interaksi terkurasi") && inter.includes("tinggi") && inter.includes("Pantau INR")]);
   results.push(["interactions: kutipan label", inter.includes("Disebutkan di label") && inter.includes("Kutipan label")]);
+
+  await dispatchHash("#/search?q=dengue&mode=ai");
+  const view = registry.get("view").innerHTML;
+  results.push(
+    ["mode: segmented gratis vs AI", view.includes("data-mode=\"search\"") && view.includes("data-mode=\"ai\"")],
+  );
+  results.push(["mode AI: panel tampil", view.includes('id="ai-panel"')]);
+  const aiAsk = registry.get("ai-ask")?.innerHTML || "";
+  results.push(
+    ["mode AI: terkunci tanpa akun", aiAsk.includes("memerlukan akun") || aiAsk.includes("Masuk")],
+  );
+
+  await dispatchHash("#/saldo");
+  const saldo = registry.get("saldo-body")?.innerHTML || "";
+  results.push(["saldo: halaman render", saldo.includes("Belum masuk") || saldo.includes("Saldo")]);
+  results.push(["saldo: catatan gratis tetap jalan", saldo.includes("gratis") || saldo.includes("Belum masuk")]);
+
+  await dispatchHash("#/harga");
+  const harga = registry.get("view").innerHTML;
+  results.push(["harga: paket tampil", harga.includes("50.000") && harga.includes("500.000")]);
 
   let failed = 0;
   for (const [name, ok] of results) {

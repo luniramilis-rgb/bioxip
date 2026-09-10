@@ -20,9 +20,11 @@
       <a href="#/" data-route="home">Cari</a>
       <a href="#/answer" data-route="answer">Jawaban PICO</a>
       <a href="#/drug" data-route="drug">Obat</a>
+      <a href="#/saldo" data-route="saldo">Saldo</a>
       <a href="#/sources" data-route="sources">Sumber</a>
       <a href="#/legal" data-route="legal">Kebijakan</a>
     </nav>
+    <span id="balance-badge" class="balance-badge" data-state="anonymous">Saldo: —</span>
   </header>
 
   <main id="view" tabindex="-1"></main>
@@ -42,8 +44,8 @@
     <a href="#/" data-route="home"><span aria-hidden="true">⌕</span>Cari</a>
     <a href="#/answer" data-route="answer"><span aria-hidden="true">✦</span>Jawaban</a>
     <a href="#/drug" data-route="drug"><span aria-hidden="true">⬡</span>Obat</a>
+    <a href="#/saldo" data-route="saldo"><span aria-hidden="true">Rp</span>Saldo</a>
     <a href="#/sources" data-route="sources"><span aria-hidden="true">◈</span>Sumber</a>
-    <a href="#/legal" data-route="legal"><span aria-hidden="true">§</span>Kebijakan</a>
   </nav>
 
   <div id="sheet-backdrop" class="sheet-backdrop" hidden></div>
@@ -58,6 +60,9 @@
   <script src="/js/answer.js"></script>
   <script src="/js/drug.js"></script>
   <script src="/js/interactions.js"></script>
+  <script src="/js/credits.js"></script>
+  <script src="/js/ai.js"></script>
+  <script src="/js/saldo.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
