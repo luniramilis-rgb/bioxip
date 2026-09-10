@@ -242,6 +242,12 @@
       view.innerHTML = A.pageHTML(q);
       A.formHandler();
       A.load(q);
+    } else if (path[0] === "drug") {
+      const D = window.BIOXIP_DRUG;
+      const q = new URLSearchParams(queryPart || "").get("q") || "";
+      view.innerHTML = D.pageHTML(q);
+      D.formHandler();
+      D.load(q);
     } else if (path[0] === "topic") {
       const topic = TOPICS.find((t) => t.slug === path[1]);
       if (topic) {
@@ -307,7 +313,7 @@
   function navNameFor(path) {
     if (!path.length) return "home";
     if (path[0] === "search" || path[0] === "topic") return "home";
-    if (["answer", "sources", "legal"].includes(path[0])) return path[0];
+    if (["answer", "drug", "sources", "legal"].includes(path[0])) return path[0];
     return "home";
   }
 

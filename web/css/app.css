@@ -256,6 +256,7 @@ details.accordion summary {
   font-size: 0.85rem;
 }
 .chip-btn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+a.chip-btn { text-decoration: none; display: inline-block; }
 
 .pico { margin: 0.4rem 0 0.6rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
