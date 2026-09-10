@@ -20,7 +20,7 @@ Terkait: `docs/credits.md` (§14 auth, §15 data) dan `docs/plan.md` (Sprint 1).
 | **Jangan tampilkan harga berbeda di onboarding** | Menghindari kesan diskriminatif; kumpulkan data dulu |
 | **Honor-based segmentasi** | Verifikasi (email institusi/STR/NIM) menyusul, jangan jadi gerbang |
 | **Consent singkat (UU PDP)** | Wajib transparan; jangan menyembunyikan pemakaian data |
-| **Google dominan, Apple opsional** | Gunakan Google OAuth utama + magic link; Apple ditambah hanya bila ada app iOS kelak |
+| **Google dominan; tanpa Apple** | Google OAuth + magic link/OTP; Apple dibatalkan (biaya & relay email) |
 
 ## 3. Alur onboarding (3 kartu + 1 baris consent)
 ```
@@ -94,18 +94,19 @@ Aturan tampilan:
 
 > Catatan penting: karena AI berbayar dan tanpa trial, **wajib ada contoh hasil statis** (snapshot dari golden set yang sudah divalidasi) agar pengguna merasakan nilai sebelum membayar. Snapshot ini diambil dari pertanyaan yang sama saat golden set dibuat (Sprint 4), ditandai tanggal & sumber, dan **tidak pernah** menampilkan jawaban yang belum diverifikasi.
 
-### 4.1 Setelah contoh hasil tampil → dorong berbagi (loop pertumbuhan)
-Sesuai `docs/principles.md` §4/§6, setiap contoh hasil dan jawaban nyata punya:
-1. **Tombol bagikan** (Web Share API; fallback tombol WhatsApp/Instagram/Threads/X).
-2. **Teks siap-kirim** + tautan **publik** (halaman topik / snapshot jawaban publik) — bukan tautan halaman dalam login.
-3. **Kartu gambar** yang dirender di klien untuk IG/Story (tanpa tautan yang bisa diklik di caption → sediakan "salin tautan").
-4. Tautan ber-`?ref=<hash>&utm_source=<kanal>` untuk mengukur **K-factor**.
-5. Snapshot publik menampilkan jawaban + sitasi + atribusi "dibuat dengan bioXip" (opsional; hanya bila pengguna memilih "bagikan publik").
+### 4.1 Setelah contoh hasil tampil → dorong berbagi (fondasi sekarang, integrasi ditunda)
+Sesuai `docs/principles.md` §4, yang **dikerjakan sekarang** hanya fondasi murah:
+1. **Tombol "Salin tautan"** pada contoh hasil & drug card.
+2. **Halaman topik publik** sebagai tujuan tautan (aman dibagikan tanpa login).
+3. **OG tags + gambar 1200×630** agar preview tautan rapi.
+
+**Ditunda ke backlog** (setelah sistem dasar stabil): Web Share API, tombol eksplisit WhatsApp/IG/Threads/X, kartu gambar share, `share_target` PWA, snapshot jawaban publik (opt-in), dan pelacakan rujukan `?ref=`/K-factor.
 
 ### 4.2 Auth & lingkungan mobile
-- Penyedia masuk: **Google OAuth** + **Apple Sign In** + **magic link** (cadangan).
-- **In-app browser** (Instagram/Facebook/TikTok/Line) memblokir OAuth Google/Apple → deteksi UA dan tampilkan layar "Buka di Chrome/Safari" + tombol salin tautan.
-- Apple "Hide My Email" → jangan andalkan email untuk komunikasi; sediakan email kontak terpisah (opsional) atau notifikasi in-app.
+- Penyedia masuk: **Google OAuth** + **magic link/OTP email**. (**Apple Sign In tidak dipakai**.)
+- **In-app browser** (Instagram/Facebook/TikTok/Line) memblokir OAuth Google → deteksi UA dan tampilkan layar "Buka di Chrome/Safari" + tombol salin tautan.
+- **Keterkiriman email**: domain pengirim + SPF/DKIM; sediakan **OTP 6 digit** sebagai cadangan bila magic link gagal dibuka.
+- Tombol **Salin tautan** tersedia pada contoh hasil (fondasi berbagi); integrasi kanal share ditunda ke backlog.
 
 ## 5. Spesifikasi data (ringkas)
 Tabel `profiles` (baru, melengkapi `credit_accounts`):

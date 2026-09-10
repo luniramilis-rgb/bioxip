@@ -33,26 +33,20 @@ Deliverable:
 - **Preview 3 hasil** + CTA "Masuk untuk melihat semua" pada halaman hasil.
 - Rate limit magic link per email/IP + Turnstile pada form masuk.
 - **Layar "buka di browser"** untuk in-app browser (Instagram/FB/TikTok/Line) — sesuai `docs/principles.md` §5.
-- **Tombol bagikan dasar** (Web Share API + fallback WhatsApp) di hasil & drug card + OG tags.
+- **Fondasi berbagi (murah, wajib sekarang)**: halaman publik sebagai tujuan tautan, **OG tags + gambar 1200×630**, dan tombol **Salin tautan**. (Integrasi kanal share ditunda ke backlog.)
 
-Env baru: `SUPABASE_JWT_SECRET` (verifikasi), `GOOGLE_OAUTH_*` (di Supabase), `TURNSTILE_*`.
-Validasi: `scripts/validate_auth.js` (401 tanpa token, 200 dengan token uji; onboarding tersimpan), `ui_harness.js` diperluas (halaman masuk, gate hasil, preview 3, tombol bagikan).
-DoD: pengunjung bisa melihat halaman topik & 3 hasil; setelah login mendapat hasil penuh + profil tersimpan; tautan berbagi mengarah ke halaman publik.
+Env baru: `SUPABASE_JWT_SECRET` (verifikasi), `GOOGLE_OAUTH_*` (di Supabase), `SMTP_*` untuk magic link/OTP, `TURNSTILE_*`.
+Validasi: `scripts/validate_auth.js` (401 tanpa token, 200 dengan token uji; onboarding tersimpan), `ui_harness.js` diperluas (halaman masuk, gate hasil, preview 3, salin tautan).
+DoD: pengunjung bisa melihat halaman topik & 3 hasil; setelah login mendapat hasil penuh + profil tersimpan; tautan yang disalin mengarah ke halaman publik.
 
-## Sprint 1.5 — Apple Sign In + loop berbagi (pertumbuhan)
-**Tujuan:** melengkapi kanal masuk & menjadikan berbagi sebagai mesin akuisisi.
-Prasyarat: Sprint 1 stabil; **Apple Developer Program** aktif.
-
-Deliverable:
-- **Apple Sign In** (Service ID, key, verifikasi domain) + penanganan "Hide My Email".
-- **Kartu gambar share** (canvas/SVG di klien) untuk Instagram/Story.
-- **Snapshot jawaban publik** (opt-in pengguna): jawaban + sitasi + atribusi, read-only.
+## Backlog Pertumbuhan (DITUNDA — setelah sistem dasar stabil)
+Dipindahkan dari Sprint 1.5 sesuai keputusan 2026-09-10. Isi:
+- **Web Share API** + tombol eksplisit WhatsApp/Instagram/Threads/X.
+- **Kartu gambar share** (canvas/SVG) untuk Instagram/Story.
 - **`share_target` PWA**: membagikan tautan dari aplikasi lain → masuk ke bioXip.
-- **Pelacakan rujukan**: `?ref=&utm_source=`, event `share_clicked`/`ref_signup`, hitung **K-factor**.
-- Tombol bagikan di: hasil pencarian, jawaban AI, drug card, halaman topik.
-
-Validasi: `ui_harness.js` (share sheet fallback, snapshot publik, share_target), `validate_api.js` (halaman snapshot publik 200 tanpa login).
-DoD: 1 tautan dibagikan dari HP → penerima melihat halaman publik tanpa login → mendaftar (rujukan tercatat).
+- **Snapshot jawaban publik** (opt-in, dengan atribusi) — menunggu AI stabil & review klinis.
+- **Pelacakan rujukan** `?ref=&utm_source=` + perhitungan **K-factor**.
+Syarat mulai: Sprint 1–5 stabil (auth, search, ledger, AI, UI) dan ada trafik nyata untuk diukur.
 
 ## Sprint 2 — PubMed E-utilities (gratis, dampak besar)
 **Tujuan:** literatur kedokteran lebih presisi & terverifikasi; tanpa biaya AI.
@@ -142,15 +136,16 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 | # | Keputusan | Dibutuhkan di |
 |---|---|---|
 | 1 | Google OAuth (buat OAuth client di Google Cloud) + konfigurasi Supabase Auth | Sprint 1 |
-| 2 | NCBI API key (gratis) untuk PubMed E-utilities | Sprint 2 |
-| 3 | Simpan chunk korpus atau retrieval live untuk AI | Sprint 8 (dapat ditunda) |
-| 4 | Kanal Xendit mana yang diaktifkan lebih dulu (QRIS/VA/e-wallet) | Sprint 7 |
-| 5 | Batas rate limit AI per user (`RATE_LIMIT_RPM`) | Sprint 5 |
+| 2 | **SMTP pengirim** (domain + SPF/DKIM) untuk magic link/OTP | Sprint 1 |
+| 3 | NCBI API key (gratis) untuk PubMed E-utilities | Sprint 2 |
+| 4 | Simpan chunk korpus atau retrieval live untuk AI | Sprint 8 (dapat ditunda) |
+| 5 | Kanal Xendit mana yang diaktifkan lebih dulu (QRIS/VA/e-wallet) | Sprint 7 |
+| 6 | Batas rate limit AI per user (`RATE_LIMIT_RPM`) | Sprint 5 |
 
 ## Checklist validasi per sprint (ringkas)
 | Sprint | Validasi otomatis | Validasi manual |
 |---|---|---|
-| 1 Auth+gating | `validate_auth.js` + `ui_harness.js` (gate & preview) | uji login Google + magic link di HP |
+| 1 Auth+gating | `validate_auth.js` + `ui_harness.js` (gate, preview, salin tautan) | uji login Google + magic link/OTP di HP (termasuk in-app browser) |
 | 2 PubMed | `validate_pubmed.js` + `validate_api.js` | spot-check 10 query oleh Anda |
 | 3 Ledger | `validate_credits.js` + rekonsiliasi | simulasi admin top-up |
 | 4 Grounded | `validate_grounded.js` (golden 30) | review apoteker/dokter |
