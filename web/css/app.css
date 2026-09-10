@@ -239,6 +239,10 @@ h2 { margin-top: 1.6rem; font-size: 1.2rem; }
 }
 .safety p { margin: 0.35rem 0; }
 
+.chip.sev-high { background: #f7d9d5; color: #9b2c1f; }
+.chip.sev-moderate { background: #fbeccb; color: #8a5a00; }
+.chip.sev-low { background: var(--chip); color: var(--muted); }
+
 details.accordion {
   border: 1px solid var(--line);
   border-radius: 12px;

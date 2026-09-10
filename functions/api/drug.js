@@ -138,35 +138,62 @@ async function fetchLabel(drug, rxnorm) {
     attempts.push(`openfda.generic_name:"${candidate}"`);
     attempts.push(`openfda.substance_name:"${candidate}"`);
   }
+  let best = null;
+  let matchedTerm = null;
   for (const search of attempts) {
     const resp = await fetch(
-      `${OPENFDA}?search=${encodeURIComponent(search)}&limit=1`,
+      `${OPENFDA}?search=${encodeURIComponent(search)}&limit=10`,
       { signal: AbortSignal.timeout(TIMEOUT_MS) },
     );
     if (!resp.ok) continue;
     const data = await resp.json();
-    const result = data.results?.[0];
-    if (!result) continue;
-    const source = result.openfda?.spl_set_id?.[0]
-      ? `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${result.openfda.spl_set_id[0]}`
-      : `${OPENFDA}?search=${encodeURIComponent(search)}`;
-    const fields = {};
+    const results = data.results || [];
+    if (!results.length) continue;
+    const merged = mergeLabels(results);
+    if (!best || Object.keys(merged.fields).length > Object.keys(best.fields).length) {
+      best = merged;
+      matchedTerm = candidateFrom(search);
+    }
+    if (Object.keys(best.fields).length >= LABEL_FIELDS.length) break;
+  }
+  if (!best || Object.keys(best.fields).length === 0) {
+    return { available: false, source: OPENFDA, fields: {}, tried: candidates };
+  }
+  return {
+    available: true,
+    matched_term: matchedTerm,
+    label_count: best.count,
+    effective_time: best.effective_time,
+    source: best.source,
+    source_name: "openFDA / DailyMed drug label",
+    lang: "en",
+    fields: best.fields,
+  };
+}
+
+function mergeLabels(results) {
+  const fields = {};
+  let effectiveTime = null;
+  let source = OPENFDA;
+  for (const result of results) {
+    const setid = result.openfda?.spl_set_id?.[0];
+    const src = setid
+      ? `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${setid}`
+      : OPENFDA;
+    if (result.effective_time && (!effectiveTime || result.effective_time > effectiveTime)) {
+      effectiveTime = result.effective_time;
+    }
     for (const [key, fdaKey] of LABEL_FIELDS) {
       const value = join(result[fdaKey]);
-      if (value) fields[key] = buildField(value, source);
+      if (!value) continue;
+      const existing = fields[key];
+      if (!existing || value.length > existing.text.length) {
+        fields[key] = buildField(value, src);
+        if (key === "indikasi") source = src;
+      }
     }
-    if (Object.keys(fields).length === 0) continue;
-    return {
-      available: true,
-      matched_term: candidateFrom(search),
-      effective_time: result.effective_time || null,
-      source,
-      source_name: "openFDA / DailyMed drug label",
-      lang: "en",
-      fields,
-    };
   }
-  return { available: false, source: OPENFDA, fields: {}, tried: candidates };
+  return { fields, count: results.length, effective_time: effectiveTime, source };
 }
 
 function candidateFrom(search) {

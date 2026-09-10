@@ -114,6 +114,7 @@
         <p class="actions">
           <a class="btn small" target="_blank" rel="noopener"
              href="https://wa.me/?text=${encodeURIComponent(shareText)}">Bagikan ke WhatsApp</a>
+          <a class="btn small ghost" href="#/interactions?q=${encodeURIComponent(drug.name)}">Cek interaksi</a>
           <button class="btn small ghost" data-copy="${esc(shareText)}">Salin ringkasan</button>
         </p>
       </section>
