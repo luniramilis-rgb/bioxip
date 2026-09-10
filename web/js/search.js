@@ -40,6 +40,7 @@ window.BIOXIP_SEARCH = {
         <p class="actions">
           ${doc.oa && doc.oa.pdf_url ? `<a class="btn small" target="_blank" rel="noopener" href="${this.safeUrl(doc.oa.pdf_url)}">PDF</a>` : ""}
           ${doc.url ? `<a class="btn small ghost" target="_blank" rel="noopener" href="${this.safeUrl(doc.url)}">Buka sumber</a>` : ""}
+          ${doc.url ? `<button class="btn small ghost" data-copy-link="${this.escape(doc.url)}">Salin tautan</button>` : ""}
           <button class="btn small ghost" data-copy="${this.escape(citeOf(doc))}">Salin sitasi</button>
         </p>
       </article>`;

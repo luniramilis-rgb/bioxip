@@ -24,6 +24,12 @@ jobs:
       - name: Validasi tabel interaksi
         run: node scripts/validate_interactions.js
 
+      - name: Validasi data topik publik
+        run: node scripts/validate_topics.js
+
+      - name: Halaman topik tidak basi (build --check)
+        run: node scripts/build_topics.js --check
+
       - name: Validasi render UI (harness)
         run: node tests/ui_harness.js
       - name: Cek sintaks JS (functions + web)

@@ -14,6 +14,8 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 - `node scripts/validate_drugs.js` — struktur katalog obat + ATC
 - `node scripts/validate_monitoring.js` — kelengkapan monitoring 30 obat
 - `node scripts/validate_interactions.js` — tabel interaksi + severity
+- `node scripts/validate_topics.js` — data topik + halaman statis (meta/JSON-LD/disclaimer)
+- `node scripts/build_topics.js` — bangun halaman topik; `--check` untuk CI (deteksi file basi)
 - `node tests/ui_harness.js` — render UI (search/answer/drug/interactions)
 - `node scripts/validate_rxnorm.js` — pemetaan RxNorm 30 nama
 - `node scripts/validate_api.js` — kontrak API production (butuh jaringan)

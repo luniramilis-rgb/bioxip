@@ -1,1 +1,15 @@
-/
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://bioxip.pages.dev/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/tb/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/dbd/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/stunting/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/malaria/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/kesehatan-ibu/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/diabetes/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/hipertensi/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/hiv/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/imunisasi/</loc><priority>0.8</priority></url>
+  <url><loc>https://bioxip.pages.dev/topik/mental/</loc><priority>0.8</priority></url>
+</urlset>

@@ -1,7 +1,7 @@
 (() => {
   const S = window.BIOXIP_SEARCH;
   const view = document.getElementById("view");
-  const TOPICS = window.BIOXIP_TOPICS || [];
+  let TOPICS = window.BIOXIP_TOPICS || [];
   const MAX_PAGES = 5;
 
   const nav = { key: null, pages: [], cursors: null, upstream: 0 };
@@ -43,8 +43,49 @@
     const host = document.getElementById("topics");
     if (!host) return;
     host.innerHTML = TOPICS.map(
-      (t) => `<a class="topic" href="#/search?q=${encodeURIComponent(t.query)}">${t.label}<small>${t.desc}</small></a>`
+      (t) => `<a class="topic" href="#/search?q=${encodeURIComponent(t.query)}">${esc(t.label)}<small>${esc(t.desc)}</small></a>`
     ).join("");
+  }
+
+  async function loadTopics() {
+    try {
+      const resp = await fetch("/data/topics.json");
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (Array.isArray(data.topics) && data.topics.length) TOPICS = data.topics;
+    } catch {
+      /* pakai daftar bawaan */
+    }
+  }
+
+  function copyText(value) {
+    if (!value) return;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(value).catch(() => fallbackCopy(value));
+      return;
+    }
+    fallbackCopy(value);
+  }
+
+  function fallbackCopy(value) {
+    const area = document.createElement("textarea");
+    area.value = value;
+    document.body.appendChild(area);
+    area.select();
+    try {
+      document.execCommand("copy");
+    } catch {
+      /* abaikan */
+    }
+    area.remove();
+  }
+
+  function showToast(message) {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 1800);
   }
 
   async function stats() {
@@ -276,7 +317,14 @@
     document.addEventListener("click", (event) => {
       const copy = event.target.closest("[data-copy]");
       if (copy) {
-        navigator.clipboard?.writeText(copy.dataset.copy).catch(() => {});
+        copyText(copy.dataset.copy);
+        showToast("Disalin");
+        return;
+      }
+      const copyLink = event.target.closest("[data-copy-link]");
+      if (copyLink) {
+        copyText(copyLink.dataset.copyLink || location.href);
+        showToast("Tautan disalin");
         return;
       }
     });
@@ -384,5 +432,5 @@
   registerServiceWorker();
   globalEvents();
   window.addEventListener("hashchange", route);
-  route();
+  loadTopics().finally(route);
 })();

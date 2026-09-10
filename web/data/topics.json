@@ -1,0 +1,225 @@
+{
+  "topics": [
+    {
+      "slug": "tb",
+      "label": "Tuberkulosis (TB)",
+      "query": "tuberculosis treatment OR diagnosis OR resistance",
+      "desc": "Bukti terkini untuk diagnosis, terapi, dan resistensi TB.",
+      "intro": "Tuberkulosis masih menjadi salah satu beban penyakit menular terbesar di Indonesia. Halaman ini merangkum tema bukti utama yang paling sering dicari klinisi dan peneliti, beserta tautan ke sumber resmi dan pencarian literatur.",
+      "points": [
+        "Pedoman terapi TB mengikuti skema berbasis bukti yang disesuaikan dengan status resistensi dan kondisi khusus (kehamilan, HIV, gangguan hati).",
+        "Uji cepat molekuler berperan besar dalam deteksi dini, termasuk penentuan resistensi terhadap obat utama.",
+        "Kepatuhan dan dukungan pengobatan (termasuk pengawas menelan obat) menentukan keberhasilan tata laksana.",
+        "TB laten, TB pada anak, dan TB ekstraparu memerlukan pendekatan diagnosis yang berbeda."
+      ],
+      "sources": [
+        { "name": "WHO — Tuberculosis", "url": "https://www.who.int/health-topics/tuberculosis" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" },
+        { "name": "Fornas (e-Fornas Kemenkes)", "url": "https://e-fornas.kemkes.go.id/guest/daftar-obat" }
+      ],
+      "questions": [
+        "Bagaimana rekomendasi terapi TB pada pasien dengan gangguan fungsi hati?",
+        "Apa bukti terbaru efektivitas paduan jangka pendek untuk TB sensitif obat?",
+        "Bagaimana pendekatan diagnosis TB pada anak dan TB ekstraparu?"
+      ]
+    },
+    {
+      "slug": "dbd",
+      "label": "Demam Berdarah Dengue (DBD)",
+      "query": "dengue prevention OR management OR severe dengue",
+      "desc": "Pencegahan, tata laksana, dan peringatan dini dengue berat.",
+      "intro": "Dengue banyak ditemukan di daerah tropis termasuk Indonesia, dengan spektrum mulai dari demam ringan hingga dengue berat. Bukti terbaru menekankan deteksi tanda peringatan dini dan tata laksana cairan yang tepat.",
+      "points": [
+        "Pemantauan tanda peringatan (warning signs) menjadi kunci untuk mencegah progresi ke dengue berat.",
+        "Tata laksana cairan disesuaikan dengan fase penyakit dan status hemodinamik.",
+        "Pengendalian vektor dan pemberantasan sarang nyamuk tetap menjadi dasar pencegahan.",
+        "Vaksin dengue tersedia dengan rekomendasi yang bergantung pada riwayat infeksi dan kelompok usia."
+      ],
+      "sources": [
+        { "name": "WHO — Dengue and severe dengue", "url": "https://www.who.int/health-topics/dengue-and-severe-dengue" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Apa tanda peringatan yang memerlukan pemantauan ketat pada dengue?",
+        "Bagaimana panduan pemberian cairan pada dengue dengan syok?",
+        "Apa bukti terbaru efektivitas dan keamanan vaksin dengue?"
+      ]
+    },
+    {
+      "slug": "stunting",
+      "label": "Stunting & Gizi Anak",
+      "query": "stunting prevention OR child growth OR nutrition intervention",
+      "desc": "Intervensi gizi dan pencegahan stunting berbasis bukti.",
+      "intro": "Stunting mencerminkan kekurangan gizi kronis dan berdampak jangka panjang pada pertumbuhan serta perkembangan anak. Intervensi paling berdampak terjadi pada 1.000 hari pertama kehidupan.",
+      "points": [
+        "Intervensi gizi spesifik (ASI, MP-ASI, suplementasi mikronutrien) dan sensitif (sanitasi, air bersih) harus berjalan bersama.",
+        "Pemantauan pertumbuhan rutin di posyandu membantu deteksi dini penyimpangan.",
+        "Suplementasi zat besi dan vitamin A menjadi bagian program gizi anak di Indonesia.",
+        "Edukasi gizi ibu dan keluarga meningkatkan keberhasilan intervensi."
+      ],
+      "sources": [
+        { "name": "WHO — Child health", "url": "https://www.who.int/health-topics/child-health" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Intervensi gizi apa yang paling berdampak mencegah stunting?",
+        "Bagaimana peran suplementasi mikronutrien pada anak?",
+        "Apa bukti efektivitas program posyandu terhadap pertumbuhan anak?"
+      ]
+    },
+    {
+      "slug": "malaria",
+      "label": "Malaria",
+      "query": "malaria treatment OR elimination OR prevention",
+      "desc": "Diagnosis, tata laksana, dan eliminasi malaria.",
+      "intro": "Malaria masih menjadi masalah kesehatan di sejumlah wilayah Indonesia, terutama Indonesia timur. Diagnosis cepat dan terapi tepat menjadi kunci untuk mencegah malaria berat.",
+      "points": [
+        "Konfirmasi diagnosis dengan pemeriksaan mikroskopis atau uji diagnostik cepat sebelum terapi.",
+        "Paduan berbasis artemisinin merupakan terapi utama malaria falciparum tanpa komplikasi.",
+        "Malaria pada kehamilan dan anak memerlukan perhatian khusus.",
+        "Pengendalian vektor dan kemoprofilaksis untuk kelompok berisiko mendukung eliminasi."
+      ],
+      "sources": [
+        { "name": "WHO — Malaria", "url": "https://www.who.int/health-topics/malaria" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Apa rekomendasi terapi malaria falciparum tanpa komplikasi?",
+        "Bagaimana tata laksana malaria pada kehamilan?",
+        "Apa strategi eliminasi malaria yang terbukti efektif?"
+      ]
+    },
+    {
+      "slug": "kesehatan-ibu",
+      "label": "Kesehatan Ibu & Maternal",
+      "query": "maternal health OR antenatal care OR postpartum",
+      "desc": "Bukti untuk kehamilan, persalinan, dan nifas yang aman.",
+      "intro": "Sebagian besar kematian ibu dapat dicegah melalui pelayanan antenatal berkualitas, penanganan persalinan yang aman, dan pemantauan nifas. Halaman ini merangkum tema bukti utama.",
+      "points": [
+        "Kunjungan antenatal berkualitas memungkinkan deteksi dini risiko dan komplikasi.",
+        "Suplementasi asam folat dan zat besi menurunkan risiko anemia pada kehamilan.",
+        "Penanganan perdarahan pascapersalinan dan hipertensi dalam kehamilan menjadi prioritas kegawatdaruratan.",
+        "Keluarga berencana pascapersalinan mendukung kesehatan ibu dan bayi."
+      ],
+      "sources": [
+        { "name": "WHO — Maternal health", "url": "https://www.who.int/health-topics/maternal-health" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Apa saja komponen pelayanan antenatal yang berkualitas?",
+        "Bagaimana penanganan cepat perdarahan pascapersalinan?",
+        "Apa bukti efektivitas suplementasi besi-folat pada kehamilan?"
+      ]
+    },
+    {
+      "slug": "diabetes",
+      "label": "Diabetes Melitus",
+      "query": "type 2 diabetes management OR glycemic control",
+      "desc": "Tatalaksana diabetes dan pencegahan komplikasi.",
+      "intro": "Diabetes melitus tipe 2 merupakan penyakit kronis dengan komplikasi mikrovaskular dan makrovaskular. Tata laksana menekankan kontrol glikemik, pengendalian faktor risiko kardiovaskular, dan pemantauan berkala.",
+      "points": [
+        "Perubahan gaya hidup (diet, aktivitas fisik, penurunan berat badan) menjadi dasar semua terapi.",
+        "Pemilihan obat disesuaikan dengan kondisi penyerta seperti penyakit kardiovaskular dan fungsi ginjal.",
+        "Pemantauan HbA1c, tekanan darah, lipid, dan fungsi ginjal penting untuk mencegah komplikasi.",
+        "Edukasi mandiri pasien meningkatkan hasil pengobatan jangka panjang."
+      ],
+      "sources": [
+        { "name": "WHO — Diabetes", "url": "https://www.who.int/health-topics/diabetes" },
+        { "name": "Fornas (e-Fornas Kemenkes)", "url": "https://e-fornas.kemkes.go.id/guest/daftar-obat" }
+      ],
+      "questions": [
+        "Bagaimana perbandingan metformin dan GLP-1 agonis pada diabetes tipe 2 dengan obesitas?",
+        "Apa target kontrol glikemik yang direkomendasikan pada pasien lansia?",
+        "Apa bukti terbaru manfaat SGLT2 inhibitor terhadap luaran kardiovaskular?"
+      ]
+    },
+    {
+      "slug": "hipertensi",
+      "label": "Hipertensi",
+      "query": "hypertension treatment OR blood pressure control",
+      "desc": "Diagnosis, terapi, dan pengendalian tekanan darah.",
+      "intro": "Hipertensi merupakan faktor risiko utama penyakit kardiovaskular dan ginjal. Pengukuran yang akurat serta pengendalian tekanan darah yang konsisten menurunkan kejadian stroke dan penyakit jantung.",
+      "points": [
+        "Konfirmasi diagnosis dengan pengukuran berulang dan pemantauan di luar fasilitas kesehatan bila tersedia.",
+        "Modifikasi gaya hidup (pengurangan garam, aktivitas fisik, penurunan berat badan) diberikan pada semua pasien.",
+        "Pilihan obat menyesuaikan kondisi penyerta dan toleransi pasien.",
+        "Kepatuhan minum obat dan pemantauan berkala menentukan keberhasilan jangka panjang."
+      ],
+      "sources": [
+        { "name": "WHO — Hipertensi (fact sheet)", "url": "https://www.who.int/news-room/fact-sheets/detail/hypertension" },
+        { "name": "Fornas (e-Fornas Kemenkes)", "url": "https://e-fornas.kemkes.go.id/guest/daftar-obat" }
+      ],
+      "questions": [
+        "Bagaimana cara menegakkan diagnosis hipertensi yang akurat?",
+        "Apa pilihan terapi awal untuk hipertensi tanpa komplikasi?",
+        "Seberapa besar penurunan risiko stroke dari pengendalian tekanan darah?"
+      ]
+    },
+    {
+      "slug": "hiv",
+      "label": "HIV & AIDS",
+      "query": "hiv antiretroviral therapy OR prevention",
+      "desc": "Terapi antiretroviral, pencegahan, dan pemantauan.",
+      "intro": "Terapi antiretroviral yang efektif mengubah HIV menjadi kondisi kronis yang dapat dikelola. Kunci keberhasilan adalah diagnosis dini, kepatuhan terapi, dan pemantauan berkala.",
+      "points": [
+        "Terapi antiretroviral dini menurunkan morbiditas dan penularan.",
+        "Pemantauan viral load dan CD4 membantu menilai respons terapi.",
+        "Pencegahan penularan ibu ke anak dan profilaksis prapajanan merupakan strategi penting.",
+        "Dukungan kepatuhan serta penanganan infeksi oportunistik menentukan hasil jangka panjang."
+      ],
+      "sources": [
+        { "name": "WHO — HIV and AIDS", "url": "https://www.who.int/health-topics/hiv-aids" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Kapan terapi antiretroviral sebaiknya dimulai?",
+        "Apa rekomendasi pemantauan viral load pada terapi HIV?",
+        "Bagaimana strategi pencegahan penularan HIV dari ibu ke anak?"
+      ]
+    },
+    {
+      "slug": "imunisasi",
+      "label": "Imunisasi & Vaksin",
+      "query": "immunization program OR vaccine effectiveness OR safety",
+      "desc": "Efektivitas, keamanan, dan program imunisasi.",
+      "intro": "Imunisasi merupakan intervensi kesehatan masyarakat yang terbukti menurunkan kesakitan dan kematian. Halaman ini merangkum tema bukti tentang efektivitas, keamanan, dan penyelenggaraan program.",
+      "points": [
+        "Efektivitas vaksin bervariasi menurut jenis vaksin, jadwal, dan populasi.",
+        "Kejadian ikutan pascaimunisasi umumnya ringan; pemantauan tetap penting.",
+        "Cakupan imunisasi yang merata diperlukan untuk mencegah wabah.",
+        "Rantai dingin dan penyimpanan memengaruhi mutu vaksin."
+      ],
+      "sources": [
+        { "name": "WHO — Vaccines and immunization", "url": "https://www.who.int/health-topics/vaccines-and-immunization" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Seberapa efektif vaksin dalam mencegah penyakit pada anak?",
+        "Apa saja kejadian ikutan pascaimunisasi yang perlu dipantau?",
+        "Bagaimana pengaruh cakupan imunisasi terhadap risiko wabah?"
+      ]
+    },
+    {
+      "slug": "mental",
+      "label": "Kesehatan Mental",
+      "query": "mental health intervention OR depression OR anxiety",
+      "desc": "Intervensi kesehatan mental remaja dan dewasa.",
+      "intro": "Gangguan kesehatan mental berkontribusi besar terhadap beban penyakit global, terutama pada remaja dan dewasa muda. Bukti menekankan deteksi dini dan intervensi berbasis komunitas maupun layanan primer.",
+      "points": [
+        "Skrining sederhana di layanan primer membantu deteksi dini gangguan umum seperti depresi dan ansietas.",
+        "Intervensi psikologis berbasis bukti menjadi terapi lini pertama untuk banyak kondisi.",
+        "Dukungan sosial dan penurunan stigma meningkatkan akses ke layanan.",
+        "Kelompok berisiko (remaja, lansia, penderita penyakit kronis) memerlukan perhatian khusus."
+      ],
+      "sources": [
+        { "name": "WHO — Mental health", "url": "https://www.who.int/health-topics/mental-health" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Apa instrumen skrining yang direkomendasikan untuk depresi?",
+        "Bagaimana efektivitas intervensi psikologis jangka pendek untuk ansietas?",
+        "Apa strategi mengurangi stigma layanan kesehatan mental?"
+      ]
+    }
+  ]
+}

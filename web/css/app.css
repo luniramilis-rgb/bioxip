@@ -239,6 +239,22 @@ h2 { margin-top: 1.6rem; font-size: 1.2rem; }
 }
 .safety p { margin: 0.35rem 0; }
 
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%) translateY(8px);
+  background: #10231d;
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.2s;
+  z-index: 50;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 .chip.sev-high { background: #f7d9d5; color: #9b2c1f; }
 .chip.sev-moderate { background: #fbeccb; color: #8a5a00; }
 .chip.sev-low { background: var(--chip); color: var(--muted); }

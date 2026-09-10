@@ -116,6 +116,7 @@
              href="https://wa.me/?text=${encodeURIComponent(shareText)}">Bagikan ke WhatsApp</a>
           <a class="btn small ghost" href="#/interactions?q=${encodeURIComponent(drug.name)}">Cek interaksi</a>
           <button class="btn small ghost" data-copy="${esc(shareText)}">Salin ringkasan</button>
+          ${label.source ? `<button class="btn small ghost" data-copy-link="${esc(label.source)}">Salin tautan label</button>` : ""}
         </p>
       </section>
 

@@ -113,7 +113,9 @@ async function fetchStub(url) {
         ? DRUG_PAYLOAD
         : url.includes("/api/interactions")
           ? INTER_PAYLOAD
-          : { sources: [] };
+          : url.includes("/data/topics.json")
+            ? { topics: [{ slug: "tb", label: "Tuberkulosis (TB)", query: "tuberculosis", desc: "Bukti TB" }] }
+            : { sources: [] };
   return { ok: true, status: 200, json: async () => body };
 }
 
@@ -152,6 +154,7 @@ async function dispatchHash(hash) {
 (async () => {
   const results = [];
 
+  await new Promise((resolve) => setTimeout(resolve, 30));
   const home = registry.get("view").innerHTML;
   results.push(["home renders hero", home.includes("Literatur medis dunia")]);
 
