@@ -125,16 +125,18 @@ Hasil:
 - **Margin keamanan estimasi**: saat provider aktif, estimasi dikalikan **1,3×** agar pemakaian nyata tidak melebihi hold (mencegah tagihan ter-*clamp* dan margin tergerus); mode mock memakai estimasi eksak.
 - Validasi live (`scripts/validate_ai.js`): 402 tanpa saldo · grant · **422** input tidak aman · estimasi · SSE lengkap · tagihan **Rp100** · saldo sesuai · `ai_usage_log` dengan **margin** · **429** setelah `usage_limits.rpm=1` → **ALL PASS**.
 
-## Sprint 6 — UI Mode Gratis vs AI (P4)
-**Tujuan:** tidak ada kejutan biaya.
-
-Deliverable:
-- Segmented `[Cari bukti · gratis]` ↔ `[Tanya AI · saldo]`; tombol menampilkan **estimasi Rp**; badge saldo di header; status **AI terkunci** saat Rp0 + CTA isi saldo.
-- Search-first upsell ("Buat sintesis AI dari N studi — ±Rp…").
-- Halaman saldo & riwayat (`/api/credits/ledger`).
-
-Validasi: `tests/ui_harness.js` diperluas (mode switch, estimasi tampil, tombol terkunci, halaman saldo).
-DoD: pengguna tanpa saldo tetap bisa seluruh search & drug card; AI terblokir rapi.
+## Sprint 6 — UI Mode Gratis vs AI (P4) — SELESAI (2026-09-10)
+**Tujuan:** tidak ada kejutan biaya; pembeda gratis vs AI terlihat jelas.
+Hasil:
+- **Segmented** di halaman hasil: `Cari bukti · gratis` ↔ `Tanya AI · saldo` (mode disimpan di hash `?mode=ai`); tombol berubah "Cari" ↔ "Siapkan AI".
+- **Estimasi Rp tampil sebelum eksekusi**: panel AI memanggil `/api/ai/estimate`, menampilkan `Tanya AI ≈ Rp X` + saldo; tombol baru menjalankan stream saat ditekan.
+- **AI terkunci**: tanpa sesi → "memerlukan akun"; saldo < estimasi → CTA **Isi saldo**; 401/402/422/429 ditangani dengan pesan spesifik.
+- **Stream SSE di UI**: delta teks bertahap, daftar sumber bernomor, **dukungan sitasi (%)**, peringatan red flag, dan baris akhir "Terpakai Rp X · sisa Rp Y" (menandai **mode demo** bila tanpa LLM).
+- **Badge saldo** di header (empat status: anonymous/empty/ready/expired) diperbarui tiap rute & setelah pemakaian.
+- **Halaman `#/saldo`**: kartu saldo + tabel riwayat 25 transaksi (warna +/−) + CTA; menangani sesi belum ada.
+- **Halaman `#/harga`**: paket Rp50rb/100rb/150rb/500rb + penjelasan rumus biaya (markup 12×, minimum Rp100).
+- Navigasi: bottom nav kini `Cari · Jawaban · Obat · Saldo · Sumber` (Kebijakan di footer), top nav menambah **Saldo**.
+- Validasi: `ui_harness` diperluas (segmented, panel AI, terkunci tanpa akun, halaman saldo, paket harga) → **ALL PASS**; `validate_imports` juga memeriksa **parity precache service worker** (SW v4 memuat credits/ai/saldo) → bug precache tertangkap & diperbaiki.
 
 ## Sprint 7 — Xendit Top-up (P5)
 **Tujuan:** pembelian saldo end-to-end.
@@ -181,6 +183,6 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 | 3 Ledger ✅ | `validate_credits.js` + `validate_credits_live.py` (live) + `validate_imports.js` — **ALL PASS** | simulasi admin top-up |
 | 4 Grounded ✅ | `validate_grounded.js` (struktur + live opsional) — **ALL PASS** | review apoteker/dokter |
 | 5 AI proxy ✅ | `validate_ai.js` (statis + live mock) — **ALL PASS** | uji 10 pertanyaan nyata (setelah `DEEPSEEK_API_KEY`) |
-| 6 UI | `ui_harness.js` | uji mobile |
+| 6 UI ✅ | `ui_harness.js` (segmented, estimasi, terkunci, saldo, harga) — **ALL PASS** | uji mobile |
 | 7 Xendit | webhook ganda + rekonsiliasi | transaksi sandbox Xendit |
 | 8 Kualitas | regresi golden 150+ di CI | review ahli per domain |
