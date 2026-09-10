@@ -51,7 +51,8 @@ export async function onRequestPost(context) {
     return json({ error: insufficient ? "unauthorized" : "topup_failed", detail: created.body }, insufficient ? 401 : 502);
   }
   const topup = Array.isArray(created.body) ? created.body[0] : created.body;
-  if (!topup?.topup_id) return json({ error: "topup_failed" }, 502);
+  if (!topup?.topup_id) return json({ error: "topup_failed", detail: created.body }, 502);
+  const topupStatus = topup.topup_status || topup.status || "pending";
 
   // Bila sudah punya payment_url (pending yang sama), tidak perlu memanggil provider lagi.
   if (topup.payment_url) {
@@ -61,7 +62,7 @@ export async function onRequestPost(context) {
       amount_idr: Number(topup.amount_idr),
       credited_idr: Number(topup.credited_idr),
       channel: topup.channel,
-      status: topup.status,
+      status: topupStatus,
       payment_url: topup.payment_url,
       expires_at: topup.expires_at,
       mode: xenditConfig(env).mode,
@@ -91,7 +92,7 @@ export async function onRequestPost(context) {
     amount_idr: amountIdr,
     credited_idr: Number(topup.credited_idr),
     channel,
-    status: topup.status,
+    status: topupStatus,
     payment_url: charge.ok ? charge.payment_url : null,
     expires_at: charge.ok ? charge.expires_at : topup.expires_at,
     mode: xenditConfig(env).mode,
