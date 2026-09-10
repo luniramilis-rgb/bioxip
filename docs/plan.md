@@ -81,16 +81,15 @@ Env baru: `NCBI_API_KEY`, `NCBI_EMAIL`, `NCBI_TOOL=bioxip`.
 Validasi: `scripts/validate_pubmed.js` (10 query emas: TB, DBD, stunting, hipertensi, dll) memastikan hasil punya PMID & sumber `pubmed`.
 DoD: search menampilkan badge sumber `pubmed`; dedupe tidak menggandakan DOI sama; CI hijau.
 
-## Sprint 3 — Ledger + Saldo (tanpa AI)
+## Sprint 3 — Ledger + Saldo (tanpa AI) — SELESAI (2026-09-10)
 **Tujuan:** pondasi penagihan; belum menyentuh DeepSeek.
-
-Deliverable:
-- Migrasi `008_credits.sql`: `credit_accounts`, `credit_ledger` (append-only + idempotency), `topups`, `ai_usage_log`, `ai_chat_log`, `usage_limits` + trigger saldo + RLS (sesuai `docs/credits.md`).
-- Endpoint: `GET /api/credits/me` (saldo, plan, `ai_locked`), `GET /api/credits/ledger`.
-- Utilitas server: `functions/_credits.js` (hold/settle/refund, konversi µIDR, pembulatan, minimum Rp100).
-
-Validasi: `scripts/validate_credits.js` (unit: konversi & pembulatan; integrasi: hold→settle, hold→fail→refund, saldo tak negatif, idempotency ganda) + job rekonsiliasi `SUM(ledger) == balance`.
-DoD: saldo dapat diisi manual (admin) lalu terpotong lewat uji simulasi; 0 saldo negatif.
+Hasil:
+- Migrasi `008_credits.sql` + `009_credit_trigger_fix.sql`: `credit_accounts`, `credit_ledger` (append-only + idempotency), `credit_operations` (hold/settle/refund), `topups`, `ai_usage_log` (margin generated), `ai_chat_log` (retensi 90 hari), `usage_limits`, RLS baca-milik-sendiri, dan view `v_credit_reconciliation`.
+- RPC `fn_credit_ensure_account`, `fn_credit_hold`, `fn_credit_settle`, `fn_credit_refund` (untuk `authenticated`), serta `fn_credit_grant` (khusus service_role/admin).
+- Endpoint `GET /api/credits/me` dan `GET /api/credits/ledger` (wajib JWT → 401 tanpa token; sudah diverifikasi produksi).
+- Harga: `functions/_pricing.json` (markup **12×**, tarif cache hit/miss/output) + `functions/_pricing.js` (cost/charge/estimate µIDR).
+- **Temuan & perbaikan penting**: `INSERT ... ON CONFLICT` memvalidasi CHECK pada baris kandidat → upsert delta negatif selalu gagal; trigger diganti memakai `UPDATE` + `row_count` (migration 009). Juga ditemukan **path impor relatif salah** yang membuat bundel Functions gagal (deploy tertahan) → diperbaiki + ditambah `scripts/validate_imports.js` di CI.
+- Validasi: `validate_credits.js` (statis) + `validate_credits_live.py` (live: hold→settle→refund, idempotency, penolakan saldo kurang, constraint, rekonsiliasi) → **ALL PASS**; `validate_api` termasuk 401 endpoint kredit.
 
 ## Sprint 4 — Pipeline Grounded internal (K1, tanpa biaya ke pengguna)
 **Tujuan:** membuktikan "tidak halu" sebelum dijual.
@@ -167,7 +166,7 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 | 1A Fondasi publik ✅ | `validate_topics.js` + `build_topics.js --check` + `ui_harness.js` — **ALL PASS** | cek preview OG (WhatsApp) & indeks |
 | 1 Auth+gating | `validate_auth.js` + `ui_harness.js` (gate, preview, salin tautan) | uji login Google + magic link/OTP di HP (termasuk in-app browser) |
 | 2 PubMed ✅ | `validate_pubmed.js` + `validate_api.js` — **ALL PASS** | spot-check 10 query oleh Anda |
-| 3 Ledger | `validate_credits.js` + rekonsiliasi | simulasi admin top-up |
+| 3 Ledger ✅ | `validate_credits.js` + `validate_credits_live.py` (live) + `validate_imports.js` — **ALL PASS** | simulasi admin top-up |
 | 4 Grounded | `validate_grounded.js` (golden 30) | review apoteker/dokter |
 | 5 AI proxy | `validate_api.js` (402/422/429) + provider mock | uji 10 pertanyaan nyata |
 | 6 UI | `ui_harness.js` | uji mobile |
