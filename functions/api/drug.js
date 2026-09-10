@@ -131,7 +131,7 @@ function labelCandidates(drug, rxnorm) {
   const cleaned = raw
     .map((t) => String(t || "").trim().toLowerCase())
     .filter((t) => /^[a-z][a-z\s-]{2,}$/.test(t));
-  return [...new Set(cleaned)].slice(0, 8);
+  return [...new Set(cleaned)].slice(0, 5);
 }
 
 async function fetchLabel(drug, rxnorm) {
@@ -157,11 +157,15 @@ async function fetchLabel(drug, rxnorm) {
       best = merged;
       matchedTerm = candidateFrom(search);
     }
-    if (Object.keys(best.fields).length >= LABEL_FIELDS.length) break;
+    if (Object.keys(best.fields).length >= 8) break;
   }
-  if (best && Object.keys(best.fields).length < LABEL_FIELDS.length && matchedTerm) {
+
+  if (best && matchedTerm && Object.keys(best.fields).length < 9) {
+    let passes = 0;
     for (const [key, fdaKey] of LABEL_FIELDS) {
       if (best.fields[key]) continue;
+      if (passes >= 6) break;
+      passes++;
       const search = `openfda.generic_name:"${matchedTerm}" AND _exists_:${fdaKey}`;
       const resp = await fetch(`${OPENFDA}?search=${encodeURIComponent(search)}&limit=3`, {
         signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -169,10 +173,9 @@ async function fetchLabel(drug, rxnorm) {
       if (!resp.ok) continue;
       const data = await resp.json();
       if ((data.results || []).length) mergeInto(best, data.results);
-      if (Object.keys(best.fields).length >= LABEL_FIELDS.length) break;
+      if (Object.keys(best.fields).length >= 9) break;
     }
   }
-
   if (!best || Object.keys(best.fields).length === 0) {
     return { available: false, source: OPENFDA, fields: {}, tried: candidates };
   }
@@ -189,14 +192,16 @@ async function fetchLabel(drug, rxnorm) {
 }
 
 function mergeLabels(results) {
-  const merged = { fields: {}, count: results.length, effective_time: null, source: OPENFDA };
+  const merged = { fields: {}, count: 0, ids: [], effective_time: null, source: OPENFDA };
   mergeInto(merged, results);
   return merged;
 }
 
 function mergeInto(target, results) {
+  if (!Array.isArray(target.ids)) target.ids = [];
   for (const result of results) {
     const setid = result.openfda?.spl_set_id?.[0];
+    if (setid && !target.ids.includes(setid)) target.ids.push(setid);
     const src = setid
       ? `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${setid}`
       : OPENFDA;
@@ -213,7 +218,7 @@ function mergeInto(target, results) {
       }
     }
   }
-  target.count = Math.max(target.count || 0, results.length);
+  target.count = target.ids.length || results.length;
 }
 
 function candidateFrom(search) {

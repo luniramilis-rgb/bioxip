@@ -41,6 +41,13 @@ async function main() {
     check(`drug ${drug}: matched + ATC + Fornas + safety`, res.status === 200 && matched && hasAtc && hasFornas && hasSafety, res.body?.drug?.atc || "");
   }
 
+  const para = await get("/api/drug?q=parasetamol");
+  check(
+    "drug parasetamol: label teragregasi tanpa field kosong",
+    Array.isArray(para.body?.safety?.missing_fields) && para.body.safety.missing_fields.length === 0,
+    `missing=${(para.body?.safety?.missing_fields || []).join("|")}`,
+  );
+
   const rx = await get("/api/drug?q=parasetamol");
   check("drug rxnorm tersedia (info)", Boolean(rx.body?.rxnorm?.rxcui), rx.body?.rxnorm?.rxcui || "tidak tersedia");
 
@@ -66,9 +73,10 @@ async function main() {
   check("interactions: drugs resolved 2", (inter.body?.drugs || []).filter((d) => d.rxcui?.rxcui).length >= 2, "");
   check("interactions: pairs array", Array.isArray(inter.body?.pairs), String((inter.body?.pairs || []).length));
   check(
-    "interactions: pasangan terkurasi (metronidazol+warfarin)",
-    (inter.body?.pairs || []).some((p) => /tinggi|sedang|rendah/i.test(p.severity)),
-    "",
+    "interactions: pasangan terkurasi dengan severity valid",
+    (inter.body?.pairs || []).every((p) => ["tinggi", "sedang", "rendah"].includes(p.severity)) &&
+      (inter.body?.pairs || []).length >= 1,
+    (inter.body?.pairs || []).map((p) => p.severity).join("|"),
   );
   check("interactions: mentions array", Array.isArray(inter.body?.mentions), String((inter.body?.mentions || []).length));
 

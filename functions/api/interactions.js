@@ -167,7 +167,7 @@ async function fetchInteractionsText(catalogue, name) {
   ]
     .map((t) => String(t || "").trim().toLowerCase())
     .filter((t) => /^[a-z][a-z\s-]{2,}$/.test(t));
-  for (const candidate of [...new Set(candidates)].slice(0, 5)) {
+  for (const candidate of [...new Set(candidates)].slice(0, 3)) {
     for (const field of ["generic_name", "substance_name"]) {
       const search = `openfda.${field}:"${candidate}"`;
       const resp = await fetch(`${OPENFDA}?search=${encodeURIComponent(search)}&limit=5`, {
