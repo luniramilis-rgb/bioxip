@@ -37,8 +37,19 @@ async function main() {
     const matched = res.body?.matched === true;
     const hasAtc = Boolean(res.body?.drug?.atc);
     const hasFornas = Boolean(res.body?.fornas?.edition);
-    check(`drug ${drug}: matched + ATC + Fornas`, res.status === 200 && matched && hasAtc && hasFornas, res.body?.drug?.atc || "");
+    const hasSafety = Array.isArray(res.body?.safety?.missing_fields);
+    check(`drug ${drug}: matched + ATC + Fornas + safety`, res.status === 200 && matched && hasAtc && hasFornas && hasSafety, res.body?.drug?.atc || "");
   }
+
+  const rx = await get("/api/drug?q=parasetamol");
+  check("drug rxnorm tersedia (info)", Boolean(rx.body?.rxnorm?.rxcui), rx.body?.rxnorm?.rxcui || "tidak tersedia");
+
+  const outside = await get("/api/drug?q=warfarin");
+  check(
+    "drug di luar katalog: matched via RxNorm atau saran",
+    outside.body?.matched === true || Array.isArray(outside.body?.suggestions),
+    outside.body?.matched ? String(outside.body?.outside_catalogue) : "suggestions",
+  );
 
   const unknown = await get("/api/drug?q=zzzznotadrug");
   check("drug tidak dikenal: matched=false + saran", unknown.body?.matched === false && Array.isArray(unknown.body?.suggestions), "");

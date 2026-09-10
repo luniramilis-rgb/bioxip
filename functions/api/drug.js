@@ -3,6 +3,7 @@ import { findDrug, suggestDrugs, FORNAS } from "../_drugs.js";
 const OPENFDA = "https://api.fda.gov/drug/label.json";
 const PUBCHEM = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name";
 const CHEMBL = "https://www.ebi.ac.uk/chembl/api/data";
+const RXNAV = "https://rxnav.nlm.nih.gov/REST";
 const TIMEOUT_MS = 9000;
 const MAX_FIELD = 1500;
 
@@ -25,32 +26,65 @@ export async function onRequestGet(context) {
     const q = (url.searchParams.get("q") || "").trim();
     if (!q) return json({ error: "param q wajib" }, 400);
 
-    const drug = findDrug(q);
+    let drug = findDrug(q);
+    let outsideCatalogue = false;
+
+    const rxnorm = await resolveRxNorm(...rxCandidates(drug, q)).catch(() => null);
+
     if (!drug) {
-      return json({ matched: false, query: q, suggestions: suggestDrugs(q) });
+      if (rxnorm?.rxcui) {
+        drug = {
+          slug: `rxnorm-${rxnorm.rxcui}`,
+          name: rxnorm.name,
+          inn: rxnorm.name,
+          atc: null,
+          kelas: "Di luar katalog Fornas (hasil normalisasi RxNorm)",
+          rute: null,
+          aliases: [],
+        };
+        outsideCatalogue = true;
+      } else {
+        return json({ matched: false, query: q, suggestions: suggestDrugs(q) });
+      }
     }
 
     const term = String(drug.inn).split("/")[0].trim();
     const [label, chemistry, mechanism] = await Promise.all([
-      fetchLabel(drug).catch(() => null),
+      fetchLabel(drug, rxnorm).catch(() => null),
       fetchChemistry(term).catch(() => null),
       fetchMechanism(term).catch(() => null),
     ]);
 
+    const missing = LABEL_FIELDS.map(([key]) => key).filter(
+      (key) => !(label && label.fields && label.fields[key]),
+    );
+
+    const blackbox = label?.fields?.peringatan_blackbox || null;
+
     return json({
       matched: true,
       query: q,
+      catalogue: !outsideCatalogue,
+      outside_catalogue: outsideCatalogue,
       drug,
-      fornas: FORNAS,
+      fornas: outsideCatalogue ? null : FORNAS,
+      rxnorm,
       retrieved_at: new Date().toISOString(),
       chemistry,
       mechanism,
       label,
+      safety: {
+        blackbox: Boolean(blackbox),
+        blackbox_excerpt: blackbox ? truncate(blackbox.text, 400) : null,
+        watchouts: drug.watchouts || [],
+        lasa_notes: drug.lasa_notes || [],
+        missing_fields: missing,
+      },
       disclaimer:
         "Informasi bukti & label untuk referensi profesional; bukan nasihat medis, bukan perintah peresepan. Dosis harus disesuaikan penilaian klinis dan sumber resmi terbaru.",
       notes: [
         "Isi label berasal dari openFDA/DailyMed (bahasa Inggris, apa adanya) dan ditautkan ke sumbernya.",
-        "Field yang tidak ada di sumber ditandai kosong — tidak dikarang.",
+        "Normalisasi nama obat memakai RxNorm (NLM). Field yang tidak ada di sumber ditandai kosong — tidak dikarang.",
       ],
     });
   } catch (error) {
@@ -58,20 +92,47 @@ export async function onRequestGet(context) {
   }
 }
 
-function labelCandidates(drug) {
-  const raw = [
-    drug.us_name,
-    drug.inn,
-    ...(drug.aliases || []),
-  ];
+function rxCandidates(drug, q) {
+  const list = drug
+    ? [drug.us_name, drug.inn, ...(drug.aliases || []), drug.name]
+    : [q];
+  return [...new Set(list.map((t) => String(t || "").trim()).filter(Boolean))].slice(0, 4);
+}
+
+async function resolveRxNorm(...terms) {
+  for (const term of terms) {
+    const resp = await fetch(
+      `${RXNAV}/approximateTerm.json?term=${encodeURIComponent(term)}&maxEntries=3`,
+      { signal: AbortSignal.timeout(6000) },
+    );
+    if (!resp.ok) continue;
+    const data = await resp.json();
+    const candidates = data.approximateGroup?.candidate || [];
+    const best = candidates
+      .filter((c) => c.rxcui)
+      .sort((a, b) => Number(a.rank || 99) - Number(b.rank || 99) || Number(b.score || 0) - Number(a.score || 0))[0];
+    if (!best) continue;
+    if (Number(best.rank || 99) > 1) continue;
+    return {
+      rxcui: String(best.rxcui),
+      name: best.name || term,
+      score: Number(best.score || 0),
+      source: `https://mor.nlm.nih.gov/RxNav/search?searchBy=RXCUI&searchTerm=${best.rxcui}`,
+    };
+  }
+  return null;
+}
+
+function labelCandidates(drug, rxnorm) {
+  const raw = [rxnorm?.name, drug.us_name, drug.inn, ...(drug.aliases || [])];
   const cleaned = raw
     .map((t) => String(t || "").trim().toLowerCase())
     .filter((t) => /^[a-z][a-z\s-]{2,}$/.test(t));
-  return [...new Set(cleaned)].slice(0, 6);
+  return [...new Set(cleaned)].slice(0, 8);
 }
 
-async function fetchLabel(drug) {
-  const candidates = labelCandidates(drug);
+async function fetchLabel(drug, rxnorm) {
+  const candidates = labelCandidates(drug, rxnorm);
   const attempts = [];
   for (const candidate of candidates) {
     attempts.push(`openfda.generic_name:"${candidate}"`);
@@ -177,6 +238,11 @@ async function fetchMechanism(term) {
     source: `https://www.ebi.ac.uk/chembl/compound_report_card/${id}/`,
     source_name: "ChEMBL",
   };
+}
+
+function truncate(text, limit) {
+  const value = String(text || "").trim();
+  return value.length > limit ? value.slice(0, limit).trim() + "…" : value;
 }
 
 function join(value) {

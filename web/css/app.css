@@ -229,6 +229,16 @@ h2 { margin-top: 1.6rem; font-size: 1.2rem; }
 .answer-list { margin: 0.4rem 0 0; padding-left: 1.1rem; }
 .answer-list li { margin: 0.4rem 0; }
 
+.safety {
+  border: 1px solid var(--line);
+  border-left: 4px solid #c0392b;
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  background: var(--card);
+  margin: 0.8rem 0;
+}
+.safety p { margin: 0.35rem 0; }
+
 details.accordion {
   border: 1px solid var(--line);
   border-radius: 12px;

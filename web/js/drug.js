@@ -23,7 +23,7 @@
     return `
       <section class="answer-head">
         <h1>Kartu obat</h1>
-        <p class="muted">Dosis, kontraindikasi, peringatan, dan interaksi dari label resmi (openFDA/DailyMed) + PubChem/ChEMBL — setiap bagian bertaut sumber.</p>
+        <p class="muted">Dosis, kontraindikasi, peringatan, dan interaksi dari label resmi (openFDA/DailyMed) + PubChem/ChEMBL/RxNorm — setiap bagian bertaut sumber.</p>
         <form id="drug-form" class="searchbox">
           <input id="drug-q" type="search" value="${esc(q)}" placeholder="mis. parasetamol, amoksisilin, oralit" />
           <button type="submit">Cari obat</button>
@@ -73,11 +73,12 @@
 
   function render(data) {
     const drug = data.drug || {};
-    const fornas = data.fornas || {};
-    const chem = data.chemistry;
-    const mech = data.mechanism;
+    const fornas = data.fornas;
+    const chemistry = data.chemistry;
+    const mechanism = data.mechanism;
     const label = data.label || {};
-    const shareText = `${drug.name} (${drug.inn}) — ATC ${drug.atc}\nKartu obat bioXip\n${location.href}`;
+    const safety = data.safety || {};
+    const shareText = `${drug.name}${drug.inn ? ` (${drug.inn})` : ""}${drug.atc ? ` — ATC ${drug.atc}` : ""}\nKartu obat bioXip\n${location.href}`;
 
     const fields = Object.entries(label.fields || {})
       .map(
@@ -90,17 +91,26 @@
       )
       .join("");
 
+    const missing = (safety.missing_fields || []).map((key) => FIELD_LABELS[key] || key);
+    const missingLine = missing.length
+      ? `<p class="muted">Tidak ditemukan di sumber: ${esc(missing.join(", "))}.</p>`
+      : "";
+
     return `
+      ${renderSafety(safety)}
+
       <section class="answer-card">
-        <h2>${esc(drug.name)} <span class="chip">${esc(drug.atc)}</span></h2>
+        <h2>${esc(drug.name)} ${drug.atc ? `<span class="chip">${esc(drug.atc)}</span>` : ""}</h2>
         <div class="pico">
-          <span class="chip">INN: ${esc(drug.inn)}</span>
-          <span class="chip">${esc(drug.kelas)}</span>
-          <span class="chip">Rute: ${esc(drug.rute)}</span>
-          <span class="chip oa">Fornas</span>
+          ${drug.inn ? `<span class="chip">INN: ${esc(drug.inn)}</span>` : ""}
+          ${drug.kelas ? `<span class="chip">${esc(drug.kelas)}</span>` : ""}
+          ${drug.rute ? `<span class="chip">Rute: ${esc(drug.rute)}</span>` : ""}
+          ${data.outside_catalogue ? '<span class="chip">di luar Fornas</span>' : '<span class="chip oa">Fornas</span>'}
         </div>
-        <p class="muted">Katalog: ${esc(fornas.edition || "-")} ·
-          <a href="${esc(fornas.source_url)}" target="_blank" rel="noopener">e-Fornas Kemenkes</a></p>
+        ${fornas ? `<p class="muted">Katalog: ${esc(fornas.edition)} ·
+          <a href="${esc(fornas.source_url)}" target="_blank" rel="noopener">e-Fornas Kemenkes</a></p>` : ""}
+        ${data.rxnorm ? `<p class="muted">RxNorm (NLM): <a href="${esc(data.rxnorm.source)}" target="_blank" rel="noopener">${esc(data.rxnorm.name)} (RxCUI ${esc(data.rxnorm.rxcui)})</a></p>` : ""}
+        ${data.outside_catalogue ? '<p class="muted">Obat ini belum masuk katalog Fornas bioXip; identitas dinormalisasi lewat RxNorm.</p>' : ""}
         <p class="actions">
           <a class="btn small" target="_blank" rel="noopener"
              href="https://wa.me/?text=${encodeURIComponent(shareText)}">Bagikan ke WhatsApp</a>
@@ -108,33 +118,50 @@
         </p>
       </section>
 
-      ${chem ? `<section class="answer-card">
+      ${chemistry ? `<section class="answer-card">
         <h3>Identitas kimia</h3>
-        <p class="meta">CID ${esc(chem.cid)} · ${esc(chem.molecular_formula)} · BM ${esc(chem.molecular_weight)}</p>
-        ${chem.iupac_name ? `<p class="muted">${esc(chem.iupac_name)}</p>` : ""}
-        <p><a href="${esc(chem.source)}" target="_blank" rel="noopener">PubChem</a></p>
+        <p class="meta">CID ${esc(chemistry.cid)} · ${esc(chemistry.molecular_formula)} · BM ${esc(chemistry.molecular_weight)}</p>
+        ${chemistry.iupac_name ? `<p class="muted">${esc(chemistry.iupac_name)}</p>` : ""}
+        <p><a href="${esc(chemistry.source)}" target="_blank" rel="noopener">PubChem</a></p>
       </section>` : ""}
 
-      ${mech ? `<section class="answer-card">
+      ${mechanism ? `<section class="answer-card">
         <h3>Mekanisme (ChEMBL)</h3>
-        <p class="meta">${esc(mech.pref_name || "")} · ${esc(mech.molecule_type || "")}</p>
-        ${(mech.actions || []).length
-          ? `<ul class="answer-list">${mech.actions
+        <p class="meta">${esc(mechanism.pref_name || "")} · ${esc(mechanism.molecule_type || "")}</p>
+        ${(mechanism.actions || []).length
+          ? `<ul class="answer-list">${mechanism.actions
               .map((a) => `<li>${esc(a.action || "")} ${esc(a.target || "")}${a.mechanism ? " — " + esc(a.mechanism) : ""}</li>`)
               .join("")}</ul>`
           : '<p class="muted">Data mekanisme tidak tersedia di sumber.</p>'}
-        <p><a href="${esc(mech.source)}" target="_blank" rel="noopener">ChEMBL</a></p>
+        <p><a href="${esc(mechanism.source)}" target="_blank" rel="noopener">ChEMBL</a></p>
       </section>` : ""}
 
       <section class="answer-studies">
         <h3>Label resmi (openFDA/DailyMed)</h3>
         ${label.available ? fields : '<p class="muted">Label tidak ditemukan di openFDA untuk obat ini — tidak ada data yang dikarang.</p>'}
+        ${missingLine}
         ${label.effective_time ? `<p class="muted">Versi label: ${esc(label.effective_time)}</p>` : ""}
+        ${label.matched_term ? `<p class="muted">Nama di label: ${esc(label.matched_term)}</p>` : ""}
       </section>
 
       <section class="tldr">
         <p class="muted">${esc(data.disclaimer || "")}</p>
         ${(data.notes || []).map((n) => `<p class="muted">${esc(n)}</p>`).join("")}
+      </section>`;
+  }
+
+  function renderSafety(safety) {
+    const watchouts = safety.watchouts || [];
+    const lasa = safety.lasa_notes || [];
+    if (!safety.blackbox && !watchouts.length && !lasa.length) return "";
+    return `
+      <section class="safety">
+        ${safety.blackbox
+          ? `<p><strong>Peringatan kotak hitam (black box):</strong> ${esc(safety.blackbox_excerpt || "")}</p>`
+          : ""}
+        ${watchouts.length ? `<p><strong>Perlu diperhatikan:</strong></p><ul class="answer-list">${watchouts.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+        ${lasa.length ? `<p class="muted">Risiko salah baca (LASA): ${esc(lasa.join(" "))}</p>` : ""}
+        <p class="muted">Flag keselamatan ini alat bantu; keputusan tetap pada penilaian profesi dan sumber resmi terbaru.</p>
       </section>`;
   }
 
