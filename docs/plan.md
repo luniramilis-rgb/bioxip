@@ -49,16 +49,16 @@ Dipindahkan dari Sprint 1.5 sesuai keputusan 2026-09-10. Isi:
 - **Pelacakan rujukan** `?ref=&utm_source=` + perhitungan **K-factor**.
 Syarat mulai: Sprint 1–5 stabil (auth, search, ledger, AI, UI) dan ada trafik nyata untuk diukur.
 
-## Sprint 1A — Fondasi publik (SEO + salin tautan, tanpa auth)
+## Sprint 1A — Fondasi publik (SEO + salin tautan, tanpa auth) — SELESAI (2026-09-10)
 **Tujuan:** bagian Sprint 1 yang **tidak butuh kredensial**, dan wajib ada sebelum gating diberlakukan. Penting agar saat auth diaktifkan, trafik organik tidak hilang.
-Deliverable:
-- Halaman topik **publik**: `/topik/{tb,dbd,stunting,diabetes,hipertensi,malaria,kesehatan-ibu,hiv,imunisasi,mental}` — konten Bahasa Indonesia ringkas + daftar sumber + tautan ke pencarian.
-- **OG/meta tags** + gambar pratinjau 1200×630 untuk semua halaman publik & hasil.
-- **Tombol "Salin tautan"** untuk hasil pencarian & drug card.
-- **Structured data** (`schema.org`) pada halaman topik.
-- `sitemap.xml` + `robots.txt` diperbarui.
-Validasi: `ui_harness.js` (halaman topik render, salin tautan), `validate_api.js` (halaman publik 200 tanpa login).
-DoD: 10 halaman topik terindeks-able (meta & structured data benar), tanpa mengubah alur login yang belum ada.
+Hasil (terverifikasi di produksi `bioxip.pages.dev`):
+- **11 halaman statis**: hub `/topik/` + 10 topik (`tb`, `dbd`, `stunting`, `malaria`, `kesehatan-ibu`, `diabetes`, `hipertensi`, `hiv`, `imunisasi`, `mental`) dengan intro, poin bukti, contoh pertanyaan, dan sumber resmi (WHO/Kemenkes/Fornas).
+- **OG tags + 11 gambar 1200×630** (`/og/*.png`, 32 KB/gambar) + Twitter card.
+- **JSON-LD** (`MedicalWebPage` + `BreadcrumbList`), canonical, meta description.
+- **Sitemap 12 URL** + `robots.txt` dengan `Sitemap:`; cache `/topik/*` 1 jam, `/og/*` 24 jam.
+- **Tombol "Salin tautan"** (hasil pencarian: tautan artikel; drug card: tautan label; halaman topik: URL halaman) + toast.
+- Konten topik dari satu sumber `web/data/topics.json`; frontend memuatnya dengan fallback bawaan.
+- Validasi: `validate_topics.js` (data + meta/JSON-LD/disclaimer/salin tautan + 11 gambar OG) dan `build_topics.js --check` di CI; `ui_harness` + `validate_api` **ALL PASS**.
 
 ## Sprint 1 — (lanjutan) Auth + gating — blokir kredensial
 Setelah Sprint 1A selesai dan kredensial tersedia: Google OAuth client, SMTP + domain pengirim (SPF/DKIM), Turnstile. Lanjut ke deliverable auth/gating di atas.
@@ -164,7 +164,7 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 ## Checklist validasi per sprint (ringkas)
 | Sprint | Validasi otomatis | Validasi manual |
 |---|---|---|
-| 1A Fondasi publik | `ui_harness.js` + `validate_api.js` (halaman publik) | cek preview OG (WhatsApp) & indeks |
+| 1A Fondasi publik ✅ | `validate_topics.js` + `build_topics.js --check` + `ui_harness.js` — **ALL PASS** | cek preview OG (WhatsApp) & indeks |
 | 1 Auth+gating | `validate_auth.js` + `ui_harness.js` (gate, preview, salin tautan) | uji login Google + magic link/OTP di HP (termasuk in-app browser) |
 | 2 PubMed ✅ | `validate_pubmed.js` + `validate_api.js` — **ALL PASS** | spot-check 10 query oleh Anda |
 | 3 Ledger | `validate_credits.js` + rekonsiliasi | simulasi admin top-up |
