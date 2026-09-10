@@ -19,6 +19,9 @@
 /og/*
   Cache-Control: public, max-age=86400
 
+/data/*
+  Cache-Control: public, max-age=3600
+
 /topik/*
   Cache-Control: public, max-age=3600
 

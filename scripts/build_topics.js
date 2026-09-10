@@ -6,6 +6,7 @@ const WEB = path.join(ROOT, "web");
 const SITE = (process.env.SITE_URL || "https://bioxip.pages.dev").replace(/\/$/, "");
 const DATA = path.join(WEB, "data", "topics.json");
 const CHECK = process.argv.includes("--check");
+const DIAGNOSE = process.argv.includes("--diagnose");
 
 const topicsFile = JSON.parse(fs.readFileSync(DATA, "utf8"));
 const topics = topicsFile.topics;
@@ -17,8 +18,7 @@ const esc = (value) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
-const STYLE = `
-:root{--ink:#1b2733;--muted:#5c6b7a;--line:#e3e8ee;--accent:#0a7a63;--chip:#eef3f6;--bg:#fff}
+const STYLE = `:root{--ink:#1b2733;--muted:#5c6b7a;--line:#e3e8ee;--accent:#0a7a63;--chip:#eef3f6;--bg:#fff}
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.65;color:var(--ink);background:var(--bg)}
 header{border-bottom:1px solid var(--line);padding:.9rem 1.1rem;display:flex;gap:1rem;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg);z-index:5}
@@ -42,6 +42,7 @@ footer{border-top:1px solid var(--line);padding:1.4rem 1.1rem;color:var(--muted)
 .copy{display:inline-block;min-height:44px;padding:.5rem 1rem;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-size:.95rem;cursor:pointer}
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);background:#10231d;color:#fff;padding:.6rem 1rem;border-radius:10px;opacity:0;pointer-events:none;transition:.2s}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(prefers-color-scheme:dark){:root{--ink:#e8eef3;--muted:#9fb0be;--line:#2a3743;--accent:#22a884;--chip:#1e2b36;--bg:#101820}.copy{background:#141e28;color:#e8eef3}}
 `;
 
 function head({ title, description, canonical, image, jsonLd }) {
@@ -66,7 +67,7 @@ function head({ title, description, canonical, image, jsonLd }) {
 <meta name="twitter:description" content="${esc(description)}" />
 <meta name="twitter:image" content="${esc(image)}" />
 <meta name="theme-color" content="#0a7a63" />
-<link rel="stylesheet" href="data:text/css;base64,${Buffer.from(STYLE).toString("base64")}" />
+<link rel="stylesheet" href="/css/topik.css" />
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
 </head>
 <body>
@@ -231,13 +232,31 @@ function writeOrCheck(file, content) {
   const exists = fs.existsSync(file);
   const current = exists ? fs.readFileSync(file, "utf8") : null;
   if (current === content) return { file, status: "unchanged" };
+  if (DIAGNOSE) {
+    const firstDiff = [...content].findIndex((ch, index) => current?.[index] !== ch);
+    console.log(`bedakan ${path.relative(ROOT, file)} @${firstDiff} panjang lama=${current?.length} baru=${content.length}`);
+  }
   if (CHECK) return { file, status: "stale" };
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, content, "utf8");
   return { file, status: exists ? "updated" : "created" };
 }
 
-const results = [writeOrCheck(path.join(WEB, "topik", "index.html"), hubPage())];
+function topicsJs() {
+  const list = topics.map((topic) => ({
+    slug: topic.slug,
+    label: topic.label,
+    query: topic.query,
+    desc: topic.desc,
+  }));
+  return `window.BIOXIP_TOPICS = ${JSON.stringify(list, null, 2)};\n`;
+}
+
+const results = [
+  writeOrCheck(path.join(WEB, "css", "topik.css"), STYLE),
+  writeOrCheck(path.join(WEB, "js", "topics.js"), topicsJs()),
+  writeOrCheck(path.join(WEB, "topik", "index.html"), hubPage()),
+];
 for (const topic of topics) {
   results.push(writeOrCheck(path.join(WEB, "topik", topic.slug, "index.html"), topicPage(topic)));
 }

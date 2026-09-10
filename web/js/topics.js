@@ -1,12 +1,62 @@
 window.BIOXIP_TOPICS = [
-  { slug: "tb", label: "Tuberkulosis", query: "tuberculosis treatment OR diagnosis", desc: "Bukti terkini untuk TB: diagnosis, obat, dan resistensi." },
-  { slug: "dbd", label: "Demam berdarah", query: "dengue prevention OR management", desc: "Pencegahan dan tatalaksana dengue." },
-  { slug: "stunting", label: "Stunting", query: "stunting intervention child growth", desc: "Intervensi pencegahan stunting." },
-  { slug: "malaria", label: "Malaria", query: "malaria treatment OR elimination", desc: "Terapi dan eliminasi malaria." },
-  { slug: "maternal", label: "Kesehatan ibu", query: "maternal mortality antenatal care", desc: "Bukti untuk keselamatan ibu." },
-  { slug: "diabetes", label: "Diabetes", query: "type 2 diabetes management", desc: "Tatalaksana diabetes melitus tipe 2." },
-  { slug: "hipertensi", label: "Hipertensi", query: "hypertension treatment guidelines", desc: "Kontrol tekanan darah berbasis bukti." },
-  { slug: "hiv", label: "HIV", query: "hiv antiretroviral therapy", desc: "Terapi antiretroviral dan pencegahan HIV." },
-  { slug: "imunisasi", label: "Imunisasi", query: "vaccination coverage program", desc: "Cakupan imunisasi dan program vaksinasi." },
-  { slug: "mental", label: "Kesehatan mental", query: "mental health adolescent intervention", desc: "Kesehatan mental remaja dan dewasa muda." },
+  {
+    "slug": "tb",
+    "label": "Tuberkulosis (TB)",
+    "query": "tuberculosis treatment OR diagnosis OR resistance",
+    "desc": "Bukti terkini untuk diagnosis, terapi, dan resistensi TB."
+  },
+  {
+    "slug": "dbd",
+    "label": "Demam Berdarah Dengue (DBD)",
+    "query": "dengue prevention OR management OR severe dengue",
+    "desc": "Pencegahan, tata laksana, dan peringatan dini dengue berat."
+  },
+  {
+    "slug": "stunting",
+    "label": "Stunting & Gizi Anak",
+    "query": "stunting prevention OR child growth OR nutrition intervention",
+    "desc": "Intervensi gizi dan pencegahan stunting berbasis bukti."
+  },
+  {
+    "slug": "malaria",
+    "label": "Malaria",
+    "query": "malaria treatment OR elimination OR prevention",
+    "desc": "Diagnosis, tata laksana, dan eliminasi malaria."
+  },
+  {
+    "slug": "kesehatan-ibu",
+    "label": "Kesehatan Ibu & Maternal",
+    "query": "maternal health OR antenatal care OR postpartum",
+    "desc": "Bukti untuk kehamilan, persalinan, dan nifas yang aman."
+  },
+  {
+    "slug": "diabetes",
+    "label": "Diabetes Melitus",
+    "query": "type 2 diabetes management OR glycemic control",
+    "desc": "Tatalaksana diabetes dan pencegahan komplikasi."
+  },
+  {
+    "slug": "hipertensi",
+    "label": "Hipertensi",
+    "query": "hypertension treatment OR blood pressure control",
+    "desc": "Diagnosis, terapi, dan pengendalian tekanan darah."
+  },
+  {
+    "slug": "hiv",
+    "label": "HIV & AIDS",
+    "query": "hiv antiretroviral therapy OR prevention",
+    "desc": "Terapi antiretroviral, pencegahan, dan pemantauan."
+  },
+  {
+    "slug": "imunisasi",
+    "label": "Imunisasi & Vaksin",
+    "query": "immunization program OR vaccine effectiveness OR safety",
+    "desc": "Efektivitas, keamanan, dan program imunisasi."
+  },
+  {
+    "slug": "mental",
+    "label": "Kesehatan Mental",
+    "query": "mental health intervention OR depression OR anxiety",
+    "desc": "Intervensi kesehatan mental remaja dan dewasa."
+  }
 ];

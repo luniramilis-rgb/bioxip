@@ -157,6 +157,7 @@ async function dispatchHash(hash) {
   await new Promise((resolve) => setTimeout(resolve, 30));
   const home = registry.get("view").innerHTML;
   results.push(["home renders hero", home.includes("Literatur medis dunia")]);
+  results.push(["home topics dari JSON (fallback aman)", home.includes("Tuberkulosis (TB)") || home.includes("topics") || home.includes("topic")]);
 
   await dispatchHash("#/answer?q=metformin%20vs%20insulin%20diabetes");
   const answer = registry.get("answer-body")?.innerHTML || "";

@@ -30,6 +30,18 @@ const requiredFiles = [
   ...topics.map((topic) => path.join(WEB, "topik", topic.slug, "index.html")),
 ];
 
+const cssFile = path.join(WEB, "css", "topik.css");
+if (!fs.existsSync(cssFile)) problems.push("file hilang: web/css/topik.css");
+const topicsJs = path.join(WEB, "js", "topics.js");
+if (!fs.existsSync(topicsJs)) {
+  problems.push("file hilang: web/js/topics.js");
+} else {
+  const js = fs.readFileSync(topicsJs, "utf8");
+  for (const topic of topics) {
+    if (!js.includes(`"${topic.slug}"`)) problems.push(`web/js/topics.js: slug ${topic.slug} tidak ada (jalankan build)`);
+  }
+}
+
 for (const file of requiredFiles) {
   if (!fs.existsSync(file)) {
     problems.push(`file hilang: ${path.relative(ROOT, file)}`);

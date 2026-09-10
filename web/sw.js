@@ -1,18 +1,24 @@
-const VERSION = "bioxip-v2";
+const VERSION = "bioxip-v3";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
   "/css/app.css",
+  "/css/topik.css",
   "/js/brand.js",
   "/js/topics.js",
   "/js/search.js",
   "/js/answer.js",
+  "/js/drug.js",
+  "/js/interactions.js",
   "/js/app.js",
+  "/data/topics.json",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  "/topik/",
+  "/og/bioxip-og.png",
 ];
-const FRESH_ASSETS = ["/css/", "/js/", "/icons/", "/manifest.json"];
+const FRESH_ASSETS = ["/css/", "/js/", "/icons/", "/data/", "/manifest.json", "/topik/", "/og/"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
