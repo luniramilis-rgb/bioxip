@@ -32,11 +32,12 @@ Dua suite, satu mesin:
   - Sumber: DailyMed/openFDA (label), PubChem (identitas/CID), ChEMBL (mekanisme/target), Open Targets.
   - Tab **Obat** di UI + kartu terapi pada halaman `#/answer`.
   - `functions/_drugs.js` (normalisasi nama obat + peta istilah ID).
+- Deliverable tambahan (P1): katalog Fornas 30 obat (`functions/_drugs.json`) + validator + panduan review apoteker (`docs/review-drugs.md`).
 - Exit: 20 obat umum (ID) menampilkan kartu lengkap dengan tautan sumber di setiap field.
 - Validasi:
-  - Otomatis: setiap field wajib punya `source_url`; field kosong → "tidak ditemukan".
-  - Manual: 1 apoteker (reviewer) memverifikasi 20 kartu vs label (checklist; catat tanggal & reviewer).
-  - Ambang: ≥95% field akurat; 0 klaim tanpa sumber.
+  - Otomatis: setiap field wajib punya `source_url`; field kosong → "tidak ditemukan". `scripts/validate_drugs.js` + `scripts/validate_api.js` (ALL PASS).
+  - Manual: 1 apoteker (reviewer) memverifikasi 30 kartu vs label/Fornas (checklist di `docs/review-drugs.md`; catat tanggal & reviewer).
+  - Ambang: ≥95% field akurat; 0 klaim tanpa sumber; 0 temuan kritis terbuka.
 
 ### S2 — Interaction & Monitoring (fitur pembeda farmasi)
 - Deliverable:
