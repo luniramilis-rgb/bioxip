@@ -32,7 +32,7 @@ export async function onRequestGet(context) {
 
     const term = String(drug.inn).split("/")[0].trim();
     const [label, chemistry, mechanism] = await Promise.all([
-      fetchLabel(term).catch(() => null),
+      fetchLabel(drug).catch(() => null),
       fetchChemistry(term).catch(() => null),
       fetchMechanism(term).catch(() => null),
     ]);
@@ -58,12 +58,25 @@ export async function onRequestGet(context) {
   }
 }
 
-async function fetchLabel(term) {
-  const attempts = [
-    `openfda.generic_name:"${term}"`,
-    `openfda.substance_name:"${term}"`,
-    `openfda.brand_name:"${term}"`,
+function labelCandidates(drug) {
+  const raw = [
+    drug.us_name,
+    drug.inn,
+    ...(drug.aliases || []),
   ];
+  const cleaned = raw
+    .map((t) => String(t || "").trim().toLowerCase())
+    .filter((t) => /^[a-z][a-z\s-]{2,}$/.test(t));
+  return [...new Set(cleaned)].slice(0, 6);
+}
+
+async function fetchLabel(drug) {
+  const candidates = labelCandidates(drug);
+  const attempts = [];
+  for (const candidate of candidates) {
+    attempts.push(`openfda.generic_name:"${candidate}"`);
+    attempts.push(`openfda.substance_name:"${candidate}"`);
+  }
   for (const search of attempts) {
     const resp = await fetch(
       `${OPENFDA}?search=${encodeURIComponent(search)}&limit=1`,
@@ -81,8 +94,10 @@ async function fetchLabel(term) {
       const value = join(result[fdaKey]);
       if (value) fields[key] = buildField(value, source);
     }
+    if (Object.keys(fields).length === 0) continue;
     return {
-      available: Object.keys(fields).length > 0,
+      available: true,
+      matched_term: candidateFrom(search),
       effective_time: result.effective_time || null,
       source,
       source_name: "openFDA / DailyMed drug label",
@@ -90,7 +105,11 @@ async function fetchLabel(term) {
       fields,
     };
   }
-  return { available: false, source: OPENFDA, fields: {} };
+  return { available: false, source: OPENFDA, fields: {}, tried: candidates };
+}
+
+function candidateFrom(search) {
+  return search.replace(/^openfda\.\w+:"/, "").replace(/"$/, "");
 }
 
 function buildField(text, source) {
