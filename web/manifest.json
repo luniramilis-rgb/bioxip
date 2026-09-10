@@ -1,0 +1,16 @@
+{
+  "name": "bioXip — Literatur medis dunia",
+  "short_name": "bioXip",
+  "description": "Mesin pencari literatur biomedis internasional untuk peneliti dan klinisi Indonesia.",
+  "lang": "id",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0a7a63",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

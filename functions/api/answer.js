@@ -102,6 +102,9 @@ async function fetchTrials(query, limit) {
 function mapEpmc(hit) {
   const types = hit.pubTypeList?.pubType || [];
   const studyType = classify(types, hit.source);
+  const pdf = (hit.fullTextUrlList?.urls || []).find(
+    (u) => String(u.documentStyle || "").toLowerCase() === "pdf",
+  );
   return {
     id: `epmc|${hit.doi ? `doi:${hit.doi.toLowerCase()}` : hit.pmid ? `pmid:${hit.pmid}` : `epmc:${hit.source}:${hit.id}`}`,
     title: hit.title || "",
@@ -113,7 +116,7 @@ function mapEpmc(hit) {
     source: "europepmc",
     study_type: studyType,
     citation_count: Number(hit.citedByCount) || 0,
-    oa: { is_oa: String(hit.isOpenAccess || "") === "Y" },
+    oa: { is_oa: String(hit.isOpenAccess || "") === "Y", pdf_url: pdf?.url || null },
   };
 }
 

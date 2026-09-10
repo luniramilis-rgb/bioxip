@@ -225,6 +225,7 @@
     const raw = location.hash.slice(2) || "";
     const [pathPart, queryPart] = raw.split("?");
     const path = pathPart.split("/").filter(Boolean);
+    markNav(navNameFor(path));
 
     if (path.length === 0) {
       view.innerHTML = homeHTML();
@@ -303,7 +304,71 @@
     return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
   }
 
+  function navNameFor(path) {
+    if (!path.length) return "home";
+    if (path[0] === "search" || path[0] === "topic") return "home";
+    if (["answer", "sources", "legal"].includes(path[0])) return path[0];
+    return "home";
+  }
+
+  function markNav(name) {
+    document.querySelectorAll("[data-route]").forEach((el) => {
+      if (el.dataset.route === name) el.setAttribute("aria-current", "page");
+      else el.removeAttribute("aria-current");
+    });
+  }
+
+  function initSheet() {
+    const sheet = document.getElementById("sheet");
+    const backdrop = document.getElementById("sheet-backdrop");
+    const body = document.getElementById("sheet-body");
+    if (!sheet || !backdrop || !body) return;
+    const close = () => {
+      sheet.hidden = true;
+      backdrop.hidden = true;
+      body.innerHTML = "";
+    };
+    window.BIOXIP_SHEET = {
+      open(html) {
+        body.innerHTML = html;
+        sheet.hidden = false;
+        backdrop.hidden = false;
+        sheet.scrollTop = 0;
+        const focusable = sheet.querySelector("a, button");
+        focusable?.focus?.();
+      },
+      close,
+    };
+    backdrop.addEventListener("click", close);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") close();
+    });
+  }
+
+  function initSaver() {
+    const toggle = document.getElementById("saver-toggle");
+    const saved = localStorage.getItem("bioxip-saver") === "true";
+    document.body.classList.toggle("saver", saved);
+    if (toggle) {
+      toggle.checked = saved;
+      toggle.addEventListener("change", () => {
+        document.body.classList.toggle("saver", toggle.checked);
+        localStorage.setItem("bioxip-saver", String(toggle.checked));
+      });
+    }
+  }
+
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    });
+  }
+
   brand();
+  initSheet();
+  initSaver();
+  registerServiceWorker();
   globalEvents();
   window.addEventListener("hashchange", route);
   route();

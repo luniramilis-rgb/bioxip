@@ -2,28 +2,50 @@
 <html lang="id">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>bioXip — Literatur medis dunia, untuk peneliti Indonesia</title>
   <meta name="description" content="Cari literatur biomedis internasional dengan Bahasa Indonesia, langsung dari Europe PMC, ClinicalTrials.gov, PubChem, dan sumber terbuka lainnya." />
+  <meta name="theme-color" content="#0a7a63" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body>
   <header class="topbar">
     <a href="#/" class="brand" data-brand>bioXip</a>
-    <nav>
-      <a href="#/">Cari</a>
-      <a href="#/answer">Jawaban PICO</a>
-      <a href="#/sources">Sumber</a>
-      <a href="#/legal">Kebijakan</a>
+    <nav class="topnav">
+      <a href="#/" data-route="home">Cari</a>
+      <a href="#/answer" data-route="answer">Jawaban PICO</a>
+      <a href="#/sources" data-route="sources">Sumber</a>
+      <a href="#/legal" data-route="legal">Kebijakan</a>
     </nav>
   </header>
 
   <main id="view" tabindex="-1"></main>
 
   <footer>
-    <span data-brand>bioXip</span> — literatur dunia untuk peneliti Indonesia.
-    Sumber: Europe PMC, ClinicalTrials.gov, PubChem, ChEMBL, Open Targets.
+    <p><span data-brand>bioXip</span> — literatur dunia untuk peneliti Indonesia.</p>
+    <p class="muted">Sumber: Europe PMC, ClinicalTrials.gov, PubChem, ChEMBL, Open Targets.</p>
+    <label class="check saver-toggle">
+      <input type="checkbox" id="saver-toggle" /> Mode hemat data
+    </label>
   </footer>
+
+  <nav class="bottomnav" aria-label="Navigasi utama">
+    <a href="#/" data-route="home"><span aria-hidden="true">⌕</span>Cari</a>
+    <a href="#/answer" data-route="answer"><span aria-hidden="true">✦</span>Jawaban</a>
+    <a href="#/sources" data-route="sources"><span aria-hidden="true">◈</span>Sumber</a>
+    <a href="#/legal" data-route="legal"><span aria-hidden="true">§</span>Kebijakan</a>
+  </nav>
+
+  <div id="sheet-backdrop" class="sheet-backdrop" hidden></div>
+  <aside id="sheet" class="sheet" role="dialog" aria-modal="true" aria-label="Detail studi" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div id="sheet-body"></div>
+  </aside>
 
   <script src="/js/brand.js"></script>
   <script src="/js/topics.js"></script>
