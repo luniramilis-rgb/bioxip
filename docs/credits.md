@@ -289,7 +289,7 @@ Selaras dengan `docs/plan.md`:
 | P8 | Paket institusi & API pelanggan |
 
 ## 12. Keputusan yang sudah final
-1. **Sign in wajib** untuk menggunakan bioXip (search & data) — mulai dari versi gratis, demi data pengguna. Metode: **Google OAuth** (utama) + **magic link email** (cadangan).
+1. **Sign in wajib** untuk menggunakan bioXip (search & data) — mulai dari versi gratis, demi data pengguna. Metode: **Google OAuth**, **Apple Sign In**, + **magic link email** (cadangan).
 2. Top-up: **Xendit** (QRIS + Virtual Account + e-wallet).
 3. Search & data gratis untuk pengguna login; **AI terkunci tanpa saldo**; tanpa trial.
 4. Provider: **DeepSeek V4.1 Flash** — tarif input cache hit $0,006 / miss $0,30 / output $1,20 per 1 juta token.
@@ -306,15 +306,17 @@ Karena gate diberlakukan sejak versi gratis, trafik organik harus diselamatkan l
 5. **Berbagi WhatsApp** dari dalam aplikasi → tautan mengarah ke halaman publik topik (bukan halaman dalam login).
 6. Ukur: kunjungan organik → sign in → aktivitas → top-up pertama.
 
-## 14. Alur auth (email: Google OAuth / magic link)
+## 14. Alur auth (Google OAuth / Apple / magic link)
 ```
-1. Pengunjung menekan "Masuk" → pilih "Lanjutkan dengan Google" atau "Kirim tautan email".
+1. Pengunjung menekan "Masuk" → pilih "Lanjutkan dengan Google", "Lanjutkan dengan Apple", atau "Kirim tautan email".
 2. Supabase Auth menyelesaikan OAuth / mengirim magic link (OTP email sebagai cadangan).
 3. Login pertama → trigger handle_new_user membuat profil + credit_accounts (plan='free').
 4. Sesi JWT (access + refresh) disimpan; middleware memverifikasi JWT pada setiap /api/* kecuali /api/auth/*, /api/payments/webhook, dan endpoint publik topik/drug ringkas.
 5. Logout → token dihapus; akses API kembali 401 → UI mengarahkan ke Sign in.
 ```
 Guardrail: rate limit pengiriman magic link per email & per IP; verifikasi email; larangan akun ganda untuk keperluan abuse (audit bila perlu).
+⚠️ **In-app browser** (Instagram/Facebook/TikTok/Line) memblokir OAuth Google/Apple → deteksi UA & tampilkan layar "Buka di Chrome/Safari" (`docs/principles.md` §5).
+⚠️ **Apple Hide My Email** menghasilkan alamat relay → jangan andalkan email untuk komunikasi; gunakan notifikasi in-app atau minta email kontak terpisah.
 
 ## 15. Onboarding data (alasan utama sign-in sejak gratis)
 Rancangan lengkap (pertanyaan, opsi, event analitik, aturan pemakaian data, template pertanyaan AI) ada di **`docs/onboarding.md`**.

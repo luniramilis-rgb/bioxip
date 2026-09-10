@@ -32,10 +32,27 @@ Deliverable:
 - **Halaman publik untuk SEO**: `/topik/*`, `/obat/{slug}` ringkas, `/sumber`, `/legal`, `/harga`.
 - **Preview 3 hasil** + CTA "Masuk untuk melihat semua" pada halaman hasil.
 - Rate limit magic link per email/IP + Turnstile pada form masuk.
+- **Layar "buka di browser"** untuk in-app browser (Instagram/FB/TikTok/Line) — sesuai `docs/principles.md` §5.
+- **Tombol bagikan dasar** (Web Share API + fallback WhatsApp) di hasil & drug card + OG tags.
 
 Env baru: `SUPABASE_JWT_SECRET` (verifikasi), `GOOGLE_OAUTH_*` (di Supabase), `TURNSTILE_*`.
-Validasi: `scripts/validate_auth.js` (401 tanpa token, 200 dengan token uji; onboarding tersimpan), `ui_harness.js` diperluas (halaman masuk, gate hasil, preview 3).
-DoD: pengunjung bisa melihat halaman topik & 3 hasil; setelah login mendapat hasil penuh + profil tersimpan.
+Validasi: `scripts/validate_auth.js` (401 tanpa token, 200 dengan token uji; onboarding tersimpan), `ui_harness.js` diperluas (halaman masuk, gate hasil, preview 3, tombol bagikan).
+DoD: pengunjung bisa melihat halaman topik & 3 hasil; setelah login mendapat hasil penuh + profil tersimpan; tautan berbagi mengarah ke halaman publik.
+
+## Sprint 1.5 — Apple Sign In + loop berbagi (pertumbuhan)
+**Tujuan:** melengkapi kanal masuk & menjadikan berbagi sebagai mesin akuisisi.
+Prasyarat: Sprint 1 stabil; **Apple Developer Program** aktif.
+
+Deliverable:
+- **Apple Sign In** (Service ID, key, verifikasi domain) + penanganan "Hide My Email".
+- **Kartu gambar share** (canvas/SVG di klien) untuk Instagram/Story.
+- **Snapshot jawaban publik** (opt-in pengguna): jawaban + sitasi + atribusi, read-only.
+- **`share_target` PWA**: membagikan tautan dari aplikasi lain → masuk ke bioXip.
+- **Pelacakan rujukan**: `?ref=&utm_source=`, event `share_clicked`/`ref_signup`, hitung **K-factor**.
+- Tombol bagikan di: hasil pencarian, jawaban AI, drug card, halaman topik.
+
+Validasi: `ui_harness.js` (share sheet fallback, snapshot publik, share_target), `validate_api.js` (halaman snapshot publik 200 tanpa login).
+DoD: 1 tautan dibagikan dari HP → penerima melihat halaman publik tanpa login → mendaftar (rujukan tercatat).
 
 ## Sprint 2 — PubMed E-utilities (gratis, dampak besar)
 **Tujuan:** literatur kedokteran lebih presisi & terverifikasi; tanpa biaya AI.

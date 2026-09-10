@@ -74,8 +74,7 @@ Lalu baris consent (checkbox, **wajib dicentang hanya untuk menyimpan profil**; 
 
 Aturan: `consent_at` disimpan; bila tidak dicentang, tetap boleh lanjut dengan `consent = false` (personalisasi dimatikan, data tetap anonim untuk agregat).
 
-## 4. Langkah akhir — Template pertanyaan AI (pola Consensus)
-Setelah onboarding, tampilkan **3 kartu contoh** sesuai peran, masing-masing berisi **pertanyaan siap-pakai**. Mengetuk salah satu langsung menjalankan jawaban AI dan **memperlihatkan contoh hasil**.
+## 4. Langkah akhir — Template pertanyaan AI (pola Consensus)Setelah onboarding, tampilkan **3 kartu contoh** sesuai peran, masing-masing berisi **pertanyaan siap-pakai**. Mengetuk salah satu langsung menjalankan jawaban AI dan **memperlihatkan contoh hasil**.
 
 Kartu contoh (dipilih otomatis berdasarkan `role_category` + `purpose`):
 
@@ -94,6 +93,19 @@ Aturan tampilan:
 5. Jika saldo > 0: jalankan sungguhan; hasil asli menggantikan mock.
 
 > Catatan penting: karena AI berbayar dan tanpa trial, **wajib ada contoh hasil statis** (snapshot dari golden set yang sudah divalidasi) agar pengguna merasakan nilai sebelum membayar. Snapshot ini diambil dari pertanyaan yang sama saat golden set dibuat (Sprint 4), ditandai tanggal & sumber, dan **tidak pernah** menampilkan jawaban yang belum diverifikasi.
+
+### 4.1 Setelah contoh hasil tampil → dorong berbagi (loop pertumbuhan)
+Sesuai `docs/principles.md` §4/§6, setiap contoh hasil dan jawaban nyata punya:
+1. **Tombol bagikan** (Web Share API; fallback tombol WhatsApp/Instagram/Threads/X).
+2. **Teks siap-kirim** + tautan **publik** (halaman topik / snapshot jawaban publik) — bukan tautan halaman dalam login.
+3. **Kartu gambar** yang dirender di klien untuk IG/Story (tanpa tautan yang bisa diklik di caption → sediakan "salin tautan").
+4. Tautan ber-`?ref=<hash>&utm_source=<kanal>` untuk mengukur **K-factor**.
+5. Snapshot publik menampilkan jawaban + sitasi + atribusi "dibuat dengan bioXip" (opsional; hanya bila pengguna memilih "bagikan publik").
+
+### 4.2 Auth & lingkungan mobile
+- Penyedia masuk: **Google OAuth** + **Apple Sign In** + **magic link** (cadangan).
+- **In-app browser** (Instagram/Facebook/TikTok/Line) memblokir OAuth Google/Apple → deteksi UA dan tampilkan layar "Buka di Chrome/Safari" + tombol salin tautan.
+- Apple "Hide My Email" → jangan andalkan email untuk komunikasi; sediakan email kontak terpisah (opsional) atau notifikasi in-app.
 
 ## 5. Spesifikasi data (ringkas)
 Tabel `profiles` (baru, melengkapi `credit_accounts`):
