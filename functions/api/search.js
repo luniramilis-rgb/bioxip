@@ -147,12 +147,12 @@ function epmcQuery(raw, filters) {
 
 function cleanText(value, limit = 0) {
   const text = String(value || "")
-    .replace(/<[^>]+>/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!limit || text.length <= limit) return text;
