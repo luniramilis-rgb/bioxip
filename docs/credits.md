@@ -6,12 +6,12 @@ Dokumen hidup. Keputusan dicatat juga di `docs/blueprint.md` (decision log).
 
 1. **Search & data selalu gratis** (tanpa login, tanpa batas, tanpa ledger).
 2. **AI (Tanya AI / sintesis) terkunci tanpa saldo.** Tidak ada trial.
-3. Saldo dibeli bertingkat: **Rp50.000 · Rp100.000 · Rp150.000 · Rp500.000** (opsional bonus untuk paket besar).
+3. Saldo dibeli bertingkat: **Rp50.000 · Rp100.000 · Rp150.000 · Rp500.000** — **tanpa bonus** (1:1).
 4. **Saldo tidak kedaluwarsa** — tanpa masa berlaku.
 5. Saldo ditampilkan dalam **Rp** (gaya platform DeepSeek), bukan "kredit".
 6. Harga AI = **biaya asli DeepSeek × markup 12×**, dihitung dari **tarif peak**.
 7. Provider AI: **DeepSeek V4.1 Flash** (satu-satunya, dengan lapisan abstraksi `provider`).
-8. Top-up via **Xendit** (QRIS/e-wallet/VA) dengan webhook idempotent.
+8. Top-up via **Xendit**: QRIS, Virtual Account, dan e-wallet.
 
 Prinsip teknis:
 - **Ledger append-only** (sumber kebenaran); saldo = jumlah mutasi.
@@ -120,30 +120,58 @@ for each row execute function apply_ledger_delta();
 
 RLS: user hanya **membaca** data miliknya; insert/update/delete hanya via `service_role`.
 
-## 4. Konfigurasi harga & markup
-| Variabel | Contoh | Fungsi |
+## 4. Tarif, konfigurasi, dan markup
+
+Tarif DeepSeek V4.1 Flash (per 1 juta token, USD):
+| Komponen | Tarif |
+|---|---|
+| Input — cache **hit** | $0,006 |
+| Input — cache **miss** | $0,30 |
+| Output | $1,20 |
+
+| Variabel | Nilai | Fungsi |
 |---|---|---|
 | `DEEPSEEK_API_KEY` | sk-… | server-only |
 | `DEEPSEEK_BASE_URL` | https://api.deepseek.com | endpoint |
 | `DEEPSEEK_MODEL` | deepseek-v4.1-flash | model |
-| `PRICE_IN_MICRO_IDR_PER_1K_PEAK` | _isi setelah verifikasi tarif_ | input, tarif peak per 1k token |
-| `PRICE_OUT_MICRO_IDR_PER_1K_PEAK` | _isi setelah verifikasi tarif_ | output, tarif peak per 1k token |
+| `USD_IDR` | 16300 | kurs internal (perbarui berkala) |
+| `PRICE_IN_HIT_MICRO_IDR_PER_1K` | 97800 | input cache hit per 1k token (µIDR) |
+| `PRICE_IN_MISS_MICRO_IDR_PER_1K` | 4890000 | input cache miss per 1k token (µIDR) |
+| `PRICE_OUT_MICRO_IDR_PER_1K` | 19560000 | output per 1k token (µIDR) |
 | `MARKUP` | **12** | pengali harga jual |
 | `MIN_CHARGE_MICRO_IDR` | 100000000 (Rp100) | minimal tagihan |
 | `RATE_LIMIT_RPM` | 6 | batas permintaan AI/menit/user |
 
-Rumus:
+Rumus (µIDR, integer):
 ```
-cost     = ceil(in_tokens/1000 * PRICE_IN) + ceil(out_tokens/1000 * PRICE_OUT)  # µIDR tarif peak
-charged  = max(cost * MARKUP, MIN_CHARGE)                                       # µIDR
-charged  = ceil(charged / 1_000_000) * 1_000_000                                # bulat ke Rp1
+cost    = ceil(in_hit_tokens/1000  * PRICE_IN_HIT)
+        + ceil(in_miss_tokens/1000 * PRICE_IN_MISS)
+        + ceil(out_tokens/1000     * PRICE_OUT)
+charged = max(cost * MARKUP, MIN_CHARGE)
+charged = ceil(charged / 1_000_000) * 1_000_000        # bulat ke Rp1
 ```
-Markup dihitung dari tarif **peak**, sehingga saat tarif off-peak berlaku margin lebih besar.
 
-### Ilustrasi (angka contoh — WAJIB diganti dengan tarif resmi)
-Tarif peak mis. input $0,28/juta token & output $1,10/juta token, kurs Rp16.300/$ → input ≈ Rp4.564/juta, output ≈ Rp17.930/juta.
-- Jawaban 4.000 input + 1.000 output → biaya ≈ **Rp36** → dijual 12× ≈ **Rp435**.
-- **Rp50.000 ≈ 115 jawaban**; Rp100.000 ≈ 230; Rp150.000 ≈ 345; Rp500.000 ≈ 1.150.
+### Peran penting cache (pengungkit margin terbesar)
+Cache hit **50× lebih murah** dari cache miss ($0,006 vs $0,30). Karena itu prompt harus disusun agar **prefix stabil**:
+- Urutan: `system prompt` + kamus/instruksi tetap → **konteks retrieval & pertanyaan di paling akhir**.
+- Jangan menyisipkan timestamp/ID acak di awal prompt (merusak cache).
+- Pertahankan system prompt identik antar-request sebisa mungkin.
+
+### Ilustrasi (kurs Rp16.300/$)
+Satu jawaban: 4.000 token input + 1.000 token output.
+
+| Skenario | Biaya asli | Dijual 12× | Dibulatkan |
+|---|---|---|---|
+| Input mayoritas cache **hit** (2.800 hit + 1.200 miss) | ≈ Rp25,7 | ≈ Rp308 | **Rp309** |
+| Input **tanpa cache** (4.000 miss) | ≈ Rp39,1 | ≈ Rp469 | **Rp470** |
+
+Daya beli saldo (perkiraan):
+| Saldo | Dengan cache baik (Rp309/jawaban) | Tanpa cache (Rp470/jawaban) |
+|---|---|---|
+| Rp50.000 | ±161 jawaban | ±106 jawaban |
+| Rp100.000 | ±323 | ±212 |
+| Rp150.000 | ±485 | ±319 |
+| Rp500.000 | ±1.618 | ±1.063 |
 
 ## 5. Alur debit & refund (AI) — tanpa trial
 
@@ -176,14 +204,15 @@ Tanpa saldo: **AI terkunci** (tombol menjadi "Isi saldo"), tetapi seluruh search
 
 Alasan pemisahan ini penting: `/api/search` tidak pernah menyentuh ledger, sehingga **mustahil** biaya muncul dari pencarian.
 
-## 7. Paket top-up
-| Paket | Dibayar | Bonus (usulan) | Saldo masuk |
-|---|---|---|---|
-| Kecil | Rp50.000 | — | Rp50.000 |
-| Menengah | Rp100.000 | +Rp5.000 (5%) | Rp105.000 |
-| Besar | Rp150.000 | +Rp10.000 (6,7%) | Rp160.000 |
-| Ekstra | Rp500.000 | +Rp50.000 (10%) | Rp550.000 |
-Bonus hanya untuk mendorong paket besar; mudah diubah (`topups.bonus_idr`).
+## 7. Paket top-up (tanpa bonus, 1:1)
+| Paket | Dibayar | Saldo masuk |
+|---|---|---|
+| Kecil | Rp50.000 | Rp50.000 |
+| Menengah | Rp100.000 | Rp100.000 |
+| Besar | Rp150.000 | Rp150.000 |
+| Ekstra | Rp500.000 | Rp500.000 |
+
+Kanal pembayaran (Xendit): **QRIS**, **Virtual Account**, **e-wallet** (OVO/DANA/ShopeePay sesuai ketersediaan akun Xendit).
 
 ## 8. Kontrak endpoint
 
@@ -253,8 +282,9 @@ Uji wajib: perhitungan tagihan (pembulatan + minimum), hold→settle, hold→fai
 | P6 | Paket institusi & API pelanggan |
 
 ## 12. Keputusan yang sudah final
-1. Top-up: **Xendit**.
+1. Top-up: **Xendit** (QRIS + Virtual Account + e-wallet).
 2. Model: **search gratis selamanya; AI terkunci tanpa saldo; tanpa trial**.
-3. Provider: **DeepSeek V4.1 Flash** (abstraksi provider disiapkan).
+3. Provider: **DeepSeek V4.1 Flash** — tarif input cache hit $0,006 / miss $0,30 / output $1,20 per 1 juta token.
 4. Percakapan: **disimpan untuk evaluasi** (retensi 90 hari, dapat dihapus, tanpa data pasien).
-5. Saldo: **Rp, tanpa kedaluwarsa**, markup **12× tarif peak**.
+5. Saldo: **Rp, tanpa kedaluwarsa, tanpa bonus**, markup **12×** biaya asli.
+6. Optimasi cache prompt (prefix stabil) sebagai pengungkit margin utama.
