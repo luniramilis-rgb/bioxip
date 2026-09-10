@@ -142,12 +142,39 @@
         ${label.available ? fields : '<p class="muted">Label tidak ditemukan di openFDA untuk obat ini — tidak ada data yang dikarang.</p>'}
         ${missingLine}
         ${label.effective_time ? `<p class="muted">Versi label: ${esc(label.effective_time)}</p>` : ""}
+        ${label.label_count ? `<p class="muted">Digabung dari ${esc(label.label_count)} label.</p>` : ""}
         ${label.matched_term ? `<p class="muted">Nama di label: ${esc(label.matched_term)}</p>` : ""}
       </section>
+
+      ${renderMonitoring(data.monitoring, data.monitoring_reviewed)}
 
       <section class="tldr">
         <p class="muted">${esc(data.disclaimer || "")}</p>
         ${(data.notes || []).map((n) => `<p class="muted">${esc(n)}</p>`).join("")}
+      </section>`;
+  }
+
+  function renderMonitoring(monitoring, reviewed) {
+    if (!monitoring) return "";
+    const rows = [
+      ["Ginjal", monitoring.renal],
+      ["Hati", monitoring.hepatic],
+      ["Lansia", monitoring.geriatric],
+    ].filter(([, value]) => value);
+    return `
+      <section class="answer-studies">
+        <h3>Monitoring &amp; penyesuaian (kurasi)
+          <span class="chip ${reviewed ? "reviewed" : "review-pending"}">${reviewed ? "terverifikasi" : "menunggu verifikasi apoteker"}</span>
+        </h3>
+        ${(monitoring.monitoring || []).length
+          ? `<ul class="answer-list">${monitoring.monitoring.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>`
+          : ""}
+        ${rows.length ? `<p class="meta">${rows.map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ")}</p>` : ""}
+        ${(monitoring.deprescribing || []).length
+          ? `<p><strong>Deprescribing:</strong></p><ul class="answer-list">${monitoring.deprescribing
+              .map((d) => `<li>${esc(d)}</li>`)
+              .join("")}</ul>`
+          : ""}
       </section>`;
   }
 

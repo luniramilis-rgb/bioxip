@@ -1,4 +1,5 @@
 import { findDrug, suggestDrugs, FORNAS } from "../_drugs.js";
+import monitoring from "../_monitoring.json";
 
 const OPENFDA = "https://api.fda.gov/drug/label.json";
 const PUBCHEM = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name";
@@ -72,6 +73,8 @@ export async function onRequestGet(context) {
       retrieved_at: new Date().toISOString(),
       chemistry,
       mechanism,
+      monitoring: monitoring.drugs?.[drug.slug] || null,
+      monitoring_reviewed: Boolean(monitoring.reviewed),
       label,
       safety: {
         blackbox: Boolean(blackbox),
@@ -156,6 +159,20 @@ async function fetchLabel(drug, rxnorm) {
     }
     if (Object.keys(best.fields).length >= LABEL_FIELDS.length) break;
   }
+  if (best && Object.keys(best.fields).length < LABEL_FIELDS.length && matchedTerm) {
+    for (const [key, fdaKey] of LABEL_FIELDS) {
+      if (best.fields[key]) continue;
+      const search = `openfda.generic_name:"${matchedTerm}" AND _exists_:${fdaKey}`;
+      const resp = await fetch(`${OPENFDA}?search=${encodeURIComponent(search)}&limit=3`, {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if ((data.results || []).length) mergeInto(best, data.results);
+      if (Object.keys(best.fields).length >= LABEL_FIELDS.length) break;
+    }
+  }
+
   if (!best || Object.keys(best.fields).length === 0) {
     return { available: false, source: OPENFDA, fields: {}, tried: candidates };
   }
@@ -172,28 +189,31 @@ async function fetchLabel(drug, rxnorm) {
 }
 
 function mergeLabels(results) {
-  const fields = {};
-  let effectiveTime = null;
-  let source = OPENFDA;
+  const merged = { fields: {}, count: results.length, effective_time: null, source: OPENFDA };
+  mergeInto(merged, results);
+  return merged;
+}
+
+function mergeInto(target, results) {
   for (const result of results) {
     const setid = result.openfda?.spl_set_id?.[0];
     const src = setid
       ? `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${setid}`
       : OPENFDA;
-    if (result.effective_time && (!effectiveTime || result.effective_time > effectiveTime)) {
-      effectiveTime = result.effective_time;
+    if (result.effective_time && (!target.effective_time || result.effective_time > target.effective_time)) {
+      target.effective_time = result.effective_time;
     }
     for (const [key, fdaKey] of LABEL_FIELDS) {
       const value = join(result[fdaKey]);
       if (!value) continue;
-      const existing = fields[key];
+      const existing = target.fields[key];
       if (!existing || value.length > existing.text.length) {
-        fields[key] = buildField(value, src);
-        if (key === "indikasi") source = src;
+        target.fields[key] = buildField(value, src);
+        if (key === "indikasi") target.source = src;
       }
     }
   }
-  return { fields, count: results.length, effective_time: effectiveTime, source };
+  target.count = Math.max(target.count || 0, results.length);
 }
 
 function candidateFrom(search) {

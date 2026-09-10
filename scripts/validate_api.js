@@ -44,6 +44,13 @@ async function main() {
   const rx = await get("/api/drug?q=parasetamol");
   check("drug rxnorm tersedia (info)", Boolean(rx.body?.rxnorm?.rxcui), rx.body?.rxnorm?.rxcui || "tidak tersedia");
 
+  const mono = await get("/api/drug?q=metformin");
+  check(
+    "drug monitoring kurasi (metformin)",
+    Boolean(mono.body?.monitoring?.monitoring?.length) && Boolean(mono.body?.monitoring?.renal),
+    "",
+  );
+
   const outside = await get("/api/drug?q=warfarin");
   check(
     "drug di luar katalog: matched via RxNorm atau saran",

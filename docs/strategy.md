@@ -45,6 +45,8 @@ Dua suite, satu mesin:
   - Monitoring & penyesuaian ginjal/hati (rentang, dari label) + checklist deprescribing (Beers/STOPP/START).
   - Export ringkas (PDF/gambar) + salin sitasi.
 - Catatan teknis (2026-09-10): **RxNav Interaction API (NLM) telah dihentikan (404)** → diganti dua lapis: (1) **tabel interaksi terkurasi** (`functions/_interactions.json`, 15 pasangan, `reviewed:false` sampai diverifikasi apoteker — lihat `docs/review-interactions.md`); (2) **kutipan bagian interaksi label** openFDA/DailyMed sebagai bukti grounded (`mentions`). RxNorm tetap dipakai untuk normalisasi nama.
+- Deliverable monitoring (2026-09-10): `functions/_monitoring.json` (30 obat: monitoring, penyesuaian ginjal/hati, lansia, deprescribing, `reviewed:false`) + bagian UI di kartu obat + `docs/review-monitoring.md` + `scripts/validate_monitoring.js`.
+- Catatan label (2026-09-10): agregasi multi-label openFDA (`limit=10`) + pass bertarget `_exists_:<field>` → metformin/ibuprofen kini 10/10 field tanpa "tidak ditemukan".
 - Exit: 50 pasangan interaksi umum terverifikasi; deprescribing untuk 10 kondisi geriatri.
 - Validasi: apoteker reviewer (≥95% akurasi tingkat keparahan), uji regresi otomatis (`validate_interactions.js` + `validate_api.js`) terhadap pasangan acuan.
 
