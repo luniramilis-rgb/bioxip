@@ -21,6 +21,8 @@ async function main() {
   check("search: 200", search.status === 200, String(search.status));
   check("search: results array", Array.isArray(search.body?.results), "");
   check("search: total number", typeof search.body?.total === "number", String(search.body?.total));
+  const sources = new Set((search.body?.results || []).map((r) => r.source));
+  check("search: PubMed ikut tampil", sources.has("pubmed"), [...sources].join("/"));
 
   const answer = await get("/api/answer?q=metformin%20vs%20insulin%20diabetes");
   const studies = answer.body?.studies || [];

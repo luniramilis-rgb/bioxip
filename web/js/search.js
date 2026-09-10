@@ -21,6 +21,7 @@ window.BIOXIP_SEARCH = {
   renderResult(doc) {
     const authors = (doc.authors || []).slice(0, 6).map((a) => `${a.given || ""} ${a.family || ""}`.trim()).join(", ");
     const metaBits = [];
+    metaBits.push(`<span class="chip">${this.escape(this.sourceLabel(doc.source))}</span>`);
     metaBits.push(`<span class="chip">${this.escape(doc.doc_type)}</span>`);
     if (doc.oa && doc.oa.is_oa) metaBits.push('<span class="chip oa">OA</span>');
     if (doc.journal) metaBits.push(this.escape(doc.journal));
@@ -55,6 +56,16 @@ window.BIOXIP_SEARCH = {
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
+  },
+
+  sourceLabel(source) {
+    return (
+      {
+        europepmc: "Europe PMC",
+        pubmed: "PubMed",
+        clinicaltrials: "ClinicalTrials.gov",
+      }[source] || source
+    );
   },
 
   safeUrl(value) {

@@ -17,3 +17,7 @@ jobs:
         run: node scripts/validate_api.js
         env:
           BIOXIP_BASE: https://bioxip.pages.dev
+      - name: Validasi PubMed (sumber & dedupe)
+        run: node scripts/validate_pubmed.js
+        env:
+          BIOXIP_BASE: https://bioxip.pages.dev

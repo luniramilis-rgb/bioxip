@@ -1,4 +1,5 @@
-import { expandQuery } from "../_dictionary.js";
+import { expandQuery, expandQueryEnglish } from "../_dictionary.js";
+import { searchPubmed } from "../_pubmed.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 const CT = "https://clinicaltrials.gov/api/v2/studies";
@@ -25,6 +26,8 @@ export async function onRequestGet(context) {
     const query = expandQuery(raw);
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
     const needTrial = !types || types.includes("trial");
+    const needPubmed = needLit && (!types || types.includes("paper"));
+    const env = context.env || {};
 
     const calls = [];
     if (needLit) {
@@ -33,23 +36,34 @@ export async function onRequestGet(context) {
     if (needTrial) {
       calls.push(fetchTrials(query, { oa, indonesia, types, sort, limit: perPage, token: ctToken }));
     }
+    if (needPubmed) {
+      calls.push(
+        searchPubmed(expandQueryEnglish(raw), { retmax: perPage, env }).then((data) => ({
+          total: data.total,
+          results: data.results,
+          pagination: { pubmedHasMore: false },
+          countsTowardTotal: false,
+        })),
+      );
+    }
 
     const settled = await Promise.allSettled(calls.map((p) => withTimeout(p, TIMEOUT_MS)));
 
-    const results = [];
+    const collected = [];
     let total = 0;
     const notes = [];
     const pagination = {};
     for (const item of settled) {
       if (item.status === "fulfilled") {
-        results.push(...item.value.results);
-        total += item.value.total;
+        collected.push(...item.value.results);
+        if (item.value.countsTowardTotal !== false) total += item.value.total;
         Object.assign(pagination, item.value.pagination);
       } else {
         notes.push(item.reason instanceof Error ? item.reason.message : "sumber tidak merespons");
       }
     }
 
+    const results = dedupeResults(collected);
     results.sort(rankBy(sort));
     const paged = results.slice(0, perPage);
 
@@ -184,6 +198,32 @@ function mapTrial(study) {
     meta: { phase, status: status.overallStatus, conditions: cond.conditions || [], nct_id: ident.nctId },
     external_ids: { nctid: ident.nctId },
   };
+}
+
+const SOURCE_PRIORITY = { europepmc: 0, pubmed: 1, clinicaltrials: 2 };
+
+function dedupeResults(rows) {
+  const map = new Map();
+  for (const row of rows) {
+    const key = resultKey(row);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, row);
+      continue;
+    }
+    const current = SOURCE_PRIORITY[existing.source] ?? 9;
+    const candidate = SOURCE_PRIORITY[row.source] ?? 9;
+    if (candidate < current) map.set(key, row);
+  }
+  return [...map.values()];
+}
+
+function resultKey(row) {
+  const doi = row.doi && String(row.doi).toLowerCase();
+  if (doi) return `doi:${doi}`;
+  const pmid = row.external_ids?.pmid;
+  if (pmid) return `pmid:${pmid}`;
+  return `id:${row.id}`;
 }
 
 function rankBy(sort) {

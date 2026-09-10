@@ -29,6 +29,19 @@ export function expandQuery(raw) {
   return groups.length ? `(${query}) OR ${groups.join(" OR ")}` : query;
 }
 
+export function expandQueryEnglish(raw) {
+  const query = (raw || "").trim();
+  if (!query) return query;
+  const groups = [];
+  for (const entry of DICTIONARY) {
+    if (query.toLowerCase().includes(entry.id_term)) groups.push(`(${entry.en_terms})`);
+  }
+  if (!groups.length) return query;
+  const tokens = query.split(/\s+/).filter((t) => /^[a-zA-Z][a-zA-Z0-9-]*$/.test(t) && t.length > 2);
+  const ascii = [...new Set(tokens)].join(" OR ");
+  return ascii ? `(${ascii}) OR ${groups.join(" OR ")}` : groups.join(" OR ");
+}
+
 export function suggest(prefix) {
   const p = (prefix || "").trim().toLowerCase();
   if (!p) return [];

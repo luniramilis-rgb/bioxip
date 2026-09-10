@@ -26,7 +26,6 @@ jobs:
 
       - name: Validasi render UI (harness)
         run: node tests/ui_harness.js
-
       - name: Cek sintaks JS (functions + web)
         run: |
           for f in $(find functions web -name "*.js"); do node --check "$f" || exit 1; done
