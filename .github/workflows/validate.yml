@@ -30,6 +30,9 @@ jobs:
       - name: Validasi impor fungsi (anti-gagal bundel)
         run: node scripts/validate_imports.js
 
+      - name: Validasi proxy AI & debit (statis)
+        run: node scripts/validate_ai.js
+
       - name: Validasi skema kredit & rumus harga
         run: node scripts/validate_credits.js
 
