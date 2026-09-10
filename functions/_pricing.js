@@ -27,7 +27,7 @@ export function chargedMicroIdr(costMicro, markup = pricing.markup) {
   return rupiah * pricing.micro_per_idr;
 }
 
-export function estimateMicroIdr({ inputTokens = 0, maxOutputTokens = 1024, cacheHitRatio = 0.7 }) {
+export function estimateMicroIdr({ inputTokens = 0, maxOutputTokens = 1024, cacheHitRatio = 0.7, safety = 1 }) {
   const hit = Math.round(inputTokens * cacheHitRatio);
   const miss = Math.max(0, inputTokens - hit);
   const cost = costMicroIdr({
@@ -35,7 +35,12 @@ export function estimateMicroIdr({ inputTokens = 0, maxOutputTokens = 1024, cach
     inputMissTokens: miss,
     outputTokens: maxOutputTokens,
   });
-  return chargedMicroIdr(cost);
+  const charged = chargedMicroIdr(cost);
+  const withSafety = safety > 1
+    ? Math.ceil((charged * safety) / pricing.micro_per_idr) * pricing.micro_per_idr
+    : charged;
+  const minimum = pricing.min_charge_idr * pricing.micro_per_idr;
+  return Math.max(withSafety, minimum);
 }
 
 export function microToIdr(micro) {

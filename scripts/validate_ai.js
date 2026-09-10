@@ -43,11 +43,18 @@ for (const marker of [
   'send("done"',
   "classifyInput",
   "extractiveAnswer",
+  "rate_limited",
+  "effectiveRpm",
+  "recentRequestCount",
+  "safety: providerOk ? 1.3 : 1",
 ]) {
   if (!chat.includes(marker)) fail(`api/ai/chat.js: tidak ada "${marker}"`);
 }
 if (!chat.includes("chargedMicro > estimate")) fail("api/ai/chat.js: harus menjamin tagihan tidak melebihi hold");
 if (!chat.includes("refundCredits")) fail("api/ai/chat.js: harus refund saat gagal");
+
+const pricing = fs.readFileSync(path.join(ROOT, "functions", "_pricing.js"), "utf8");
+if (!pricing.includes("safety")) fail("_pricing.js: estimate harus mendukung faktor keamanan (safety)");
 
 const migration = fs.readFileSync(path.join(ROOT, "supabase", "migrations", "010_ai_logging.sql"), "utf8");
 for (const marker of [
@@ -109,6 +116,20 @@ async function signIn(email, password) {
   });
   const body = await resp.json();
   return body.access_token || null;
+}
+
+async function setUserRpm(userId, rpm) {
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/usage_limits`, {
+    method: "POST",
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    },
+    body: JSON.stringify({ user_id: userId, rpm }),
+  });
+  return resp.ok;
 }
 
 async function readSse(response) {
@@ -217,6 +238,15 @@ async function liveTests() {
       usageRows.length >= 1 && Number(usageRows[0].charged_micro_idr) > 0 && Number(usageRows[0].margin_micro_idr) > 0,
       JSON.stringify(usageRows[0] || {}),
     );
+
+    const rpmSet = await setUserRpm(userId, 1);
+    check("live: set rpm user = 1", rpmSet);
+    const limited = await fetch(`${BASE}/api/ai/chat`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: "Apa bukti terapi hipertensi?", use_provider: false, max_tokens: 256 }),
+    });
+    check("live: 429 rate limit per-user", limited.status === 429, String(limited.status));
   } finally {
     await admin(`users/${userId}`, { method: "DELETE" });
   }

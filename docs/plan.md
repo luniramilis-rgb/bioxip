@@ -121,7 +121,9 @@ Hasil:
 - `GET /api/ai/estimate` (401 tanpa token) → estimasi Rp berbasis `_pricing.json`.
 - Migrasi `010_ai_logging.sql`: `fn_ai_log_usage`, `fn_ai_log_chat`, `fn_usage_limit_for` (SECURITY DEFINER, hanya `authenticated`) — menulis log tanpa service_role di edge.
 - **Mock mode**: aktif otomatis ketika `DEEPSEEK_API_KEY` belum diset → jawaban ekstraktif bersitasi + usage sintetis (tetap dipotong saldo, minimum Rp100). Aman untuk uji & demo tanpa biaya token.
-- Validasi live (`scripts/validate_ai.js`): 402 tanpa saldo · grant · **422** input tidak aman · estimasi **Rp267** · SSE lengkap (`meta,delta,…,citation,…,done`) · tagihan **Rp100** (batas minimum) · saldo **49.900** sesuai · `ai_usage_log` tercatat dengan **margin** → **ALL PASS**.
+- **Rate limit 429** per pengguna: `recentRequestCount` (jumlah `credit_operations` 60 detik terakhir) dibanding `rpm`; `rpm` diambil dari env `RATE_LIMIT_RPM` bila ada, jika tidak dari tabel `usage_limits` (default 6).
+- **Margin keamanan estimasi**: saat provider aktif, estimasi dikalikan **1,3×** agar pemakaian nyata tidak melebihi hold (mencegah tagihan ter-*clamp* dan margin tergerus); mode mock memakai estimasi eksak.
+- Validasi live (`scripts/validate_ai.js`): 402 tanpa saldo · grant · **422** input tidak aman · estimasi · SSE lengkap · tagihan **Rp100** · saldo sesuai · `ai_usage_log` dengan **margin** · **429** setelah `usage_limits.rpm=1` → **ALL PASS**.
 
 ## Sprint 6 — UI Mode Gratis vs AI (P4)
 **Tujuan:** tidak ada kejutan biaya.

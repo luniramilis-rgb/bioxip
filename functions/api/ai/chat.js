@@ -23,18 +23,56 @@ function estimateInputTokens(question, evidence) {
   return Math.max(200, Math.ceil(chars / 4));
 }
 
-export function estimatePayload({ question = "", evidenceCount = 8, maxTokens = 1024 }) {
+export function estimatePayload({ question = "", evidenceCount = 8, maxTokens = 1024, safety = 1 }) {
   const approximateEvidenceChars = evidenceCount * 700;
   const inputTokens = Math.max(300, Math.ceil((String(question).length + approximateEvidenceChars) / 4));
-  const estimate = estimateMicroIdr({ inputTokens, maxOutputTokens: maxTokens });
+  const estimate = estimateMicroIdr({ inputTokens, maxOutputTokens: maxTokens, safety });
   return {
     estimate_idr: microToIdr(estimate),
     estimate_micro_idr: estimate,
     basis: "peak",
     markup: 12,
+    safety,
     assumed_input_tokens: inputTokens,
     max_tokens: maxTokens,
   };
+}
+
+async function recentRequestCount(env, token) {
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const resp = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/credit_operations?select=request_id&created_at=gte.${encodeURIComponent(since)}&limit=100`,
+    {
+      headers: {
+        apikey: env.SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    },
+  );
+  if (!resp.ok) return 0;
+  const rows = await resp.json();
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
+async function userRateLimit(env, token) {
+  const resp = await fetch(`${env.SUPABASE_URL}/rest/v1/usage_limits?select=rpm&limit=1`, {
+    headers: {
+      apikey: env.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+  if (!resp.ok) return null;
+  const rows = await resp.json();
+  const rpm = Number(rows?.[0]?.rpm);
+  return Number.isFinite(rpm) && rpm > 0 ? rpm : null;
+}
+
+export async function effectiveRpm(env, token) {
+  const fromEnv = Number(env.RATE_LIMIT_RPM);
+  const rpm = fromEnv > 0 ? fromEnv : (await userRateLimit(env, token)) || 6;
+  return Math.min(Math.max(rpm, 1), 60);
 }
 
 export async function onRequestPost(context) {
@@ -67,11 +105,19 @@ export async function onRequestPost(context) {
   const account = await fetchAccount(env, token);
   if (!account) return json({ error: "unauthorized" }, 401);
 
+  const rpm = await effectiveRpm(env, token);
+  const recent = await recentRequestCount(env, token);
+  if (recent >= rpm) {
+    return json({ error: "rate_limited", rpm, retry_after: 60 }, 429);
+  }
+
   const origin = new URL(request.url).origin;
   const evidence = await gatherEvidence(origin, question, { limit: 8 });
+  const providerOk = useProvider && providerReady(env);
   const estimate = estimateMicroIdr({
     inputTokens: estimateInputTokens(question, evidence),
     maxOutputTokens: maxTokens,
+    safety: providerOk ? 1.3 : 1,
   });
 
   const balanceMicro = Number(account.balance_micro_idr || 0);
@@ -123,8 +169,8 @@ export async function onRequestPost(context) {
           evidence_count: evidence.length,
         });
 
-        const providerOk = useProvider && providerReady(env);
-        if (providerOk) {
+        const providerIsReady = useProvider && providerReady(env);
+        if (providerIsReady) {
           const result = await callDeepseek(env, {
             system: SYSTEM_PROMPT,
             user: buildUserPrompt(question, evidence),
@@ -250,7 +296,7 @@ export async function onRequestPost(context) {
 }
 
 async function logUsage(env, token, payload) {
-  await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/fn_ai_log_usage`, {
+  const resp = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/fn_ai_log_usage`, {
     method: "POST",
     headers: {
       apikey: env.SUPABASE_ANON_KEY,
@@ -269,10 +315,13 @@ async function logUsage(env, token, payload) {
       p_status: payload.status,
     }),
   }).catch(() => null);
+  if (!resp || !resp.ok) {
+    console.warn("bioxip: gagal menulis ai_usage_log", resp ? resp.status : "network");
+  }
 }
 
 async function logChat(env, token, payload) {
-  await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/fn_ai_log_chat`, {
+  const resp = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/fn_ai_log_chat`, {
     method: "POST",
     headers: {
       apikey: env.SUPABASE_ANON_KEY,
@@ -287,4 +336,7 @@ async function logChat(env, token, payload) {
       p_citations: payload.citations,
     }),
   }).catch(() => null);
+  if (!resp || !resp.ok) {
+    console.warn("bioxip: gagal menulis ai_chat_log", resp ? resp.status : "network");
+  }
 }
