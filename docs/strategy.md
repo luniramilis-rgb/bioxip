@@ -75,10 +75,12 @@ Dua suite, satu mesin:
 | Analitik | log query anonim, akurasi field, error rate |
 
 ## 5. Validasi berlapis (wajib di setiap fase)
+Otomatis di CI (`.github/workflows/validate.yml`, tiap push/PR): `validate_drugs` + `validate_monitoring` + `validate_interactions` + `ui_harness` + cek sintaks seluruh JS. Terjadwal harian (`.github/workflows/validate-api.yml`): `validate_api` terhadap produksi.
+
 | Lapisan | Cara | Ambang lulus |
 |---|---|---|
-| Unit & sintaks | `node --check`, harness UI (`ui_harness.js`), `pytest` harvester | 100% lulus |
-| Kontrak API | Uji skema respons tiap endpoint | Field wajib ada; 0 error 5xx |
+| Unit & sintaks | `node --check`, harness UI (`tests/ui_harness.js`), `pytest` harvester | 100% lulus |
+| Kontrak API | `scripts/validate_api.js` (22 cek) | Field wajib ada; 0 error 5xx |
 | Integritas sitasi | Otomatis: setiap `[n]`/`source_url` valid dalam payload | ≥98% klaim tersupport |
 | Golden set | 30 pertanyaan/obat dengan jawaban acuan | ≥95% akurasi field |
 | Tinjauan klinis | 1 dokter + 1 apoteker (checklist + tanggal) | 0 temuan kritis terbuka |
