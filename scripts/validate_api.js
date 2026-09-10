@@ -108,6 +108,25 @@ async function main() {
   });
   check("ai/chat: 401 tanpa token", chat.status === 401, String(chat.status));
 
+  const topupGet = await get("/api/credits/topup?id=00000000-0000-0000-0000-000000000000");
+  check("credits/topup GET: 401 tanpa token", topupGet.status === 401, String(topupGet.status));
+  const topupPost = await fetch(`${BASE}/api/credits/topup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount_idr: 100000, channel: "QRIS" }),
+  });
+  check("credits/topup POST: 401 tanpa token", topupPost.status === 401, String(topupPost.status));
+  const webhookBad = await fetch(`${BASE}/api/payments/webhook`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ external_id: "uji", status: "SUCCEEDED" }),
+  });
+  check(
+    "payments/webhook: tidak menerima tanpa verifikasi",
+    [200, 401, 400].includes(webhookBad.status),
+    String(webhookBad.status),
+  );
+
   let failed = 0;
   for (const item of results) {
     if (!item.ok) failed++;

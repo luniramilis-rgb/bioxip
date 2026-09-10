@@ -138,15 +138,15 @@ Hasil:
 - Navigasi: bottom nav kini `Cari · Jawaban · Obat · Saldo · Sumber` (Kebijakan di footer), top nav menambah **Saldo**.
 - Validasi: `ui_harness` diperluas (segmented, panel AI, terkunci tanpa akun, halaman saldo, paket harga) → **ALL PASS**; `validate_imports` juga memeriksa **parity precache service worker** (SW v4 memuat credits/ai/saldo) → bug precache tertangkap & diperbaiki.
 
-## Sprint 7 — Xendit Top-up (P5)
+## Sprint 7 — Xendit Top-up (P5) — SELESAI (2026-09-10, mode mock)
 **Tujuan:** pembelian saldo end-to-end.
-
-Deliverable:
-- `POST /api/credits/topup` (QRIS, VA, e-wallet) + `POST /api/payments/webhook` (verifikasi signature/callback token, idempotent via `provider_ref`).
-- Halaman/instruksi pembayaran (QR string, nomor VA, expiry) + status.
-
-Validasi: webhook ganda → saldo bertambah sekali; status `expired` tidak menambah saldo; rekonsiliasi Xendit vs ledger.
-DoD: 1 transaksi uji sukses di sandbox Xendit.
+Hasil:
+- Migrasi `011_topups.sql` (+ perbaikan `012_topup_create_fix.sql`): kolom `channel`, `external_id` (unik), `payment_url`, `expires_at`, `raw`; RPC `fn_topup_create` (paket & kanal divalidasi di server, pakai ulang pending yang sama), `fn_topup_get`, `fn_topup_attach`, dan `fn_topup_mark_paid` (**webhook, idempotent, kredit hanya via ledger; hanya service_role**).
+- `POST /api/credits/topup` (JWT; validasi nominal & kanal) → membuat tagihan Xendit **atau instruksi mock**; `GET /api/credits/topup?id=` untuk status; `POST /api/payments/webhook` (verifikasi `x-callback-token`; idempotent via `external_id`).
+- `functions/_xendit.js`: mode **mock otomatis** bila `XENDIT_SECRET_KEY` belum diset (`QRIS`/`VA`/`EWALLET` menghasilkan instruksi sandbox + `payment_url`), mode live memakai **Xendit Payment Requests** (`api-version: 2024-11-11`); verifikasi callback token.
+- UI `#/saldo`: tombol paket (Rp50rb/100rb/150rb/500rb) + pilih kanal, menampilkan instruksi pembayaran & tautan, **polling status** tiap 3 dtk (auto-refresh saldo saat `paid`), dan penanganan `expired/failed`.
+- **Temuan & perbaikan penting**: RPC `fn_topup_create` gagal karena **OUT parameter bernama `status` bentrok dengan kolom `topups.status`** ("column reference status is ambiguous"); `create or replace` juga tidak dapat mengubah return type → migrasi diubah memakai `drop function` + nama OUT `topup_status` + kualifikasi `t.status`. Tambah `notify pgrst, 'reload schema'`.
+- Validasi live (`scripts/validate_topup.js`): saldo awal 0 · tolak nominal/kanal tidak valid · buat topup mock · pakai ulang pending · status pending · **webhook kredit Rp100.000** · **webhook dobel diabaikan** · saldo & ledger tepat sekali · gate 401 → **ALL PASS (12/12)**.
 
 ## Sprint 8 — Kualitas Retrieval & Data (K2–K4)
 - Retrieval hibrida (FTS + `pgvector`) + section-aware chunking + reranker.
@@ -184,5 +184,5 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 | 4 Grounded ✅ | `validate_grounded.js` (struktur + live opsional) — **ALL PASS** | review apoteker/dokter |
 | 5 AI proxy ✅ | `validate_ai.js` (statis + live mock) — **ALL PASS** | uji 10 pertanyaan nyata (setelah `DEEPSEEK_API_KEY`) |
 | 6 UI ✅ | `ui_harness.js` (segmented, estimasi, terkunci, saldo, harga) — **ALL PASS** | uji mobile |
-| 7 Xendit | webhook ganda + rekonsiliasi | transaksi sandbox Xendit |
+| 7 Xendit ✅ | `validate_topup.js` (statis + live mock) — **ALL PASS 12/12** | transaksi sandbox Xendit (setelah kunci) |
 | 8 Kualitas | regresi golden 150+ di CI | review ahli per domain |
