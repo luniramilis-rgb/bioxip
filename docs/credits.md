@@ -4,14 +4,15 @@ Dokumen hidup. Keputusan dicatat juga di `docs/blueprint.md` (decision log).
 
 ## 1. Model bisnis (final)
 
-1. **Search & data selalu gratis** (tanpa login, tanpa batas, tanpa ledger).
-2. **AI (Tanya AI / sintesis) terkunci tanpa saldo.** Tidak ada trial.
-3. Saldo dibeli bertingkat: **Rp50.000 · Rp100.000 · Rp150.000 · Rp500.000** — **tanpa bonus** (1:1).
-4. **Saldo tidak kedaluwarsa** — tanpa masa berlaku.
-5. Saldo ditampilkan dalam **Rp** (gaya platform DeepSeek), bukan "kredit".
-6. Harga AI = **biaya asli DeepSeek × markup 12×**, dihitung dari **tarif peak**.
-7. Provider AI: **DeepSeek V4.1 Flash** (satu-satunya, dengan lapisan abstraksi `provider`).
-8. Top-up via **Xendit**: QRIS, Virtual Account, dan e-wallet.
+1. **Wajib sign in via email** (OAuth/OTP email) untuk memakai bioXip — search maupun AI.
+2. **Search & data gratis** untuk pengguna yang sudah masuk (tanpa batas, tanpa ledger).
+3. **AI (Tanya AI / sintesis) terkunci tanpa saldo.** Tidak ada trial.
+4. Saldo dibeli bertingkat: **Rp50.000 · Rp100.000 · Rp150.000 · Rp500.000** — **tanpa bonus** (1:1).
+5. **Saldo tidak kedaluwarsa** — tanpa masa berlaku.
+6. Saldo ditampilkan dalam **Rp** (gaya platform DeepSeek), bukan "kredit".
+7. Harga AI = **biaya asli DeepSeek × markup 12×**.
+8. Provider AI: **DeepSeek V4.1 Flash** (satu-satunya, dengan lapisan abstraksi `provider`).
+9. Top-up via **Xendit**: QRIS, Virtual Account, dan e-wallet.
 
 Prinsip teknis:
 - **Ledger append-only** (sumber kebenaran); saldo = jumlah mutasi.
@@ -192,17 +193,20 @@ Daya beli saldo (perkiraan):
 
 Idempotency: `request_id + ':hold' | ':settle' | ':fail'`.
 
-## 6. Gating gratis vs berbayar
+## 6. Gating: auth wajib, search gratis, AI berbayar
 
 | Area | Akses | Biaya |
 |---|---|---|
-| `/api/search`, `/api/answer`, `/api/drug`, `/api/interactions` | publik | **gratis, tanpa ledger** |
+| Halaman publik (landing, tentang, legal) | tanpa login | — |
+| `/api/search`, `/api/answer`, `/api/drug`, `/api/interactions` | **login wajib** | **gratis, tanpa ledger** |
 | `/api/ai/chat` | login + saldo > 0 | berbayar (hold→settle) |
-| Halaman AI di UI | login + saldo > 0 | tombol menampilkan estimasi |
+| Halaman AI di UI | login + saldo > 0 | tombol menampilkan estimasi Rp |
 
-Tanpa saldo: **AI terkunci** (tombol menjadi "Isi saldo"), tetapi seluruh search & data tetap dapat dipakai — termasuk oleh pengunjung tanpa akun (SEO & akuisisi tetap jalan).
-
-Alasan pemisahan ini penting: `/api/search` tidak pernah menyentuh ledger, sehingga **mustahil** biaya muncul dari pencarian.
+Aturan teknis:
+- **Middleware gating**: semua `/api/*` kecuali `/api/auth/*` dan `/api/payments/webhook` memeriksa **JWT Supabase**; tanpa token → `401 unauthorized` + UI mengarahkan ke Sign in.
+- Halaman statis (landing, legal, `/sources`) tetap publik agar **SEO & kepercayaan** terjaga; konten hasil pencarian hanya dirender setelah login.
+- **Penting untuk SEO**: karena konten di balik login tidak terindeks Google, sediakan **halaman publik bertema** (topik, contoh pertanyaan, penjelasan sumber) — lihat §13.
+- Tanpa saldo: **AI terkunci** (tombol menjadi "Isi saldo"), search & drug card tetap dapat dipakai. `/api/search` tidak pernah menyentuh ledger, sehingga biaya mustahil muncul dari pencarian.
 
 ## 7. Paket top-up (tanpa bonus, 1:1)
 | Paket | Dibayar | Saldo masuk |
@@ -272,19 +276,62 @@ Error: 401 unauthorized · 402 insufficient_balance · 429 rate_limited · 422 u
 Uji wajib: perhitungan tagihan (pembulatan + minimum), hold→settle, hold→fail→refund, webhook ganda, akses AI dengan saldo 0 → 402, 10 prompt terlarang → 422.
 
 ## 11. Urutan implementasi
+Selaras dengan `docs/plan.md`:
 | Fase | Isi |
 |---|---|
-| P1 | Migrasi tabel + trigger + RLS; `GET /api/credits/me`; uji ledger tanpa AI |
-| P2 | `POST /api/ai/chat` proxy DeepSeek + hold/settle + `ai_usage_log` |
-| P3 | Grounded RAG + sitasi + guardrail input + `ai_chat_log` (retensi 90 hari) |
-| P4 | UI: tombol AI menampilkan estimasi, status saldo, AI terkunci saat Rp0 |
-| P5 | Xendit top-up + webhook idempotent + halaman saldo/riwayat |
-| P6 | Paket institusi & API pelanggan |
+| P1 | **Auth (Google OAuth + magic link) + gating + SEO publik + onboarding** |
+| P2 | PubMed E-utilities (MeSH, Clinical Queries) |
+| P3 | Migrasi tabel + trigger + RLS; `GET /api/credits/me`; uji ledger tanpa AI |
+| P4 | Grounded RAG internal + sitasi + guardrail input + golden 30 |
+| P5 | `POST /api/ai/chat` proxy DeepSeek + hold/settle + `ai_usage_log` |
+| P6 | UI: tombol AI menampilkan estimasi, status saldo, AI terkunci saat Rp0 |
+| P7 | Xendit top-up + webhook idempotent + halaman saldo/riwayat |
+| P8 | Paket institusi & API pelanggan |
 
 ## 12. Keputusan yang sudah final
-1. Top-up: **Xendit** (QRIS + Virtual Account + e-wallet).
-2. Model: **search gratis selamanya; AI terkunci tanpa saldo; tanpa trial**.
-3. Provider: **DeepSeek V4.1 Flash** — tarif input cache hit $0,006 / miss $0,30 / output $1,20 per 1 juta token.
-4. Percakapan: **disimpan untuk evaluasi** (retensi 90 hari, dapat dihapus, tanpa data pasien).
-5. Saldo: **Rp, tanpa kedaluwarsa, tanpa bonus**, markup **12×** biaya asli.
-6. Optimasi cache prompt (prefix stabil) sebagai pengungkit margin utama.
+1. **Sign in wajib** untuk menggunakan bioXip (search & data) — mulai dari versi gratis, demi data pengguna. Metode: **Google OAuth** (utama) + **magic link email** (cadangan).
+2. Top-up: **Xendit** (QRIS + Virtual Account + e-wallet).
+3. Search & data gratis untuk pengguna login; **AI terkunci tanpa saldo**; tanpa trial.
+4. Provider: **DeepSeek V4.1 Flash** — tarif input cache hit $0,006 / miss $0,30 / output $1,20 per 1 juta token.
+5. Percakapan: **disimpan untuk evaluasi** (retensi 90 hari, dapat dihapus, tanpa data pasien).
+6. Saldo: **Rp, tanpa kedaluwarsa, tanpa bonus**, markup **12×** biaya asli.
+7. Optimasi cache prompt (prefix stabil) sebagai pengungkit margin utama.
+
+## 13. SEO & akuisisi meski konten di balik login
+Karena gate diberlakukan sejak versi gratis, trafik organik harus diselamatkan lewat halaman publik:
+1. **Halaman topik publik** (terindeks): TB, DBD, stunting, DM, hipertensi, malaria, kesehatan ibu, HIV, imunisasi, mental — penjelasan ringkas + daftar sumber + contoh format jawaban.
+2. **Drug card publik terbatas**: identitas, ATC, kelas, rute, Fornas, tautan sumber (interaksi/monitoring kurasi tetap perlu login) + CTA "masuk untuk detail".
+3. **Structured data** (`schema.org`) pada halaman topik & drug publik.
+4. **Preview 3 hasil** di halaman pencarian untuk pengunjung belum login, sisanya "Masuk untuk melihat semua" — menjaga konversi tanpa membocorkan nilai penuh.
+5. **Berbagi WhatsApp** dari dalam aplikasi → tautan mengarah ke halaman publik topik (bukan halaman dalam login).
+6. Ukur: kunjungan organik → sign in → aktivitas → top-up pertama.
+
+## 14. Alur auth (email: Google OAuth / magic link)
+```
+1. Pengunjung menekan "Masuk" → pilih "Lanjutkan dengan Google" atau "Kirim tautan email".
+2. Supabase Auth menyelesaikan OAuth / mengirim magic link (OTP email sebagai cadangan).
+3. Login pertama → trigger handle_new_user membuat profil + credit_accounts (plan='free').
+4. Sesi JWT (access + refresh) disimpan; middleware memverifikasi JWT pada setiap /api/* kecuali /api/auth/*, /api/payments/webhook, dan endpoint publik topik/drug ringkas.
+5. Logout → token dihapus; akses API kembali 401 → UI mengarahkan ke Sign in.
+```
+Guardrail: rate limit pengiriman magic link per email & per IP; verifikasi email; larangan akun ganda untuk keperluan abuse (audit bila perlu).
+
+## 15. Onboarding data (alasan utama sign-in sejak gratis)
+Saat login pertama, minta singkat (boleh dilewati, tapi ditampilkan):
+1. **Peran**: dokter · dokter spesialis · koas/mahasiswa kedokteran · apoteker · mahasiswa farmasi · dosen/peneliti · tenaga kesehatan lain · industri.
+2. **Institusi** (opsional): kampus · RS · apotek/jaringan apotek · perusahaan · mandiri.
+3. **Kebutuhan utama**: riset/literatur · praktik klinis · studi/tugas · intelijen produk · lain.
+4. **Consent** privasi (UU PDP) + opsi komunikasi (email produk/topik).
+
+Data ini dipakai untuk segmentasi penawaran (mahasiswa → harga khusus; apoteker/RS → fitur monitoring & interaksi; industri → API/intelijen) dan dilaporkan agregat (bukan per orang) ke institusi/investor.
+
+Kewajiban privasi: consent eksplisit; minimisasi data; **tanpa data pasien**; hak hapus akun & data; query diperlakukan sebagai data pribadi.
+
+## 16. Struktur gating final
+| Area | Akses |
+|---|---|
+| Landing, `/topik/*`, `/sumber`, `/legal`, `/harga`, `/obat/{slug}` ringkas | **publik** (SEO) |
+| Preview 3 hasil pencarian | **publik** |
+| Hasil pencarian lengkap, drug card detail, interaksi, monitoring | **login** |
+| Koleksi, riwayat, ekspor | **login** |
+| Tanya AI | **login + saldo > 0** |

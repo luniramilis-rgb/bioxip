@@ -7,7 +7,7 @@ Dokumen hidup. Setiap perubahan strategi dicatat di sini dan di `docs/blueprint.
 
 Pilar: (1) bahasa & konteks Indonesia, (2) jembatan diagnosis→obat→verifikasi, (3) grounded & tersitasi, (4) mobile-first cepat & hemat data, (5) intelijen untuk industri (B2B).
 
-Monetisasi AI dirancang di `docs/credits.md`: search & data **gratis selamanya tanpa ledger**; **AI terkunci bila saldo Rp0** (tanpa trial) dan dibayar per pemakaian dari saldo Rp (tanpa kedaluwarsa, markup 12× tarif peak DeepSeek V4.1 Flash); biaya/estimasi tampil sebelum eksekusi; top-up via **Xendit**; percakapan disimpan untuk evaluasi (retensi 90 hari).
+Monetisasi AI dirancang di `docs/credits.md`: **sign in wajib sejak versi gratis** (Google OAuth + magic link); search & data **gratis bagi pengguna login** tanpa menyentuh ledger; **AI terkunci bila saldo Rp0** (tanpa trial) dan dibayar per pemakaian dari saldo Rp (tanpa kedaluwarsa, markup 12× tarif DeepSeek V4.1 Flash); biaya/estimasi tampil sebelum eksekusi; top-up via **Xendit**; percakapan disimpan untuk evaluasi (retensi 90 hari). Konten di balik login dikompensasi halaman publik untuk SEO (`/topik/*`, drug card ringkas) + preview 3 hasil.
 
 Dua suite, satu mesin:
 - **Suite Klinis** (mahasiswa kedokteran, koas, dokter umum/spesialis): PICO → opsi terapi + bukti.

@@ -12,14 +12,31 @@ Urutan disusun berdasarkan **dependensi** (auth → ledger → AI) dan **risiko/
 - Dokumen: blueprint, strategy, credits, knowledge, review-drugs, review-interactions, review-monitoring.
 
 ## Prinsip pengurutan
-1. Fitur **gratis & tanpa biaya token** dikerjakan lebih dulu (tambah nilai tanpa risiko margin).
-2. **Auth → ledger → AI**: AI tidak mungkin ditagih sebelum ledger ada.
-3. Setiap sprint punya **DoD + validasi otomatis** (lanjut pola `scripts/validate_*.js` + `tests/ui_harness.js`).
-4. Review klinis berjalan **paralel**, bukan di akhir.
+1. **Auth lebih dulu** — karena gate diberlakukan sejak versi gratis, auth adalah prasyarat produk (dan sumber data pengguna).
+2. Fitur **gratis & tanpa biaya token** dikerjakan sebelum penagihan.
+3. **Auth → ledger → AI**: AI tidak mungkin ditagih sebelum ledger ada.
+4. Setiap sprint punya **DoD + validasi otomatis** (lanjut pola `scripts/validate_*.js` + `tests/ui_harness.js`).
+5. Review klinis berjalan **paralel**, bukan di akhir.
 
 ---
 
-## Sprint 1 — PubMed E-utilities (gratis, dampak besar)
+## Sprint 1 — Auth (Google OAuth + magic link) + gating + SEO publik
+**Tujuan:** data pengguna & kontrol akses; sekaligus menyelamatkan trafik organik.
+
+Deliverable:
+- Supabase Auth: **Google OAuth** + **magic link email**; halaman `/masuk`, callback, logout.
+- Trigger `handle_new_user` → `profiles` + `credit_accounts` (`plan='free'`).
+- **Onboarding data** (peran, institusi, kebutuhan, consent) — lihat `docs/credits.md` §15.
+- **Middleware gating**: JWT wajib untuk `/api/*` kecuali `/api/auth/*`, webhook, dan prefiks publik.
+- **Halaman publik untuk SEO**: `/topik/*`, `/obat/{slug}` ringkas, `/sumber`, `/legal`, `/harga`.
+- **Preview 3 hasil** + CTA "Masuk untuk melihat semua" pada halaman hasil.
+- Rate limit magic link per email/IP + Turnstile pada form masuk.
+
+Env baru: `SUPABASE_JWT_SECRET` (verifikasi), `GOOGLE_OAUTH_*` (di Supabase), `TURNSTILE_*`.
+Validasi: `scripts/validate_auth.js` (401 tanpa token, 200 dengan token uji; onboarding tersimpan), `ui_harness.js` diperluas (halaman masuk, gate hasil, preview 3).
+DoD: pengunjung bisa melihat halaman topik & 3 hasil; setelah login mendapat hasil penuh + profil tersimpan.
+
+## Sprint 2 — PubMed E-utilities (gratis, dampak besar)
 **Tujuan:** literatur kedokteran lebih presisi & terverifikasi; tanpa biaya AI.
 
 Deliverable:
@@ -33,11 +50,10 @@ Env baru: `NCBI_API_KEY`, `NCBI_EMAIL`, `NCBI_TOOL=bioxip`.
 Validasi: `scripts/validate_pubmed.js` (10 query emas: TB, DBD, stunting, hipertensi, dll) memastikan hasil punya PMID & sumber `pubmed`.
 DoD: search menampilkan badge sumber `pubmed`; dedupe tidak menggandakan DOI sama; CI hijau.
 
-## Sprint 2 — Auth + Ledger (tanpa AI)
+## Sprint 3 — Ledger + Saldo (tanpa AI)
 **Tujuan:** pondasi penagihan; belum menyentuh DeepSeek.
 
 Deliverable:
-- **Auth**: Supabase Auth (magic link atau email+password — keputusan §Keputusan).
 - Migrasi `008_credits.sql`: `credit_accounts`, `credit_ledger` (append-only + idempotency), `topups`, `ai_usage_log`, `ai_chat_log`, `usage_limits` + trigger saldo + RLS (sesuai `docs/credits.md`).
 - Endpoint: `GET /api/credits/me` (saldo, plan, `ai_locked`), `GET /api/credits/ledger`.
 - Utilitas server: `functions/_credits.js` (hold/settle/refund, konversi µIDR, pembulatan, minimum Rp100).
@@ -45,7 +61,7 @@ Deliverable:
 Validasi: `scripts/validate_credits.js` (unit: konversi & pembulatan; integrasi: hold→settle, hold→fail→refund, saldo tak negatif, idempotency ganda) + job rekonsiliasi `SUM(ledger) == balance`.
 DoD: saldo dapat diisi manual (admin) lalu terpotong lewat uji simulasi; 0 saldo negatif.
 
-## Sprint 3 — Pipeline Grounded internal (K1, tanpa biaya ke pengguna)
+## Sprint 4 — Pipeline Grounded internal (K1, tanpa biaya ke pengguna)
 **Tujuan:** membuktikan "tidak halu" sebelum dijual.
 
 Deliverable:
@@ -57,7 +73,7 @@ Deliverable:
 Validasi: citation support ≥98% pada 30 kasus; abstain benar pada ≥5 kasus bukti tipis.
 DoD: laporan hasil golden set tersimpan di `docs/` + CI menjalankan validasi grounded (mode mock bila tanpa key).
 
-## Sprint 4 — AI Proxy + Debit (P2)
+## Sprint 5 — AI Proxy + Debit (P2)
 **Tujuan:** monetisasi berjalan.
 
 Deliverable:
@@ -68,7 +84,7 @@ Deliverable:
 Validasi: `validate_api.js` bertambah (402 tanpa saldo, 422 input terlarang, 429 rate limit); uji hold/settle dengan provider mock.
 DoD: jawaban AI berjalan di produksi dengan saldo uji; saldo berkurang sesuai `ai_usage_log`.
 
-## Sprint 5 — UI Mode Gratis vs AI (P4)
+## Sprint 6 — UI Mode Gratis vs AI (P4)
 **Tujuan:** tidak ada kejutan biaya.
 
 Deliverable:
@@ -79,7 +95,7 @@ Deliverable:
 Validasi: `tests/ui_harness.js` diperluas (mode switch, estimasi tampil, tombol terkunci, halaman saldo).
 DoD: pengguna tanpa saldo tetap bisa seluruh search & drug card; AI terblokir rapi.
 
-## Sprint 6 — Xendit Top-up (P5)
+## Sprint 7 — Xendit Top-up (P5)
 **Tujuan:** pembelian saldo end-to-end.
 
 Deliverable:
@@ -89,7 +105,7 @@ Deliverable:
 Validasi: webhook ganda → saldo bertambah sekali; status `expired` tidak menambah saldo; rekonsiliasi Xendit vs ledger.
 DoD: 1 transaksi uji sukses di sandbox Xendit.
 
-## Sprint 7 — Kualitas Retrieval & Data (K2–K4)
+## Sprint 8 — Kualitas Retrieval & Data (K2–K4)
 - Retrieval hibrida (FTS + `pgvector`) + section-aware chunking + reranker.
 - Lapisan fakta terstruktur (label, ATC, CT.gov, UniProt/GO) sebagai konteks AI.
 - Golden set diperluas 150–300 + review ahli + regresi CI.
@@ -107,19 +123,20 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 ## Keputusan yang perlu dikunci (dengan sprint terkat)
 | # | Keputusan | Dibutuhkan di |
 |---|---|---|
-| 1 | NCBI API key (gratis) untuk PubMed E-utilities | Sprint 1 |
-| 2 | Metode auth (magic link vs email+password) | Sprint 2 |
-| 3 | Simpan chunk korpus atau retrieval live untuk AI | Sprint 7 (dapat ditunda) |
-| 4 | Kanal Xendit mana yang diaktifkan lebih dulu (QRIS/VA/e-wallet) | Sprint 6 |
-| 5 | Batas rate limit AI per user (`RATE_LIMIT_RPM`) | Sprint 4 |
+| 1 | Google OAuth (buat OAuth client di Google Cloud) + konfigurasi Supabase Auth | Sprint 1 |
+| 2 | NCBI API key (gratis) untuk PubMed E-utilities | Sprint 2 |
+| 3 | Simpan chunk korpus atau retrieval live untuk AI | Sprint 8 (dapat ditunda) |
+| 4 | Kanal Xendit mana yang diaktifkan lebih dulu (QRIS/VA/e-wallet) | Sprint 7 |
+| 5 | Batas rate limit AI per user (`RATE_LIMIT_RPM`) | Sprint 5 |
 
 ## Checklist validasi per sprint (ringkas)
 | Sprint | Validasi otomatis | Validasi manual |
 |---|---|---|
-| 1 | `validate_pubmed.js` + `validate_api.js` | spot-check 10 query oleh Anda |
-| 2 | `validate_credits.js` + rekonsiliasi | simulasi admin top-up |
-| 3 | `validate_grounded.js` (golden 30) | review apoteker/dokter |
-| 4 | `validate_api.js` (402/422/429) + provider mock | uji 10 pertanyaan nyata |
-| 5 | `ui_harness.js` | uji di HP (mobile) |
-| 6 | webhook ganda + rekonsiliasi | transaksi sandbox Xendit |
-| 7 | regresi golden 150+ di CI | review ahli per domain |
+| 1 Auth+gating | `validate_auth.js` + `ui_harness.js` (gate & preview) | uji login Google + magic link di HP |
+| 2 PubMed | `validate_pubmed.js` + `validate_api.js` | spot-check 10 query oleh Anda |
+| 3 Ledger | `validate_credits.js` + rekonsiliasi | simulasi admin top-up |
+| 4 Grounded | `validate_grounded.js` (golden 30) | review apoteker/dokter |
+| 5 AI proxy | `validate_api.js` (402/422/429) + provider mock | uji 10 pertanyaan nyata |
+| 6 UI | `ui_harness.js` | uji mobile |
+| 7 Xendit | webhook ganda + rekonsiliasi | transaksi sandbox Xendit |
+| 8 Kualitas | regresi golden 150+ di CI | review ahli per domain |
