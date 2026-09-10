@@ -27,6 +27,9 @@ jobs:
       - name: Validasi data topik publik
         run: node scripts/validate_topics.js
 
+      - name: Validasi skema kredit & rumus harga
+        run: node scripts/validate_credits.js
+
       - name: Halaman topik tidak basi (build --check)
         run: node scripts/build_topics.js --check
 

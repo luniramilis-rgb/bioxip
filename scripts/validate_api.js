@@ -85,6 +85,11 @@ async function main() {
   const single = await get("/api/interactions?q=metformin");
   check("interactions: tolak < 2 obat", single.status === 400, String(single.status));
 
+  const me = await get("/api/credits/me");
+  check("credits/me: 401 tanpa token", me.status === 401, String(me.status));
+  const ledger = await get("/api/credits/ledger");
+  check("credits/ledger: 401 tanpa token", ledger.status === 401, String(ledger.status));
+
   let failed = 0;
   for (const item of results) {
     if (!item.ok) failed++;
