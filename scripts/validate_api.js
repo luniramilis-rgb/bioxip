@@ -24,6 +24,19 @@ async function main() {
   const sources = new Set((search.body?.results || []).map((r) => r.source));
   check("search: PubMed ikut tampil", sources.has("pubmed"), [...sources].join("/"));
 
+  const withAbstract = await get("/api/search?q=metformin%20diabetes&per_page=5&abstract=1");
+  const abstractRows = withAbstract.body?.results || [];
+  check(
+    "search: abstract tersedia saat diminta (untuk grounded)",
+    abstractRows.filter((row) => typeof row.abstract === "string" && row.abstract.length > 40).length >= 2,
+    `berabstrak=${abstractRows.filter((row) => row.abstract).length}/${abstractRows.length}`,
+  );
+  check(
+    "search: judul bersih dari tag HTML",
+    abstractRows.every((row) => !/<[a-z/][^>]*>/i.test(row.title || "")),
+    abstractRows.find((row) => /<[a-z/][^>]*>/i.test(row.title || ""))?.title || "",
+  );
+
   const answer = await get("/api/answer?q=metformin%20vs%20insulin%20diabetes");
   const studies = answer.body?.studies || [];
   const blocks = answer.body?.summary?.blocks || [];

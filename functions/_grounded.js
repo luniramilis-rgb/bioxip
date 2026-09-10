@@ -39,6 +39,7 @@ export async function gatherEvidence(origin, question, options = {}) {
     const url = new URL(`${origin}/api/search`);
     url.searchParams.set("q", question);
     url.searchParams.set("per_page", String(limit));
+    url.searchParams.set("abstract", "1");
     const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(20000) });
     if (resp.ok) {
       const data = await resp.json();

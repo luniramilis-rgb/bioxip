@@ -22,6 +22,7 @@ export async function onRequestGet(context) {
       : "relevance";
     const epmcCursor = url.searchParams.get("epmc_cursor") || "*";
     const ctToken = url.searchParams.get("ct_token") || null;
+    const withAbstract = url.searchParams.get("abstract") === "1" || url.searchParams.get("abstract") === "true";
 
     const query = expandQuery(raw);
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
@@ -31,10 +32,10 @@ export async function onRequestGet(context) {
 
     const calls = [];
     if (needLit) {
-      calls.push(fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor }));
+      calls.push(fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }));
     }
     if (needTrial) {
-      calls.push(fetchTrials(query, { oa, indonesia, types, sort, limit: perPage, token: ctToken }));
+      calls.push(fetchTrials(query, { oa, indonesia, types, sort, limit: perPage, token: ctToken, withAbstract }));
     }
     if (needPubmed) {
       calls.push(
@@ -100,7 +101,7 @@ async function fetchEpmc(query, filters) {
   const hasMore = hits.length === filters.limit && nextCursor && nextCursor !== filters.cursor;
   return {
     total: Number(data.hitCount || 0),
-    results: hits.map(mapEpmcHit),
+    results: hits.map((hit) => mapEpmcHit(hit, filters.withAbstract)),
     pagination: {
       epmcCursor: hasMore ? nextCursor : null,
       epmcHasMore: Boolean(hasMore),
@@ -123,7 +124,7 @@ async function fetchTrials(query, filters) {
   const hasMore = Boolean(nextToken);
   return {
     total: Number(data.totalCount || 0),
-    results: studies.map(mapTrial),
+    results: studies.map((study) => mapTrial(study, filters.withAbstract)),
     pagination: {
       ctToken: hasMore ? nextToken : null,
       ctHasMore: hasMore,
@@ -144,7 +145,21 @@ function epmcQuery(raw, filters) {
   return q;
 }
 
-function mapEpmcHit(hit) {
+function cleanText(value, limit = 0) {
+  const text = String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!limit || text.length <= limit) return text;
+  return text.slice(0, limit).replace(/\s+\S*$/, "") + "…";
+}
+
+function mapEpmcHit(hit, withAbstract = false) {
   const isPreprint = hit.source === "PPR" || (hit.pubTypeList?.pubType || []).some((t) =>
     String(t).toLowerCase().includes("preprint"),
   );
@@ -157,10 +172,10 @@ function mapEpmcHit(hit) {
   );
   const doi = hit.doi ? `doi:${hit.doi.toLowerCase()}` : null;
   const identity = doi || (hit.pmid ? `pmid:${hit.pmid}` : `epmc:${hit.source}:${hit.id}`);
-  return {
+  const row = {
     id: `epmc|${identity}`,
     doc_type: isPreprint ? "preprint" : "paper",
-    title: hit.title || "",
+    title: cleanText(hit.title),
     authors,
     journal: hit.journalInfo?.journal?.title || null,
     year: Number(hit.pubYear) || null,
@@ -172,9 +187,11 @@ function mapEpmcHit(hit) {
     citation_count: Number(hit.citedByCount) || 0,
     external_ids: { pmid: hit.pmid || null, pmcid: hit.pmcid || null, doi: hit.doi || null },
   };
+  if (withAbstract) row.abstract = cleanText(hit.abstractText, 900);
+  return row;
 }
 
-function mapTrial(study) {
+function mapTrial(study, withAbstract = false) {
   const proto = study.protocolSection || {};
   const ident = proto.identificationModule || {};
   const status = proto.statusModule || {};
@@ -182,10 +199,10 @@ function mapTrial(study) {
   const cond = proto.conditionsModule || {};
   const posted = status.studyFirstPostDateStruct?.date || null;
   const phase = design.phases || [];
-  return {
+  const row = {
     id: `ct|${ident.nctId}`,
     doc_type: "trial",
-    title: ident.briefTitle || "",
+    title: cleanText(ident.briefTitle),
     authors: [],
     journal: null,
     year: posted ? Number(String(posted).slice(0, 4)) : null,
@@ -198,6 +215,8 @@ function mapTrial(study) {
     meta: { phase, status: status.overallStatus, conditions: cond.conditions || [], nct_id: ident.nctId },
     external_ids: { nctid: ident.nctId },
   };
+  if (withAbstract) row.abstract = cleanText(proto.descriptionModule?.briefSummary, 900);
+  return row;
 }
 
 const SOURCE_PRIORITY = { europepmc: 0, pubmed: 1, clinicaltrials: 2 };
