@@ -265,8 +265,64 @@ Error:
 | P4 | Top-up QRIS/e-wallet + webhook idempotent | monetisasi aktif |
 | P5 | Tier & kuota institusi, API key pelanggan | B2B |
 
-## 10. Keputusan yang masih terbuka
-1. Provider top-up mana lebih dulu (Midtrans/Xendit vs QRIS statis manual)?
-2. Apakah tier free diberi kredit harian (mis. 2.000) atau hanya search gratis tanpa AI?
-3. Simpan teks percakapan atau metadata saja (privasi vs kualitas evaluasi)?
-4. Model fallback bila DeepSeek down (provider kedua?).
+## 10. Keputusan yang sudah ditetapkan (2026-09-10)
+1. **Provider top-up: Xendit** (QRIS/e-wallet/VA) dengan webhook idempotent.
+2. **Gratis vs berbayar: mode eksplisit** — segmented `[Cari bukti · GRATIS]` vs `[Tanya AI · kredit]`; search-first + estimasi biaya tampil sebelum eksekusi (lihat §11).
+3. **Simpan percakapan untuk evaluasi** — teks percakapan disimpan dengan kebijakan retensi & privasi (lihat §11.4).
+4. **Provider AI: DeepSeek** (satu-satunya) — tetap dibuat lapisan abstraksi `provider` agar bisa menambah model lain tanpa mengubah ledger.
+
+## 11. UX: membedakan gratis vs berbayar (satu search bar)
+
+### 11.1 Prinsip
+1. **Search & data selalu gratis** (`/api/search`, `/api/answer`, `/api/drug`, `/api/interactions`) — **tidak pernah** menyentuh ledger.
+2. **AI selalu berbayar** (`POST /api/ai/chat`) — hanya endpoint ini yang melakukan debit.
+3. **Biaya tampil sebelum eksekusi** (estimasi), dan **hasil akhir menampilkan kredit terpakai**.
+4. Tidak ada pemotongan otomatis; perpindahan ke mode AI selalu aksi sadar pengguna.
+
+### 11.2 Tata letak
+```
+[ Cari bukti · GRATIS ]  [ Tanya AI · kredit ]     ← segmented, default: gratis
+┌─────────────────────────────────────────────┐
+│ tulis pertanyaan atau kata kunci…           │
+└─────────────────────────────────────────────┘
+[ Cari ]            atau            [ Tanya AI ≈ 400 kredit ]
+Saldo: 48.210 kredit · AI gratis 2/3 hari ini · Isi kredit
+```
+- Mode gratis: tombol "Cari" (tanpa angka kredit).
+- Mode AI: tombol menampilkan estimasi; bila saldo/kuota kurang → tombol menjadi "Isi kredit".
+- Badge saldo + kuota AI harian selalu terlihat di header.
+
+### 11.3 Search-first + saran intent (bukan auto-charge)
+- Setelah hasil gratis tampil, muncul kartu: **"Buat sintesis AI dari N studi — perkiraan X kredit"** → `[Buat jawaban AI]`.
+- Deteksi intent (mis. ada "?", "apakah", "vs") hanya memunculkan **chip saran** untuk pindah ke mode AI; tetap butuh tap konfirmasi.
+
+### 11.4 Kuota gratis & penyimpanan percakapan
+- Tier free: `daily_credits = 2000` (≈3 jawaban AI/hari) untuk user terdaftar; search tetap tak terbatas.
+- Penyimpanan percakapan untuk evaluasi: teks disimpan di `ai_chat_log` dengan **retensi 90 hari**, dapat dihapus atas permintaan pengguna, dan **tidak memuat data pasien** (input semacam itu ditolak 422). Metadata (tokens, biaya, margin) disimpan lebih lama untuk audit keuangan.
+
+### 11.5 Endpoint terkait
+| Endpoint | Biaya | Auth | Catatan |
+|---|---|---|---|
+| `GET /api/search` | gratis | opsional | tanpa ledger |
+| `POST /api/ai/chat` | berbayar | wajib | debit hold→settle |
+| `GET /api/ai/estimate?feature=answer&max_tokens=1024` | gratis | wajib | `{ "credits": 420 }` untuk preview tombol |
+| `GET /api/credits/me` | gratis | wajib | saldo + kuota harian |
+| `POST /api/payments/webhook` | — | provider | idempotent |
+
+### 11.6 Tabel tambahan (percakapan)
+```sql
+create table ai_chat_log (
+  id          bigserial primary key,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  request_id  uuid not null,
+  feature     text not null,
+  messages    jsonb not null,          -- teks percakapan (retensi 90 hari)
+  answer      text,
+  citations   jsonb not null default '[]',
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz not null default (now() + interval '90 days')
+);
+create index ai_chat_log_user_idx on ai_chat_log (user_id, created_at desc);
+-- job harian: delete from ai_chat_log where expires_at < now();
+```
+

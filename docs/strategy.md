@@ -7,6 +7,8 @@ Dokumen hidup. Setiap perubahan strategi dicatat di sini dan di `docs/blueprint.
 
 Pilar: (1) bahasa & konteks Indonesia, (2) jembatan diagnosis→obat→verifikasi, (3) grounded & tersitasi, (4) mobile-first cepat & hemat data, (5) intelijen untuk industri (B2B).
 
+Monetisasi AI (prepaid kredit) dirancang di `docs/credits.md`: search & data **gratis tanpa ledger**, AI **berbayar** via endpoint terpisah, biaya tampil sebelum eksekusi, provider **DeepSeek**, top-up **Xendit**, percakapan disimpan untuk evaluasi (retensi 90 hari).
+
 Dua suite, satu mesin:
 - **Suite Klinis** (mahasiswa kedokteran, koas, dokter umum/spesialis): PICO → opsi terapi + bukti.
 - **Suite Farmasi** (apoteker, IFRS, apotek jaringan, pendidik, mahasiswa farmasi): drug card (dosis label, kontraindikasi, interaksi, monitoring, deprescribing).
