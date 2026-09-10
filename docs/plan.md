@@ -21,6 +21,7 @@ Urutan disusun berdasarkan **dependensi** (auth → ledger → AI) dan **risiko/
 ---
 
 ## Sprint 1 — Auth (Google OAuth + magic link) + gating + SEO publik
+**Status:** menunggu prasyarat dari Anda (Google OAuth client + SMTP). Rincian prasyarat di bagian bawah.
 **Tujuan:** data pengguna & kontrol akses; sekaligus menyelamatkan trafik organik.
 
 Deliverable:
@@ -48,7 +49,25 @@ Dipindahkan dari Sprint 1.5 sesuai keputusan 2026-09-10. Isi:
 - **Pelacakan rujukan** `?ref=&utm_source=` + perhitungan **K-factor**.
 Syarat mulai: Sprint 1–5 stabil (auth, search, ledger, AI, UI) dan ada trafik nyata untuk diukur.
 
-## Sprint 2 — PubMed E-utilities (gratis, dampak besar)
+## Sprint 1A — Fondasi publik (SEO + salin tautan, tanpa auth)
+**Tujuan:** bagian Sprint 1 yang **tidak butuh kredensial**, dan wajib ada sebelum gating diberlakukan. Penting agar saat auth diaktifkan, trafik organik tidak hilang.
+Deliverable:
+- Halaman topik **publik**: `/topik/{tb,dbd,stunting,diabetes,hipertensi,malaria,kesehatan-ibu,hiv,imunisasi,mental}` — konten Bahasa Indonesia ringkas + daftar sumber + tautan ke pencarian.
+- **OG/meta tags** + gambar pratinjau 1200×630 untuk semua halaman publik & hasil.
+- **Tombol "Salin tautan"** untuk hasil pencarian & drug card.
+- **Structured data** (`schema.org`) pada halaman topik.
+- `sitemap.xml` + `robots.txt` diperbarui.
+Validasi: `ui_harness.js` (halaman topik render, salin tautan), `validate_api.js` (halaman publik 200 tanpa login).
+DoD: 10 halaman topik terindeks-able (meta & structured data benar), tanpa mengubah alur login yang belum ada.
+
+## Sprint 1 — (lanjutan) Auth + gating — blokir kredensial
+Setelah Sprint 1A selesai dan kredensial tersedia: Google OAuth client, SMTP + domain pengirim (SPF/DKIM), Turnstile. Lanjut ke deliverable auth/gating di atas.
+
+## Sprint 2 — PubMed E-utilities — SELESAI (2026-09-10)
+Terverifikasi di produksi: hasil memuat sumber **pubmed** + **europepmc**, **0 duplikat DOI/PMID** pada 4 query uji (tuberculosis, dengue, stunting, hypertension), NCBI E-utilities dapat diakses (total >300 rb untuk "tuberculosis").
+Tersisa opsional: NCBI API key (naikkan batas 3→10 req/detik), dan perbaikan peringkat (PubMed saat ini muncul setelah Europe PMC).
+
+## Sprint 2 (arsip rencana) — PubMed E-utilities (gratis, dampak besar)
 **Tujuan:** literatur kedokteran lebih presisi & terverifikasi; tanpa biaya AI.
 
 Deliverable:
@@ -133,20 +152,21 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 ---
 
 ## Keputusan yang perlu dikunci (dengan sprint terkat)
-| # | Keputusan | Dibutuhkan di |
-|---|---|---|
-| 1 | Google OAuth (buat OAuth client di Google Cloud) + konfigurasi Supabase Auth | Sprint 1 |
-| 2 | **SMTP pengirim** (domain + SPF/DKIM) untuk magic link/OTP | Sprint 1 |
-| 3 | NCBI API key (gratis) untuk PubMed E-utilities | Sprint 2 |
-| 4 | Simpan chunk korpus atau retrieval live untuk AI | Sprint 8 (dapat ditunda) |
-| 5 | Kanal Xendit mana yang diaktifkan lebih dulu (QRIS/VA/e-wallet) | Sprint 7 |
-| 6 | Batas rate limit AI per user (`RATE_LIMIT_RPM`) | Sprint 5 |
+| # | Keputusan | Dibutuhkan di | Status |
+|---|---|---|---|
+| 1 | Google OAuth client (Google Cloud) + konfigurasi Supabase Auth | Sprint 1 | ⏳ menunggu |
+| 2 | SMTP pengirim (domain + SPF/DKIM) untuk magic link/OTP | Sprint 1 | ⏳ menunggu |
+| 3 | NCBI API key (gratis; opsional, menaikkan limit 3→10 rps) | Sprint 2 | opsional |
+| 4 | Simpan chunk korpus atau retrieval live untuk AI | Sprint 8 | ditunda |
+| 5 | Kanal Xendit yang diaktifkan lebih dulu | Sprint 7 | belum |
+| 6 | Batas rate limit AI per user (`RATE_LIMIT_RPM`) | Sprint 5 | belum |
 
 ## Checklist validasi per sprint (ringkas)
 | Sprint | Validasi otomatis | Validasi manual |
 |---|---|---|
+| 1A Fondasi publik | `ui_harness.js` + `validate_api.js` (halaman publik) | cek preview OG (WhatsApp) & indeks |
 | 1 Auth+gating | `validate_auth.js` + `ui_harness.js` (gate, preview, salin tautan) | uji login Google + magic link/OTP di HP (termasuk in-app browser) |
-| 2 PubMed | `validate_pubmed.js` + `validate_api.js` | spot-check 10 query oleh Anda |
+| 2 PubMed ✅ | `validate_pubmed.js` + `validate_api.js` — **ALL PASS** | spot-check 10 query oleh Anda |
 | 3 Ledger | `validate_credits.js` + rekonsiliasi | simulasi admin top-up |
 | 4 Grounded | `validate_grounded.js` (golden 30) | review apoteker/dokter |
 | 5 AI proxy | `validate_api.js` (402/422/429) + provider mock | uji 10 pertanyaan nyata |
