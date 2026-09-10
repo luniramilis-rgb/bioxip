@@ -46,6 +46,18 @@ for (const [file, name] of requiredExports) {
   }
 }
 
+// Service worker harus mem-precache semua modul JS frontend.
+const webDir = path.join(ROOT, "web", "js");
+const swFile = path.join(ROOT, "web", "sw.js");
+if (fs.existsSync(swFile)) {
+  const sw = fs.readFileSync(swFile, "utf8");
+  for (const file of fs.readdirSync(webDir).filter((name) => name.endsWith(".js"))) {
+    if (!sw.includes(`/js/${file}`)) {
+      problems.push(`web/sw.js: belum mem-precache /js/${file} (naikkan VERSION juga)`);
+    }
+  }
+}
+
 console.log(`Fungsi: ${checked} impor relatif diperiksa`);
 if (problems.length) {
   console.log("\nMASALAH:");
