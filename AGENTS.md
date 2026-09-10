@@ -9,6 +9,16 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 - Test: `python -m pytest` (di lingkungan dengan deps terpasang)
 - Migrasi: `supabase db push` (perlu Supabase CLI)
 
+## Validasi (jalankan sebelum commit)
+
+- `node scripts/validate_drugs.js` — struktur katalog obat + ATC
+- `node scripts/validate_monitoring.js` — kelengkapan monitoring 30 obat
+- `node scripts/validate_interactions.js` — tabel interaksi + severity
+- `node tests/ui_harness.js` — render UI (search/answer/drug/interactions)
+- `node scripts/validate_rxnorm.js` — pemetaan RxNorm 30 nama
+- `node scripts/validate_api.js` — kontrak API production (butuh jaringan)
+- `node --check <file>.js` untuk file JS baru
+
 ## Aturan
 
 - Nama produk/brand hanya di `web/js/brand.js` (satu tempat).

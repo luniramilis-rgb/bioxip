@@ -1,0 +1,19 @@
+name: Validate API (production)
+
+on:
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Validasi kontrak API production
+        run: node scripts/validate_api.js
+        env:
+          BIOXIP_BASE: https://bioxip.pages.dev

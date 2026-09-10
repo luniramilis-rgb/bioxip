@@ -1,0 +1,194 @@
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
+
+const ROOT = path.join(__dirname, "..", "web");
+
+function makeElement(id) {
+  return {
+    id,
+    innerHTML: "",
+    hidden: false,
+    value: "",
+    checked: false,
+    scrollTop: 0,
+    dataset: {},
+    classList: { toggle() {}, add() {}, remove() {} },
+    setAttribute() {},
+    removeAttribute() {},
+    addEventListener() {},
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    closest() { return null; },
+    focus() {},
+    insertAdjacentHTML(_pos, html) { this.innerHTML += html; },
+  };
+}
+
+const registry = new Map();
+const handlers = {};
+
+const documentStub = {
+  title: "",
+  body: makeElement("body"),
+  addEventListener(event, cb) { (handlers[event] = handlers[event] || []).push(cb); },
+  getElementById(id) {
+    if (!registry.has(id)) registry.set(id, makeElement(id));
+    return registry.get(id);
+  },
+  querySelectorAll() { return []; },
+  querySelector() { return null; },
+};
+
+const locationStub = { hash: "#/", replace(value) { this.hash = value; } };
+
+const ANSWER_PAYLOAD = {
+  question: "metformin vs insulin diabetes",
+  pico: { intervention: "metformin", comparison: "insulin", terms: ["diabetes"] },
+  mode: "extractive",
+  disclaimer: "bukan nasihat medis",
+  stats: { total: 2, by_type: { "Meta-analisis": 1, RCT: 1 }, earliest: 2020, latest: 2024, open_access: 1 },
+  summary: {
+    intro: "ringkasan dari 2 studi",
+    blocks: [
+      { text: "Metformin menurunkan HbA1c dibanding kontrol.", cites: [1], study_type: "Meta-analisis" },
+      { text: "Tidak ada perbedaan mortalitas antara kedua terapi.", cites: [2], study_type: "RCT" },
+    ],
+  },
+  studies: [
+    { ref: 1, title: "Study one", url: "https://example.org/1", source: "europepmc", study_type: "Meta-analisis", year: 2024, citation_count: 10, authors: ["A B"], oa: { is_oa: true, pdf_url: "https://example.org/1.pdf" }, abstract: "Abstract one." },
+    { ref: 2, title: "Study two", url: "https://example.org/2", source: "europepmc", study_type: "RCT", year: 2020, citation_count: 2, authors: ["C D"], oa: { is_oa: false }, abstract: "Abstract two." },
+  ],
+  notes: [],
+};
+
+const SEARCH_PAYLOAD = {
+  total: 12,
+  mode: "live",
+  page: 1,
+  limit: 20,
+  notes: [],
+  pagination: { epmcHasMore: false, ctHasMore: false },
+  results: [
+    { id: "epmc|1", doc_type: "paper", title: "Dengue paper", url: "https://example.org/d", source: "europepmc", authors: [{ given: "A", family: "B" }], year: 2024, oa: { is_oa: true, pdf_url: "https://example.org/d.pdf" }, citation_count: 3 },
+  ],
+};
+
+const DRUG_PAYLOAD = {
+  matched: true,
+  catalogue: true,
+  outside_catalogue: false,
+  drug: { slug: "parasetamol", name: "Parasetamol", inn: "paracetamol", atc: "N02BE01", kelas: "Analgesik", rute: "Oral", watchouts: ["Dosis maksimum harian perlu diverifikasi."] },
+  fornas: { edition: "KMK 1199/2025", source_url: "https://e-fornas.kemkes.go.id/guest/daftar-obat" },
+  rxnorm: { rxcui: "161", name: "Acetaminophen", source: "https://mor.nlm.nih.gov/RxNav" },
+  chemistry: { cid: 1983, molecular_formula: "C8H9NO2", molecular_weight: 151.16, source: "https://pubchem.ncbi.nlm.nih.gov/compound/1983" },
+  mechanism: { chembl_id: "CHEMBL112", pref_name: "PARACETAMOL", actions: [{ action: "inhibitor", mechanism: "COX inhibition" }], source: "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL112/" },
+  monitoring: { monitoring: ["Total dosis harian"], renal: "Ikuti label.", hepatic: "Hati-hati.", geriatric: "Perhatikan kombinasi.", deprescribing: [] },
+  monitoring_reviewed: false,
+  label: { available: true, label_count: 3, effective_time: "20260102", matched_term: "acetaminophen", fields: { indikasi: { text: "Indikasi teks", source: "https://example.org/label", truncated: false } } },
+  safety: { blackbox: false, blackbox_excerpt: null, watchouts: ["Dosis maksimum harian perlu diverifikasi."], lasa_notes: [], missing_fields: ["interaksi"] },
+  disclaimer: "bukan nasihat medis",
+  notes: ["catatan"],
+};
+
+const INTER_PAYLOAD = {
+  query: "metronidazol + warfarin",
+  drugs: [
+    { input: "metronidazol", display: "Metronidazol", catalogue: "Metronidazol", rxcui: { rxcui: "6922", name: "Metronidazole", source: "https://mor.nlm.nih.gov/RxNav" }, chembl: { actions: [{ action: "inhibitor", mechanism: "CYP2C9" }] } },
+    { input: "warfarin", display: "warfarin", catalogue: null, rxcui: { rxcui: "11289", name: "warfarin", source: "https://mor.nlm.nih.gov/RxNav" }, chembl: null },
+  ],
+  pairs: [{ a: "Metronidazol", b: "warfarin", severity: "tinggi", mechanism: "Inhibisi CYP2C9", advice: "Pantau INR", source: "Interaksi obat umum/label", reviewed: false }],
+  mentions: [{ label_of: "Metronidazol", about: "warfarin", quote: "Kutipan label.", source: "https://example.org/label", label_term: "metronidazole" }],
+  notes: [],
+  rxnav_note: "RxNav interaction retired",
+  disclaimer: "informatif",
+};
+
+async function fetchStub(url) {
+  const body = url.includes("/api/answer")
+    ? ANSWER_PAYLOAD
+    : url.includes("/api/search")
+      ? SEARCH_PAYLOAD
+      : url.includes("/api/drug")
+        ? DRUG_PAYLOAD
+        : url.includes("/api/interactions")
+          ? INTER_PAYLOAD
+          : { sources: [] };
+  return { ok: true, status: 200, json: async () => body };
+}
+
+const sandbox = {
+  console,
+  setTimeout,
+  clearTimeout,
+  AbortSignal,
+  URL,
+  URLSearchParams,
+  fetch: fetchStub,
+  window: null,
+  document: documentStub,
+  location: locationStub,
+  localStorage: { getItem() { return null; }, setItem() {} },
+  navigator: { serviceWorker: { register: () => ({ catch() {} }) }, clipboard: { writeText: () => Promise.resolve() } },
+};
+sandbox.window = sandbox;
+sandbox.window.addEventListener = (event, cb) => { (handlers[event] = handlers[event] || []).push(cb); };
+sandbox.globalThis = sandbox;
+
+vm.createContext(sandbox);
+
+const files = ["js/brand.js", "js/topics.js", "js/search.js", "js/answer.js", "js/drug.js", "js/interactions.js", "js/app.js"];
+for (const file of files) {
+  const code = fs.readFileSync(path.join(ROOT, file), "utf8");
+  vm.runInContext(code, sandbox, { filename: file });
+}
+
+async function dispatchHash(hash) {
+  locationStub.hash = hash;
+  for (const cb of handlers.hashchange || []) cb();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+}
+
+(async () => {
+  const results = [];
+
+  const home = registry.get("view").innerHTML;
+  results.push(["home renders hero", home.includes("Literatur medis dunia")]);
+
+  await dispatchHash("#/answer?q=metformin%20vs%20insulin%20diabetes");
+  const answer = registry.get("answer-body")?.innerHTML || "";
+  results.push(["answer: segmented tabs", answer.includes('data-tab="ringkasan"') && answer.includes('data-tab="studi"')]);
+  results.push(["answer: TL;DR card", answer.includes("tldr")]);
+  results.push(["answer: WhatsApp share", answer.includes("wa.me")]);
+  results.push(["answer: study cards", answer.includes("Study one") && answer.includes("data-cite")]);
+  results.push(["answer: bottom sheet button", answer.includes("data-study")]);
+
+  await dispatchHash("#/search?q=dengue&per_page=100");
+  const search = registry.get("results")?.innerHTML || "";
+  results.push(["search renders results", search.includes("Dengue paper")]);
+
+  await dispatchHash("#/drug?q=parasetamol");
+  const drug = registry.get("drug-body")?.innerHTML || "";
+  results.push(["drug: kartu + Fornas", drug.includes("Parasetamol") && drug.includes("Fornas")]);
+  results.push(["drug: banner keselamatan", drug.includes("Perlu diperhatikan")]);
+  results.push(["drug: RxNorm", drug.includes("RxCUI")]);
+  results.push(["drug: monitoring kurasi", drug.includes("Monitoring") && drug.includes("menunggu verifikasi")]);
+  results.push(["drug: label + field kosong", drug.includes("Label resmi") && drug.includes("Tidak ditemukan di sumber")]);
+
+  await dispatchHash("#/interactions?q=metronidazol%20%2B%20warfarin");
+  const inter = registry.get("inter-body")?.innerHTML || "";
+  results.push(["interactions: obat diperiksa", inter.includes("Metronidazol") && inter.includes("RxCUI")]);
+  results.push(["interactions: pasangan terkurasi + severity", inter.includes("Interaksi terkurasi") && inter.includes("tinggi") && inter.includes("Pantau INR")]);
+  results.push(["interactions: kutipan label", inter.includes("Disebutkan di label") && inter.includes("Kutipan label")]);
+
+  let failed = 0;
+  for (const [name, ok] of results) {
+    if (!ok) failed++;
+    console.log(`${ok ? "PASS" : "FAIL"}  ${name}`);
+  }
+  console.log(failed ? `\n${failed} FAILED` : "\nALL PASS");
+  process.exit(failed ? 1 : 0);
+})().catch((error) => {
+  console.error("HARNESS ERROR:", error);
+  process.exit(1);
+});

@@ -1,0 +1,32 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validasi katalog obat
+        run: node scripts/validate_drugs.js
+
+      - name: Validasi monitoring
+        run: node scripts/validate_monitoring.js
+
+      - name: Validasi tabel interaksi
+        run: node scripts/validate_interactions.js
+
+      - name: Validasi render UI (harness)
+        run: node tests/ui_harness.js
+
+      - name: Cek sintaks JS (functions + web)
+        run: |
+          for f in $(find functions web -name "*.js"); do node --check "$f" || exit 1; done
