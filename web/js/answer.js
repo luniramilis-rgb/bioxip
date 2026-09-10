@@ -212,7 +212,7 @@
 
   function openStudy(ref) {
     const study = (DATA.studies || []).find((s) => s.ref === ref);
-    if (!study) return;
+    if (!study || !window.BIOXIP_SHEET) return;
     const quote = (DATA.summary?.blocks || []).find((b) => b.cites.includes(ref));
     const html = `
       <h2>[${study.ref}] ${esc(study.title)}</h2>
@@ -241,8 +241,6 @@
   document.addEventListener("click", (event) => {
     const cite = event.target.closest("[data-cite]");
     if (cite) handleCiteClick(cite.dataset.cite);
-    const copy = event.target.closest("[data-copy]");
-    if (copy) navigator.clipboard?.writeText(copy.dataset.copy).catch(() => {});
   });
 
   window.BIOXIP_ANSWER = { pageHTML, formHandler, load };

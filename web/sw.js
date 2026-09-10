@@ -1,4 +1,4 @@
-const VERSION = "bioxip-v1";
+const VERSION = "bioxip-v2";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -12,6 +12,7 @@ const STATIC_ASSETS = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];
+const FRESH_ASSETS = ["/css/", "/js/", "/icons/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -52,16 +53,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (FRESH_ASSETS.some((prefix) => url.pathname.startsWith(prefix))) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(VERSION).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response.ok && (url.pathname.startsWith("/css/") || url.pathname.startsWith("/js/") || url.pathname.startsWith("/icons/"))) {
-          const copy = response.clone();
-          caches.open(VERSION).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      });
+      return fetch(request);
     }),
   );
 });
