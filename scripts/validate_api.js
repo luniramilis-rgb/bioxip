@@ -90,6 +90,15 @@ async function main() {
   const ledger = await get("/api/credits/ledger");
   check("credits/ledger: 401 tanpa token", ledger.status === 401, String(ledger.status));
 
+  const devGet = await get("/api/dev/answer");
+  check("dev/answer: 404 bila tak dikonfigurasi (tak terekspos)", devGet.status === 404, String(devGet.status));
+  const devPost = await fetch(`${BASE}/api/dev/answer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: "uji" }),
+  });
+  check("dev/answer POST: 404/401 tanpa token dev", [404, 401].includes(devPost.status), String(devPost.status));
+
   let failed = 0;
   for (const item of results) {
     if (!item.ok) failed++;

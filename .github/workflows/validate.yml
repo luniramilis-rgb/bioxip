@@ -33,6 +33,9 @@ jobs:
       - name: Validasi skema kredit & rumus harga
         run: node scripts/validate_credits.js
 
+      - name: Validasi grounded pipeline & golden set
+        run: node scripts/validate_grounded.js
+
       - name: Halaman topik tidak basi (build --check)
         run: node scripts/build_topics.js --check
 
