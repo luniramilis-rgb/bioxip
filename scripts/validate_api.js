@@ -99,6 +99,15 @@ async function main() {
   });
   check("dev/answer POST: 404/401 tanpa token dev", [404, 401].includes(devPost.status), String(devPost.status));
 
+  const estimate = await get("/api/ai/estimate?max_tokens=1024");
+  check("ai/estimate: 401 tanpa token", estimate.status === 401, String(estimate.status));
+  const chat = await fetch(`${BASE}/api/ai/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: "uji" }),
+  });
+  check("ai/chat: 401 tanpa token", chat.status === 401, String(chat.status));
+
   let failed = 0;
   for (const item of results) {
     if (!item.ok) failed++;

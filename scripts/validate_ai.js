@@ -5,6 +5,16 @@ const ROOT = path.join(__dirname, "..");
 const BASE = (process.env.BIOXIP_BASE || "https://bioxip.pages.dev").replace(/\/$/, "");
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://nxlcosnksgbuvtiggjpw.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE || "";
+const ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54bGNvc25rc2didXZ0aWdnanB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzYwOTUsImV4cCI6MjEwNDU1MjA5NX0.mMkfEn6OvJM-W-ZgkSBTpTWlFPZ6eJELSzYeIf1kiX0";
+
+async function userSelect(token, pathname) {
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/${pathname}`, {
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}`, Accept: "application/json" },
+  });
+  return resp.ok ? resp.json() : [];
+}
 
 const results = [];
 const problems = [];
@@ -190,10 +200,7 @@ async function liveTests() {
       `charged=${done?.data?.charged_idr} balance=${done?.data?.balance_idr}`,
     );
 
-    const after = await fetch(`${SUPABASE_URL}/rest/v1/credit_accounts?select=balance_micro_idr`, {
-      headers: { apikey: token, Authorization: `Bearer ${token}`, Accept: "application/json" },
-    });
-    const balanceRows = await after.json();
+    const balanceRows = await userSelect(token, "credit_accounts?select=balance_micro_idr");
     const balanceIdr = Math.ceil(Number(balanceRows[0]?.balance_micro_idr || 0) / 1_000_000);
     check(
       "live: saldo berkurang sesuai tagihan",
@@ -201,11 +208,10 @@ async function liveTests() {
       `sisa=${balanceIdr} charged=${done?.data?.charged_idr}`,
     );
 
-    const usage = await fetch(
-      `${SUPABASE_URL}/rest/v1/ai_usage_log?select=charged_micro_idr,margin_micro_idr,status&order=created_at.desc&limit=1`,
-      { headers: { apikey: token, Authorization: `Bearer ${token}`, Accept: "application/json" } },
+    const usageRows = await userSelect(
+      token,
+      "ai_usage_log?select=charged_micro_idr,margin_micro_idr,status&order=created_at.desc&limit=1",
     );
-    const usageRows = await usage.json();
     check(
       "live: ai_usage_log tercatat dengan margin",
       usageRows.length >= 1 && Number(usageRows[0].charged_micro_idr) > 0 && Number(usageRows[0].margin_micro_idr) > 0,

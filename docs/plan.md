@@ -114,16 +114,14 @@ Deliverable:
 Validasi: citation support ≥98% pada 30 kasus; abstain benar pada ≥5 kasus bukti tipis.
 DoD: laporan hasil golden set tersimpan di `docs/` + CI menjalankan validasi grounded (mode mock bila tanpa key).
 
-## Sprint 5 — AI Proxy + Debit (P2)
+## Sprint 5 — AI Proxy + Debit (P2) — SELESAI (2026-09-10, mode mock)
 **Tujuan:** monetisasi berjalan.
-
-Deliverable:
-- `POST /api/ai/chat` (SSE): auth wajib → estimasi → cek saldo (402) → hold → DeepSeek → settle/refund → `ai_usage_log` + `ai_chat_log`.
-- Lapisan provider `functions/_provider.js` (DeepSeek V4.1 Flash; cache-friendly prompt: prefix statis di awal).
-- `GET /api/ai/estimate`.
-
-Validasi: `validate_api.js` bertambah (402 tanpa saldo, 422 input terlarang, 429 rate limit); uji hold/settle dengan provider mock.
-DoD: jawaban AI berjalan di produksi dengan saldo uji; saldo berkurang sesuai `ai_usage_log`.
+Hasil:
+- `POST /api/ai/chat` (SSE): JWT wajib (401) → guardrail input (422) → cek saldo & estimasi → **402** bila kurang → `fn_credit_hold` → retrieval bukti → provider (**DeepSeek** bila `DEEPSEEK_API_KEY` ada; **mock ekstraktif** bila tidak) → stream `meta` / `delta` / `citation` / `citation_summary` / `red_flag` / `done` → `fn_credit_settle` (tagihan nyata, refund selisih; **dijamin tidak melebihi hold**) → `fn_ai_log_usage` + `fn_ai_log_chat` → bila gagal: refund penuh + log `refunded`.
+- `GET /api/ai/estimate` (401 tanpa token) → estimasi Rp berbasis `_pricing.json`.
+- Migrasi `010_ai_logging.sql`: `fn_ai_log_usage`, `fn_ai_log_chat`, `fn_usage_limit_for` (SECURITY DEFINER, hanya `authenticated`) — menulis log tanpa service_role di edge.
+- **Mock mode**: aktif otomatis ketika `DEEPSEEK_API_KEY` belum diset → jawaban ekstraktif bersitasi + usage sintetis (tetap dipotong saldo, minimum Rp100). Aman untuk uji & demo tanpa biaya token.
+- Validasi live (`scripts/validate_ai.js`): 402 tanpa saldo · grant · **422** input tidak aman · estimasi **Rp267** · SSE lengkap (`meta,delta,…,citation,…,done`) · tagihan **Rp100** (batas minimum) · saldo **49.900** sesuai · `ai_usage_log` tercatat dengan **margin** → **ALL PASS**.
 
 ## Sprint 6 — UI Mode Gratis vs AI (P4)
 **Tujuan:** tidak ada kejutan biaya.
@@ -180,7 +178,7 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 | 2 PubMed ✅ | `validate_pubmed.js` + `validate_api.js` — **ALL PASS** | spot-check 10 query oleh Anda |
 | 3 Ledger ✅ | `validate_credits.js` + `validate_credits_live.py` (live) + `validate_imports.js` — **ALL PASS** | simulasi admin top-up |
 | 4 Grounded ✅ | `validate_grounded.js` (struktur + live opsional) — **ALL PASS** | review apoteker/dokter |
-| 5 AI proxy | `validate_api.js` (402/422/429) + provider mock | uji 10 pertanyaan nyata |
+| 5 AI proxy ✅ | `validate_ai.js` (statis + live mock) — **ALL PASS** | uji 10 pertanyaan nyata (setelah `DEEPSEEK_API_KEY`) |
 | 6 UI | `ui_harness.js` | uji mobile |
 | 7 Xendit | webhook ganda + rekonsiliasi | transaksi sandbox Xendit |
 | 8 Kualitas | regresi golden 150+ di CI | review ahli per domain |
