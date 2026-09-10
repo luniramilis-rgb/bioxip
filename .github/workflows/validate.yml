@@ -33,6 +33,9 @@ jobs:
       - name: Validasi proxy AI & debit (statis)
         run: node scripts/validate_ai.js
 
+      - name: Validasi top-up (statis)
+        run: node scripts/validate_topup.js
+
       - name: Validasi skema kredit & rumus harga
         run: node scripts/validate_credits.js
 

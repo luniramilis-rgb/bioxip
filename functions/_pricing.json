@@ -5,5 +5,7 @@
   "price_out_usd_per_million": 1.2,
   "markup": 12,
   "min_charge_idr": 100,
-  "micro_per_idr": 1000000
+  "micro_per_idr": 1000000,
+  "packages_idr": [50000, 100000, 150000, 500000],
+  "channels": ["QRIS", "VA", "EWALLET"]
 }

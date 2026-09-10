@@ -231,6 +231,7 @@ async function dispatchHash(hash) {
   const saldo = registry.get("saldo-body")?.innerHTML || "";
   results.push(["saldo: halaman render", saldo.includes("Belum masuk") || saldo.includes("Saldo")]);
   results.push(["saldo: catatan gratis tetap jalan", saldo.includes("gratis") || saldo.includes("Belum masuk")]);
+  results.push(["saldo: tombol top-up paket", saldo.includes("data-topup") || saldo.includes("Belum masuk")]);
 
   await dispatchHash("#/harga");
   const harga = registry.get("view").innerHTML;

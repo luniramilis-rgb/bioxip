@@ -286,6 +286,15 @@ table.ledger th, table.ledger td { border-bottom: 1px solid var(--line); padding
 table.ledger td.pos { color: var(--accent); font-weight: 600; }
 table.ledger td.neg { color: #9b2c1f; font-weight: 600; }
 
+.topup-box {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  background: var(--card);
+  margin-top: 0.8rem;
+}
+
 .chip.sev-high { background: #f7d9d5; color: #9b2c1f; }
 .chip.sev-moderate { background: #fbeccb; color: #8a5a00; }
 .chip.sev-low { background: var(--chip); color: var(--muted); }

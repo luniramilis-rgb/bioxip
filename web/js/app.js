@@ -428,8 +428,7 @@
         <ul class="answer-list">
           ${paket.map((amount) => `<li><strong>${esc(window.BIOXIP_CREDITS.formatIdr(amount))}</strong></li>`).join("")}
         </ul>
-        <p class="muted">Pembayaran QRIS, Virtual Account, dan e-wallet (Xendit) sedang disiapkan.</p>
-        <p class="actions"><a class="btn small ghost" href="#/saldo">Lihat saldo & riwayat</a></p>
+        <p class="actions"><a class="btn small" href="#/saldo">Isi saldo (QRIS / VA / e-wallet)</a></p>
       </section>
       <section class="answer-card">
         <h3>Cara biaya dihitung</h3>
