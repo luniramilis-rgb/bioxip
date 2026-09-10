@@ -233,8 +233,15 @@ const ADMIN_PATTERNS = [
 function splitSentences(text) {
   return clean(text)
     .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
-    .map((s) => s.trim())
+    .map((s) => stripSectionLabel(s.trim()))
     .filter(Boolean);
+}
+
+function stripSectionLabel(sentence) {
+  return sentence.replace(
+    /^(introduction|methods?|results?|conclusions?|background|objectives?|discussion|findings|purpose|aims?|design|setting|participants?)\b[:.\-–—]?\s*/i,
+    "",
+  );
 }
 
 function scoreSentence(sentence, phrases) {
