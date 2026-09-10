@@ -27,6 +27,9 @@ jobs:
       - name: Validasi data topik publik
         run: node scripts/validate_topics.js
 
+      - name: Validasi impor fungsi (anti-gagal bundel)
+        run: node scripts/validate_imports.js
+
       - name: Validasi skema kredit & rumus harga
         run: node scripts/validate_credits.js
 

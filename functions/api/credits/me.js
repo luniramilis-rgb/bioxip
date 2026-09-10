@@ -1,4 +1,4 @@
-import { accountPayload, bearerToken, ensureAccount, fetchAccount, json } from "../_credits.js";
+import { accountPayload, bearerToken, ensureAccount, fetchAccount, json } from "../../_credits.js";
 
 export async function onRequestGet(context) {
   try {

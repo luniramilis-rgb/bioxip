@@ -1,4 +1,4 @@
-import { microToIdr } from "../_pricing.js";
+import { microToIdr } from "./_pricing.js";
 
 export function bearerToken(request) {
   const header = request.headers.get("Authorization") || request.headers.get("authorization") || "";
