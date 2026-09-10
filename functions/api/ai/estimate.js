@@ -1,4 +1,4 @@
-import { estimatePayload } from "./chat.js";
+import { estimatePayload } from "../../_estimate.js";
 import { bearerToken, json } from "../../_credits.js";
 
 export async function onRequestGet(context) {
