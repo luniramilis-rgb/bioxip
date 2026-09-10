@@ -26,7 +26,8 @@ Urutan disusun berdasarkan **dependensi** (auth → ledger → AI) dan **risiko/
 Deliverable:
 - Supabase Auth: **Google OAuth** + **magic link email**; halaman `/masuk`, callback, logout.
 - Trigger `handle_new_user` → `profiles` + `credit_accounts` (`plan='free'`).
-- **Onboarding data** (peran, institusi, kebutuhan, consent) — lihat `docs/credits.md` §15.
+- **Onboarding 3 kartu + consent** (peran, institusi, tujuan) sesuai `docs/onboarding.md`.
+- **Langkah akhir: 3 template pertanyaan AI per peran** + contoh hasil (mock bertanda "contoh" bila saldo Rp0, nyata bila ada saldo).
 - **Middleware gating**: JWT wajib untuk `/api/*` kecuali `/api/auth/*`, webhook, dan prefiks publik.
 - **Halaman publik untuk SEO**: `/topik/*`, `/obat/{slug}` ringkas, `/sumber`, `/legal`, `/harga`.
 - **Preview 3 hasil** + CTA "Masuk untuk melihat semua" pada halaman hasil.

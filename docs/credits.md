@@ -317,11 +317,13 @@ Karena gate diberlakukan sejak versi gratis, trafik organik harus diselamatkan l
 Guardrail: rate limit pengiriman magic link per email & per IP; verifikasi email; larangan akun ganda untuk keperluan abuse (audit bila perlu).
 
 ## 15. Onboarding data (alasan utama sign-in sejak gratis)
-Saat login pertama, minta singkat (boleh dilewati, tapi ditampilkan):
-1. **Peran**: dokter · dokter spesialis · koas/mahasiswa kedokteran · apoteker · mahasiswa farmasi · dosen/peneliti · tenaga kesehatan lain · industri.
-2. **Institusi** (opsional): kampus · RS · apotek/jaringan apotek · perusahaan · mandiri.
-3. **Kebutuhan utama**: riset/literatur · praktik klinis · studi/tugas · intelijen produk · lain.
-4. **Consent** privasi (UU PDP) + opsi komunikasi (email produk/topik).
+Rancangan lengkap (pertanyaan, opsi, event analitik, aturan pemakaian data, template pertanyaan AI) ada di **`docs/onboarding.md`**.
+Ringkas:
+1. **Kartu 1 — Peran**: dua tingkat (kategori + detail) dengan **Apoteker & farmasi** sebagai segmen utama; opsi "Lainnya" boleh teks bebas.
+2. **Kartu 2 — Institusi** (opsional): kampus · RS · puskesmas · apotek/jaringan · perusahaan · mandiri.
+3. **Kartu 3 — Tujuan + consent** (UU PDP): riset · klinis · studi · informasi obat · intelijen · belajar.
+4. **Langkah akhir — 3 template pertanyaan AI per peran** (pola Consensus): ketuk → jalankan AI; bila saldo Rp0 tampilkan hasil **mock bertanda "contoh"** + CTA isi saldo.
+Semua langkah dapat dilewati; data dipakai untuk personalisasi & penawaran (agregat, n ≥ 10), bukan dijual.
 
 Data ini dipakai untuk segmentasi penawaran (mahasiswa → harga khusus; apoteker/RS → fitur monitoring & interaksi; industri → API/intelijen) dan dilaporkan agregat (bukan per orang) ke institusi/investor.
 
