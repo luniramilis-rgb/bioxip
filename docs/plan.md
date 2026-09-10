@@ -91,7 +91,18 @@ Hasil:
 - **Temuan & perbaikan penting**: `INSERT ... ON CONFLICT` memvalidasi CHECK pada baris kandidat → upsert delta negatif selalu gagal; trigger diganti memakai `UPDATE` + `row_count` (migration 009). Juga ditemukan **path impor relatif salah** yang membuat bundel Functions gagal (deploy tertahan) → diperbaiki + ditambah `scripts/validate_imports.js` di CI.
 - Validasi: `validate_credits.js` (statis) + `validate_credits_live.py` (live: hold→settle→refund, idempotency, penolakan saldo kurang, constraint, rekonsiliasi) → **ALL PASS**; `validate_api` termasuk 401 endpoint kredit.
 
-## Sprint 4 — Pipeline Grounded internal (K1, tanpa biaya ke pengguna)
+## Sprint 4 — Pipeline Grounded internal (K1) — SELESAI (2026-09-10)
+**Tujuan:** membuktikan "tidak halu" sebelum dijual; belum ada biaya token ke pengguna.
+Hasil:
+- `functions/_safety.js` — klasifikasi input: data pasien (NIK/telepon/MRN), permintaan diagnosis, permintaan peresepan → blokir; deteksi **red flag** (nyeri dada, sesak, perdarahan, penurunan kesadaran, kejang, stroke) → arahan gawat darurat.
+- `functions/_grounded.js` — retrieval bukti (search + drug card Fornas) → prompt grounded (`SYSTEM_PROMPT` statis untuk cache) + skema JSON (`answer/claims/citations/uncertainty/abstain/red_flags`) → **verifikasi sitasi** (`verifyClaims`: setiap klaim wajib menunjuk evidence valid, dihitung `support_rate`) → fallback **extractive** bila provider tidak dikonfigurasi/gagal.
+- `functions/_provider.js` — DeepSeek chat completions (JSON mode, timeout 60 dtk, membaca `prompt_cache_hit_tokens` untuk perhitungan biaya).
+- `functions/api/dev/answer.js` — endpoint internal; **404 bila `DEV_ADMIN_TOKEN` tidak diset** (tidak pernah terekspos), 401 bila token salah; tanpa debit ledger.
+- `tests/golden/grounded_set.json` — **40 item**: 25 pertanyaan berjawab (klinis/farmasi/akademik), 5 abstain, 5 input tidak aman, 5 red flag.
+- `scripts/validate_grounded.js` — validasi struktur & penanda sumber (selalu) + **uji live** bila `BIOXIP_DEV_TOKEN` diset (sitasi, support_rate, abstain, 422, red flag).
+- Terverifikasi produksi: `/api/dev/answer` → **404** (aman). Aktifkan dengan menyetel `DEV_ADMIN_TOKEN` (+ `DEEPSEEK_API_KEY` untuk mode LLM) di Cloudflare Pages.
+
+## Sprint 4 (arsip) — Pipeline Grounded internal (K1, tanpa biaya ke pengguna)
 **Tujuan:** membuktikan "tidak halu" sebelum dijual.
 
 Deliverable:
@@ -153,12 +164,13 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 ## Keputusan yang perlu dikunci (dengan sprint terkat)
 | # | Keputusan | Dibutuhkan di | Status |
 |---|---|---|---|
-| 1 | Google OAuth client (Google Cloud) + konfigurasi Supabase Auth | Sprint 1 | ⏳ menunggu |
-| 2 | SMTP pengirim (domain + SPF/DKIM) untuk magic link/OTP | Sprint 1 | ⏳ menunggu |
+| 1 | Google OAuth client (Google Cloud) + konfigurasi Supabase Auth | Sprint 1B | ⏳ menunggu |
+| 2 | SMTP pengirim (domain + SPF/DKIM) untuk magic link/OTP | Sprint 1B | ⏳ menunggu |
 | 3 | NCBI API key (gratis; opsional, menaikkan limit 3→10 rps) | Sprint 2 | opsional |
-| 4 | Simpan chunk korpus atau retrieval live untuk AI | Sprint 8 | ditunda |
-| 5 | Kanal Xendit yang diaktifkan lebih dulu | Sprint 7 | belum |
-| 6 | Batas rate limit AI per user (`RATE_LIMIT_RPM`) | Sprint 5 | belum |
+| 4 | `DEV_ADMIN_TOKEN` + `DEEPSEEK_API_KEY` (untuk mengaktifkan uji live grounded & mode LLM) | Sprint 4/5 | ⏳ menunggu |
+| 5 | Simpan chunk korpus atau retrieval live untuk AI | Sprint 8 | ditunda |
+| 6 | Kanal Xendit yang diaktifkan lebih dulu | Sprint 7 | belum |
+| 7 | Batas rate limit AI per user (`RATE_LIMIT_RPM`) | Sprint 5 | belum |
 
 ## Checklist validasi per sprint (ringkas)
 | Sprint | Validasi otomatis | Validasi manual |
@@ -167,7 +179,7 @@ DoD: 1 transaksi uji sukses di sandbox Xendit.
 | 1 Auth+gating | `validate_auth.js` + `ui_harness.js` (gate, preview, salin tautan) | uji login Google + magic link/OTP di HP (termasuk in-app browser) |
 | 2 PubMed ✅ | `validate_pubmed.js` + `validate_api.js` — **ALL PASS** | spot-check 10 query oleh Anda |
 | 3 Ledger ✅ | `validate_credits.js` + `validate_credits_live.py` (live) + `validate_imports.js` — **ALL PASS** | simulasi admin top-up |
-| 4 Grounded | `validate_grounded.js` (golden 30) | review apoteker/dokter |
+| 4 Grounded ✅ | `validate_grounded.js` (struktur + live opsional) — **ALL PASS** | review apoteker/dokter |
 | 5 AI proxy | `validate_api.js` (402/422/429) + provider mock | uji 10 pertanyaan nyata |
 | 6 UI | `ui_harness.js` | uji mobile |
 | 7 Xendit | webhook ganda + rekonsiliasi | transaksi sandbox Xendit |
