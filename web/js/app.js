@@ -26,6 +26,7 @@
         <div class="quick">
           <label class="check"><input type="checkbox" id="f-oa" /> Open Access saja</label>
           <label class="check"><input type="checkbox" id="f-indonesia" /> Penelitian Indonesia</label>
+          <a class="muted" href="#/answer">Atau buat jawaban klinis (PICO) →</a>
         </div>
       </section>
       <section>
@@ -234,6 +235,12 @@
       view.innerHTML = resultsHTML();
       searchFormHandler();
       runSearch();
+    } else if (path[0] === "answer") {
+      const A = window.BIOXIP_ANSWER;
+      const q = new URLSearchParams(queryPart || "").get("q") || "";
+      view.innerHTML = A.pageHTML(q);
+      A.formHandler();
+      A.load(q);
     } else if (path[0] === "topic") {
       const topic = TOPICS.find((t) => t.slug === path[1]);
       if (topic) {

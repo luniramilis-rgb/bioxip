@@ -147,3 +147,44 @@ footer {
   color: var(--muted);
   font-size: 0.9rem;
 }
+
+.answer-head h1 { margin-bottom: 0.3rem; }
+
+.answer-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.2rem 1.4rem;
+  margin: 1.2rem 0;
+  background: #fbfdfc;
+}
+.answer-card h2 { margin-top: 0; font-size: 1.25rem; }
+
+.pico { margin: 0.4rem 0 0.6rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.answer-list { padding-left: 1.1rem; }
+.answer-list li { margin: 0.5rem 0; }
+
+.cite a { text-decoration: none; color: var(--accent); font-weight: 700; }
+
+.answer-studies .filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 1rem 0; }
+.chip-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.chip-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.study {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  margin: 0.9rem 0;
+  scroll-margin-top: 90px;
+}
+.study h3 { margin: 0 0 0.3rem; font-size: 1.02rem; }
+.study h3 a { color: var(--ink); text-decoration: none; }
+.study h3 a:hover { color: var(--accent); text-decoration: underline; }
