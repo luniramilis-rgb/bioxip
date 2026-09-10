@@ -1,0 +1,21 @@
+{
+  "version": "1",
+  "note": "Kurasi awal untuk bioXip. status reviewed=false sampai diverifikasi apoteker. severity: tinggi | sedang | rendah.",
+  "pairs": [
+    { "a": "warfarin", "b": "ibuprofen", "severity": "tinggi", "mechanism": "NSAID menambah risiko perdarahan saluran cerna bersama antikoagulan.", "advice": "Hindari bila memungkinkan; bila terpaksa, pantau tanda perdarahan.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "metronidazol", "b": "warfarin", "severity": "tinggi", "mechanism": "Inhibisi metabolisme warfarin (CYP2C9) meningkatkan efek antikoagulan.", "advice": "Pantau INR dan sesuaikan dosis.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "kotrimoksazol", "b": "glibenklamid", "severity": "tinggi", "mechanism": "Potensiasi efek sulfonilurea dapat menyebabkan hipoglikemia berat.", "advice": "Pantau glukosa ketat; pertimbangkan alternatif.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "siprofloksasin", "b": "glibenklamid", "severity": "sedang", "mechanism": "Fluorokuinolon dapat mengganggu kontrol glukosa (hipoglikemia/hiperglikemia).", "advice": "Pantau glukosa darah selama terapi.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "kaptopril", "b": "ibuprofen", "severity": "sedang", "mechanism": "NSAID mengurangi efek antihipertensi ACE inhibitor dan menambah risiko gangguan ginjal.", "advice": "Hindari NSAID bila memungkinkan; pantau tekanan darah dan kreatinin.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "furosemid", "b": "ibuprofen", "severity": "sedang", "mechanism": "NSAID menurunkan efek diuretik dan dapat memperburuk fungsi ginjal.", "advice": "Pertimbangkan analgesik alternatif; pantau ginjal.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "simvastatin", "b": "amlodipin", "severity": "sedang", "mechanism": "Amlodipin meningkatkan kadar simvastatin (CYP3A4) sehingga risiko miopati naik.", "advice": "Batasi dosis simvastatin sesuai label; pantau gejala otot.", "source": "Label simvastatin", "reviewed": false },
+    { "a": "rifampisin", "b": "warfarin", "severity": "tinggi", "mechanism": "Rifampisin menginduksi enzim hati sehingga efek warfarin menurun.", "advice": "Pantau INR; penyesuaian dosis mungkin diperlukan.", "source": "Label rifampisin", "reviewed": false },
+    { "a": "rifampisin", "b": "prednison", "severity": "sedang", "mechanism": "Induksi enzim hati menurunkan efek kortikosteroid.", "advice": "Pertimbangkan penyesuaian dosis kortikosteroid.", "source": "Label rifampisin", "reviewed": false },
+    { "a": "deksametason", "b": "ibuprofen", "severity": "sedang", "mechanism": "Kortikosteroid + NSAID meningkatkan risiko ulserasi/perdarahan saluran cerna.", "advice": "Pertimbangkan gastroproteksi; pantau gejala saluran cerna.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "omeprazol", "b": "diazepam", "severity": "sedang", "mechanism": "Omeprazol menghambat CYP2C19 sehingga kadar diazepam meningkat.", "advice": "Pantau sedasi berlebih.", "source": "Label omeprazol", "reviewed": false },
+    { "a": "omeprazol", "b": "clopidogrel", "severity": "tinggi", "mechanism": "Omeprazol menghambat aktivasi clopidogrel (CYP2C19) sehingga efek antiplatelet menurun.", "advice": "Hindari kombinasi; pertimbangkan PPI alternatif sesuai label.", "source": "Label omeprazol/clopidogrel", "reviewed": false },
+    { "a": "kotrimoksazol", "b": "kaptopril", "severity": "sedang", "mechanism": "Risiko hiperkalemia (keduanya meningkatkan kalium).", "advice": "Pantau kalium dan fungsi ginjal.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "metronidazol", "b": "diazepam", "severity": "sedang", "mechanism": "Inhibisi metabolisme benzodiazepin meningkatkan sedasi.", "advice": "Pantau sedasi; pertimbangkan penyesuaian dosis.", "source": "Interaksi obat umum/label", "reviewed": false },
+    { "a": "glibenklamid", "b": "ibuprofen", "severity": "sedang", "mechanism": "NSAID dapat meningkatkan risiko hipoglikemia pada pengguna sulfonilurea.", "advice": "Pantau glukosa darah.", "source": "Interaksi obat umum/label", "reviewed": false }
+  ]
+}

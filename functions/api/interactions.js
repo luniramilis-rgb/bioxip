@@ -1,9 +1,27 @@
 import { findDrug } from "../_drugs.js";
+import curated from "../_interactions.json";
 
+const OPENFDA = "https://api.fda.gov/drug/label.json";
 const RXNAV = "https://rxnav.nlm.nih.gov/REST";
 const CHEMBL = "https://www.ebi.ac.uk/chembl/api/data";
 const TIMEOUT_MS = 9000;
 const MAX_DRUGS = 5;
+
+const CLASS_SYNONYMS = {
+  ibuprofen: ["nsaid", "nonsteroidal", "non-steroidal", "aines", "anti-inflammatory"],
+  warfarin: ["anticoagulant", "antikoagulan"],
+  glibenklamid: ["sulfonylurea", "sulfonilurea", "glyburide"],
+  kaptopril: ["ace inhibitor", "acei"],
+  simvastatin: ["statin"],
+  diazepam: ["benzodiazepine", "benzodiazepin"],
+  rifampisin: ["rifampin", "rifampicin"],
+  kotrimoksazol: ["trimethoprim", "sulfamethoxazole", "sulfonamide"],
+  deksametason: ["corticosteroid", "kortikosteroid", "steroid"],
+  prednison: ["corticosteroid", "kortikosteroid", "steroid"],
+  clopidogrel: ["antiplatelet"],
+  metronidazol: ["nitroimidazole"],
+  alopurinol: ["xanthine oxidase"],
+};
 
 export async function onRequestGet(context) {
   try {
@@ -11,10 +29,7 @@ export async function onRequestGet(context) {
     const raw = (url.searchParams.get("q") || "").trim();
     if (!raw) return json({ error: "param q wajib (mis. metformin + warfarin)" }, 400);
 
-    const names = [...new Set(raw.split(/[+,;]|\bdan\b/i).map((s) => s.trim()).filter(Boolean))].slice(
-      0,
-      MAX_DRUGS,
-    );
+    const names = [...new Set(raw.split(/[+,;]|\bdan\b/i).map((s) => s.trim()).filter(Boolean))].slice(0, MAX_DRUGS);
     if (names.length < 2) {
       return json({ error: "butuh minimal 2 obat, pisahkan dengan + (mis. metformin + warfarin)" }, 400);
     }
@@ -23,70 +38,158 @@ export async function onRequestGet(context) {
       names.map(async (name) => {
         const catalogue = findDrug(name);
         const term = catalogue?.inn ? String(catalogue.inn).split("/")[0].trim() : name;
-        const rxcui = await resolveRxcui(term).catch(() => null);
-        const chembl = await fetchChembl(term).catch(() => null);
+        const [rxcui, chembl, label] = await Promise.all([
+          resolveRxcui(term).catch(() => null),
+          fetchChembl(term).catch(() => null),
+          fetchInteractionsText(catalogue, name).catch(() => null),
+        ]);
         return {
           input: name,
-          term_used: term,
+          canonical: canonicalId(catalogue, name),
+          display: catalogue?.name || rxcui?.name || name,
           catalogue: catalogue ? catalogue.name : null,
           rxcui,
           chembl,
+          label,
         };
       }),
     );
 
-    const matched = resolved.filter((item) => item.rxcui?.rxcui);
-    const unresolved = resolved.filter((item) => !item.rxcui?.rxcui).map((item) => item.input);
-
-    let pairs = [];
+    const pairs = matchCurated(resolved);
+    const mentions = await collectMentions(resolved);
     const notes = [];
-    if (unresolved.length) notes.push(`Tidak terpetakan di RxNorm: ${unresolved.join(", ")}`);
-
-    if (matched.length >= 2) {
-      const rxcuis = matched.map((item) => item.rxcui.rxcui).join("+");
-      const resp = await fetch(`${RXNAV}/interaction/list.json?rxcuis=${rxcuis}`, {
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        pairs = parseInteractions(data);
-      } else {
-        notes.push(`RxNav interaction ${resp.status}`);
-      }
+    if (!pairs.length && !mentions.length) {
+      notes.push("Tidak ada interaksi pada tabel terkurasi maupun kutipan label untuk kombinasi ini.");
     }
 
     return json({
       query: raw,
       drugs: resolved,
       pairs,
+      mentions,
       notes,
+      rxnav_note:
+        "RxNav Interaction API (NLM) sudah tidak tersedia. Interaksi diambil dari tabel terkurasi bioXip (menunggu verifikasi apoteker) dan kutipan bagian interaksi pada label openFDA/DailyMed.",
       disclaimer:
-        "Pemeriksaan interaksi ini bersifat informatif untuk verifikasi profesional; sumber dapat berbeda (label, basis interaksi) dan tidak menggantikan penilaian apoteker/dokter.",
+        "Pemeriksaan interaksi ini informatif untuk verifikasi profesional; tidak menggantikan penilaian apoteker/dokter dan tidak memuat seluruh interaksi yang mungkin.",
     });
   } catch (error) {
     return json({ error: error.message }, 500);
   }
 }
 
-function parseInteractions(data) {
+function canonicalId(catalogue, name) {
+  if (catalogue?.slug) return catalogue.slug;
+  return String(name || "").trim().toLowerCase();
+}
+
+function matchCurated(resolved) {
   const out = [];
-  for (const group of data.interactionTypeGroup || []) {
-    for (const type of group.interactionType || []) {
-      for (const pair of type.interactionPair || []) {
-        const concepts = (pair.interactionConcept || []).map(
-          (c) => c.minConceptItem?.name || c.sourceConceptItem?.name || "",
-        );
+  for (let i = 0; i < resolved.length; i++) {
+    for (let j = i + 1; j < resolved.length; j++) {
+      const a = resolved[i];
+      const b = resolved[j];
+      const found = (curated.pairs || []).find(
+        (pair) =>
+          (pair.a === a.canonical && pair.b === b.canonical) ||
+          (pair.a === b.canonical && pair.b === a.canonical),
+      );
+      if (found) {
         out.push({
-          a: concepts[0] || "",
-          b: concepts[1] || "",
-          severity: pair.severity || "unknown",
-          description: pair.description || "",
-          source: group.sourceName || type.sourceName || "RxNav",
+          a: a.display,
+          b: b.display,
+          severity: found.severity,
+          mechanism: found.mechanism,
+          advice: found.advice,
+          source: found.source,
+          reviewed: Boolean(found.reviewed),
         });
       }
     }
   }
   return out;
+}
+
+async function collectMentions(resolved) {
+  const mentions = [];
+  for (const drug of resolved) {
+    const text = drug.label?.text || "";
+    if (!text) continue;
+    for (const other of resolved) {
+      if (other === drug) continue;
+      const sentences = findSentences(text, searchTerms(other));
+      for (const sentence of sentences) {
+        mentions.push({
+          label_of: drug.display,
+          about: other.display,
+          quote: sentence,
+          source: drug.label.source,
+          label_term: drug.label.term,
+        });
+      }
+    }
+  }
+  return mentions.slice(0, 8);
+}
+
+function searchTerms(drug) {
+  const catalogue = findDrug(drug.input) || (drug.catalogue ? findDrug(drug.catalogue) : null);
+  const base = [
+    drug.input,
+    catalogue?.name,
+    catalogue?.inn,
+    ...(catalogue?.aliases || []),
+    ...(CLASS_SYNONYMS[drug.canonical] || []),
+  ];
+  return [...new Set(base.map((t) => String(t || "").toLowerCase()).filter((t) => t.length > 3))];
+}
+
+function findSentences(text, terms) {
+  const sentences = text
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .filter((s) => s.length >= 40 && s.length <= 400);
+  const hits = [];
+  for (const sentence of sentences) {
+    const lower = sentence.toLowerCase();
+    if (terms.some((term) => lower.includes(term))) hits.push(sentence.trim());
+    if (hits.length >= 2) break;
+  }
+  return hits;
+}
+
+async function fetchInteractionsText(catalogue, name) {
+  const candidates = [
+    catalogue?.us_name,
+    catalogue?.inn ? String(catalogue.inn).split("/")[0] : null,
+    ...(catalogue?.aliases || []),
+    name,
+  ]
+    .map((t) => String(t || "").trim().toLowerCase())
+    .filter((t) => /^[a-z][a-z\s-]{2,}$/.test(t));
+  for (const candidate of [...new Set(candidates)].slice(0, 5)) {
+    for (const field of ["generic_name", "substance_name"]) {
+      const search = `openfda.${field}:"${candidate}"`;
+      const resp = await fetch(`${OPENFDA}?search=${encodeURIComponent(search)}&limit=5`, {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const results = data.results || [];
+      const texts = [];
+      let source = OPENFDA;
+      let term = candidate;
+      for (const result of results) {
+        const value = join(result.drug_interactions);
+        if (!value) continue;
+        texts.push(value);
+        const setid = result.openfda?.spl_set_id?.[0];
+        if (setid) source = `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${setid}`;
+      }
+      if (texts.length) return { text: texts.join(" "), source, term, available: true };
+    }
+  }
+  return { text: "", source: OPENFDA, term: null, available: false };
 }
 
 async function resolveRxcui(term) {
@@ -141,6 +244,12 @@ async function fetchChembl(term) {
     actions,
     source: `https://www.ebi.ac.uk/chembl/compound_report_card/${id}/`,
   };
+}
+
+function join(value) {
+  if (!value) return "";
+  const text = Array.isArray(value) ? value.join(" ") : String(value);
+  return text.replace(/\s+/g, " ").trim();
 }
 
 function json(data, status = 200) {

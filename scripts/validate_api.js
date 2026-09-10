@@ -54,10 +54,16 @@ async function main() {
   const unknown = await get("/api/drug?q=zzzznotadrug");
   check("drug tidak dikenal: matched=false + saran", unknown.body?.matched === false && Array.isArray(unknown.body?.suggestions), "");
 
-  const inter = await get("/api/interactions?q=metformin%20%2B%20warfarin");
+  const inter = await get("/api/interactions?q=metronidazol%20%2B%20warfarin");
   check("interactions: 200", inter.status === 200, String(inter.status));
   check("interactions: drugs resolved 2", (inter.body?.drugs || []).filter((d) => d.rxcui?.rxcui).length >= 2, "");
   check("interactions: pairs array", Array.isArray(inter.body?.pairs), String((inter.body?.pairs || []).length));
+  check(
+    "interactions: pasangan terkurasi (metronidazol+warfarin)",
+    (inter.body?.pairs || []).some((p) => /tinggi|sedang|rendah/i.test(p.severity)),
+    "",
+  );
+  check("interactions: mentions array", Array.isArray(inter.body?.mentions), String((inter.body?.mentions || []).length));
 
   const single = await get("/api/interactions?q=metformin");
   check("interactions: tolak < 2 obat", single.status === 400, String(single.status));

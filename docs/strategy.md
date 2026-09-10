@@ -41,11 +41,12 @@ Dua suite, satu mesin:
 
 ### S2 — Interaction & Monitoring (fitur pembeda farmasi)
 - Deliverable:
-  - Interaction checker: pasangan obat → tingkat keparahan + mekanisme + sumber label.
+  - Interaction checker: pasangan obat → tingkat keparahan + mekanisme + sumber.
   - Monitoring & penyesuaian ginjal/hati (rentang, dari label) + checklist deprescribing (Beers/STOPP/START).
   - Export ringkas (PDF/gambar) + salin sitasi.
+- Catatan teknis (2026-09-10): **RxNav Interaction API (NLM) telah dihentikan (404)** → diganti dua lapis: (1) **tabel interaksi terkurasi** (`functions/_interactions.json`, 15 pasangan, `reviewed:false` sampai diverifikasi apoteker — lihat `docs/review-interactions.md`); (2) **kutipan bagian interaksi label** openFDA/DailyMed sebagai bukti grounded (`mentions`). RxNorm tetap dipakai untuk normalisasi nama.
 - Exit: 50 pasangan interaksi umum terverifikasi; deprescribing untuk 10 kondisi geriatri.
-- Validasi: apoteker reviewer (≥95% akurasi tingkat keparahan), uji regresi otomatis terhadap golden set.
+- Validasi: apoteker reviewer (≥95% akurasi tingkat keparahan), uji regresi otomatis (`validate_interactions.js` + `validate_api.js`) terhadap pasangan acuan.
 
 ### S3 — Jembatan Klinis ↔ Farmasi (moat)
 - Deliverable: "Bagikan kartu terapi ke apoteker" + status "diverifikasi apoteker"; koleksi kolaboratif (tanpa data pasien).
