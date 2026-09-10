@@ -13,10 +13,14 @@ function makeElement(id) {
     checked: false,
     scrollTop: 0,
     dataset: {},
+    listeners: {},
     classList: { toggle() {}, add() {}, remove() {} },
     setAttribute() {},
     removeAttribute() {},
-    addEventListener() {},
+    addEventListener(event, cb) { (this.listeners[event] = this.listeners[event] || []).push(cb); },
+    trigger(event, payload = {}) {
+      for (const cb of this.listeners[event] || []) cb(payload);
+    },
     querySelector() { return null; },
     querySelectorAll() { return []; },
     closest() { return null; },
@@ -203,6 +207,25 @@ async function dispatchHash(hash) {
   results.push(
     ["mode AI: terkunci tanpa akun", aiAsk.includes("memerlukan akun") || aiAsk.includes("Masuk")],
   );
+
+  // Uji nyata: submit dari mode AI harus mempertahankan mode + filter.
+  const formStub = registry.get("search-form");
+  formStub.listeners = {};
+  await dispatchHash("#/search?q=dengue&mode=ai");
+  const qInput = registry.get("q");
+  if (qInput) qInput.value = "dengue baru";
+  registry.get("search-form").trigger("submit", { preventDefault() {} });
+  const afterSubmit = locationStub.hash;
+  results.push([
+    "mode AI: submit mempertahankan mode=ai",
+    afterSubmit.includes("mode=ai") && afterSubmit.includes("q=dengue"),
+    afterSubmit,
+  ]);
+  results.push([
+    "mode AI: submit tidak menghilangkan mode",
+    !afterSubmit.startsWith("#/search?q=dengue+baru&") ||
+      new URLSearchParams(afterSubmit.split("?")[1] || "").get("mode") === "ai",
+  ]);
 
   await dispatchHash("#/saldo");
   const saldo = registry.get("saldo-body")?.innerHTML || "";

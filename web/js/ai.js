@@ -44,9 +44,19 @@
 
     const estimateIdr = result.body?.estimate_idr || 0;
     const account = await C.me();
+    if (account.status === 401) {
+      status.innerHTML = "";
+      ask.innerHTML = `<div class="locked"><p>Sesi berakhir. Silakan masuk kembali untuk memakai Tanya AI.</p></div>`;
+      return;
+    }
+    if (!account.ok) {
+      status.innerHTML = "";
+      ask.innerHTML = `<div class="locked"><p>Tidak dapat memuat saldo saat ini. Coba lagi sebentar.</p></div>`;
+      return;
+    }
     const balance = account.body?.balance_idr ?? 0;
 
-    if (account.status === 200 && balance < estimateIdr) {
+    if (balance < estimateIdr) {
       status.innerHTML = `<span class="muted">Saldo ${esc(C.formatIdr(balance))} kurang dari estimasi.</span>`;
       ask.innerHTML = `
         <div class="locked">

@@ -108,10 +108,20 @@
       event.preventDefault();
       const q = document.getElementById("q").value.trim();
       if (!q) return;
+      const current = new URLSearchParams(location.hash.split("?")[1] || "");
       const params = new URLSearchParams();
+      params.set("q", q);
+      if (current.get("mode") === "ai") params.set("mode", "ai");
       if (document.getElementById("f-oa")?.checked) params.set("oa", "true");
       if (document.getElementById("f-indonesia")?.checked) params.set("indonesia", "true");
-      location.hash = `#/search?q=${encodeURIComponent(q)}&${params.toString()}`;
+      if (document.getElementById("f-paper")?.checked) params.set("f-paper", "true");
+      if (document.getElementById("f-preprint")?.checked) params.set("f-preprint", "true");
+      if (document.getElementById("f-trial")?.checked) params.set("f-trial", "true");
+      const sortEl = document.getElementById("f-sort");
+      if (sortEl && sortEl.value !== "relevance") params.set("sort", sortEl.value);
+      const perEl = document.getElementById("f-per");
+      if (perEl && Number(perEl.value) !== 20) params.set("per_page", perEl.value);
+      location.hash = `#/search?${params.toString()}`;
     });
   }
 
@@ -278,6 +288,7 @@
     const [pathPart, queryPart] = raw.split("?");
     const path = pathPart.split("/").filter(Boolean);
     markNav(navNameFor(path));
+    window.BIOXIP_CREDITS?.refreshBadge?.();
 
     if (path.length === 0) {
       view.innerHTML = homeHTML();

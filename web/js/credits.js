@@ -54,7 +54,9 @@
     return getJson(`/api/ai/estimate?${params.toString()}`);
   }
 
-  async function refreshBadge() {
+  let lastRefresh = 0;
+
+  async function refreshBadge(force = false) {
     const badge = document.getElementById("balance-badge");
     if (!badge) return null;
     if (!getToken()) {
@@ -63,6 +65,9 @@
       badge.title = "Masuk untuk melihat saldo";
       return null;
     }
+    const now = Date.now();
+    if (!force && now - lastRefresh < 10000) return null;
+    lastRefresh = now;
     const result = await me();
     if (result.status === 401) {
       badge.textContent = "Saldo: sesi berakhir";
@@ -80,7 +85,6 @@
     badge.title = balance > 0 ? "Saldo tersedia" : "Saldo kosong — AI terkunci";
     return result.body;
   }
-
   async function streamChat(payload, handlers = {}) {
     const resp = await fetch("/api/ai/chat", {
       method: "POST",
