@@ -15,6 +15,10 @@ for (const marker of ["caches.default", "cacheGetJson", "cachePutJson", "cacheKe
 }
 if (!cache.includes("typeof caches")) problems.push("_cache.js: harus menjaga ketersediaan Cache API (typeof caches)");
 if (!cache.includes("expires")) problems.push("_cache.js: fallback memori harus punya masa kedaluwarsa");
+// Kunci cache harus di origin yang sama dengan Worker, bukan host sintetis.
+if (!cache.includes("origin")) problems.push("_cache.js: cacheKey harus menerima origin (same-origin untuk Cache API)");
+if (/cache\.bioxip\.local/.test(cache)) problems.push("_cache.js: kunci cache tidak boleh memakai host sintetis");
+if (!cache.includes("putWarned")) problems.push("_cache.js: kegagalan cache.put harus dicatat (tidak silent)");
 
 // 2. /api/search memakai cache dengan TTL dari env dan bisa dilewati (no_cache).
 const search = read("functions/api/search.js");

@@ -171,7 +171,7 @@ export async function onRequestPost(context) {
           max: maxTokens,
           model: providerIsReady ? env.DEEPSEEK_MODEL || "deepseek-v4.1-flash" : "mock",
           ev: hashKey(evidence.map((item) => item.id || item.title).join("|")),
-        });
+        }, origin);
         if (providerIsReady) {
           const cachedAnswer = await cacheGetJson(cacheId);
           if (cachedAnswer) {

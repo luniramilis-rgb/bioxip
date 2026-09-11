@@ -36,7 +36,7 @@ export async function onRequestGet(context) {
     // Cursor pagination mengubah isi respons → wajib ikut jadi bagian kunci cache.
     epmc_cursor: url.searchParams.get("epmc_cursor") || "",
     ct_token: url.searchParams.get("ct_token") || "",
-  });
+  }, url.origin);
 
   if (useCache) {
     try {

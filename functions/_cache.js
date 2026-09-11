@@ -1,18 +1,23 @@
 /**
  * Cache edge bioXip (Cloudflare Cache API + fallback in-memory untuk dev/test).
- * Dipakai untuk respons pencarian (JSON) dan jawaban AI (JSON grounded).
+ * Penting: Cache API mensyaratkan kunci berada pada origin yang sama dengan Worker
+ * (bukan host sintetis), jika tidak `put()` gagal dan cache tidak pernah tersimpan.
  */
 
 const VERSION = "v1";
 const MEMORY = new Map();
 const MEMORY_MAX = 200;
+// Penanda agar kunci cache tidak bertabrakan dengan rute aplikasi.
+const KEY_PREFIX = "__bioxip_cache__";
+let putWarned = false;
 
 function hasCacheApi() {
   return typeof caches !== "undefined" && caches && caches.default;
 }
 
-export function cacheKey(namespace, params = {}, version = VERSION) {
-  const url = new URL(`https://cache.bioxip.local/${namespace}`);
+export function cacheKey(namespace, params = {}, origin, version = VERSION) {
+  const base = origin && /^https?:\/\//.test(origin) ? origin : "https://cache.invalid";
+  const url = new URL(`/${KEY_PREFIX}/${namespace}`, base.endsWith("/") ? base : `${base}/`);
   for (const [key, value] of Object.entries(params).sort(([a], [b]) => a.localeCompare(b))) {
     if (value === undefined || value === null || value === "") continue;
     url.searchParams.set(key, String(value));
@@ -51,8 +56,12 @@ export async function cachePutJson(key, value, ttlSeconds) {
       });
       await caches.default.put(key, response);
       return;
-    } catch {
-      /* jatuh ke memori */
+    } catch (error) {
+      // Cache API gagal (mis. kunci lintas-origin) → jangan silent, catat sekali.
+      if (!putWarned) {
+        putWarned = true;
+        console.warn("bioxip: cache.put gagal, memakai fallback memori —", error?.message || error);
+      }
     }
   }
   if (MEMORY.size >= MEMORY_MAX) {
