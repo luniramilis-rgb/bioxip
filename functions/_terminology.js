@@ -50,6 +50,9 @@ const EXTRA = [
   { id_term: "hati", en_terms: '"liver" OR "hepatic"', mesh: ["Liver"] },
   { id_term: "jantung", en_terms: '"heart" OR "cardiac"', mesh: ["Heart"] },
   { id_term: "darah", en_terms: '"blood"', mesh: ["Blood"] },
+  { id_term: "akurasi", en_terms: '"diagnostic accuracy"', mesh: ["Sensitivity and Specificity"] },
+  { id_term: "sensitivitas", en_terms: '"sensitivity and specificity"', mesh: ["Sensitivity and Specificity"] },
+  { id_term: "spesifisitas", en_terms: '"sensitivity and specificity"', mesh: ["Sensitivity and Specificity"] },
 ];
 
 export const TERMINOLOGY = [...DICTIONARY, ...EXTRA];
@@ -96,6 +99,13 @@ export function expansionClause(text) {
   if (english.length) parts.push(english.map((term) => `"${term}"`).join(" OR "));
   if (mesh.length) parts.push(mesh.map((term) => `MESH:"${term}"`).join(" OR "));
   return parts.length ? `(${parts.join(" OR ")})` : "";
+}
+
+/** Teks untuk skoring ranking: utamakan istilah Inggris/MeSH hasil ekspansi. */
+export function expansionSearchText(text) {
+  const { english, mesh } = expandTerms(text);
+  const words = [...english, ...mesh].join(" ").trim();
+  return words || String(text || "");
 }
 
 // Filter Europe PMC sesuai jenis pertanyaan klinis.
