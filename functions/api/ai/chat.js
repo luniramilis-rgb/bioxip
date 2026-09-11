@@ -277,17 +277,29 @@ export async function onRequestPost(context) {
         let providerError = null;
         let cacheSaved = null;
         let providerAnswered = false;
+        // Bila provider sudah mengalirkan potongan jawaban, jangan kirim ulang di bawah.
+        let deltasSent = false;
+        let providerDebug = null;
         if (mode !== "cache" && providerIsReady) {
           const streamed = await runProviderStream(env, {
             system: SYSTEM_PROMPT,
             user: buildUserPrompt(question, evidence),
             maxTokens,
-            onDelta: (text) => send("delta", { text }),
+            onDelta: (text) => {
+              deltasSent = true;
+              send("delta", { text });
+            },
           });
 
           if (streamed.ok) {
             providerAnswered = true;
             model = streamed.model || model;
+            providerDebug = {
+              raw_len: streamed.raw?.length ?? 0,
+              extracted_len: streamed.extracted?.length ?? 0,
+              json_mode: streamed.json_mode,
+              usage_estimated: Boolean(streamed.usage_estimated),
+            };
             if (streamed.usage) {
               usage = streamed.usage;
             } else {
@@ -388,8 +400,12 @@ export async function onRequestPost(context) {
           };
         }
 
-        for (const piece of chunkText(answer)) {
-          send("delta", { text: piece });
+        // Kirim teks lengkap HANYA bila belum dialirkan oleh provider/event replace
+        // (mencegah jawaban terkirim dua kali).
+        if (!deltasSent) {
+          for (const piece of chunkText(answer)) {
+            send("delta", { text: piece });
+          }
         }
 
         const verified = verifyClaims(claims, evidence.length);
@@ -446,7 +462,7 @@ export async function onRequestPost(context) {
           support_rate: supportRate,
           claims: claims.length,
           cache_saved: cacheSaved,
-          debug: { raw_len: streamed?.raw?.length ?? 0, extracted_len: streamed?.extracted?.length ?? 0, answer_len: answer.length },
+          debug: providerDebug,
         });
       } catch (error) {
         try {
