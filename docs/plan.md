@@ -124,6 +124,17 @@ Hasil:
   4. Model kadang menulis **newline/tab mentah di dalam string JSON** → `sanitizeJsonStrings` + pembersihan trailing comma.
 - Validasi: unit test baru `tests/stream_unit.js` (**20 cek**) dan `tests/provider_unit.js`; skrip produksi `scripts/validate_ai_live.mjs` (2x pertanyaan sama).
 - **Bukti produksi**: run1 `mode=llm` 258 potongan, token pertama **1,95 dtk** dari total 7,38 dtk, Rp222, `cache_saved=cache_api`; run2 `mode=cache` (L1) **0,55 dtk** (13x lebih cepat), jawaban identik, sitasi tetap 8, tagihan **Rp100**.
+## Review keamanan — CELAH KRITIS DITUTUP (2026-09-11)
+**Temuan:** anon (tanpa login) dapat memanggil `fn_credit_grant`, `fn_topup_mark_paid`, dan `fn_answer_cache_hit`.
+**Bukti eksploitasi:** dengan anon key, `fn_credit_grant` mengembalikan HTTP 200 dan saldo user uji naik menjadi **Rp500.000 tanpa pembayaran**.
+**Akar masalah:** di PostgreSQL setiap fungsi baru otomatis mendapat `EXECUTE` untuk **PUBLIC**, dan Supabase juga memberi `anon`; `revoke ... from anon, authenticated` **tidak menghapus grant PUBLIC** (PUBLIC mencakup anon).
+**Dampak:** penyerang membuat topup sendiri via `/api/credits/topup` (mendapat `external_id`) lalu menandainya lunas dengan anon key → kredit gratis; atau mencetak kredit langsung lewat `fn_credit_grant`.
+**Perbaikan:**
+- Migrasi **014_function_security.sql**: mencabut EXECUTE dari **PUBLIC dan anon** untuk SEMUA fungsi (loop `pg_proc`), menambah `alter default privileges ... revoke execute on functions from public/anon` (agar fungsi baru aman), lalu memberi grant kembali hanya kepada `service_role` (fn_credit_grant, fn_topup_mark_paid, fn_answer_cache_hit) dan `authenticated` (hold/settle/refund/topup/log/ensure).
+- Migrasi **015_table_security.sql**: mencabut akses tabel anon (credit_*, topups, ai_*, usage_limits, answer_cache) + `alter default privileges ... revoke all on tables from anon`.
+**Verifikasi ulang:** eksploitasi kini `HTTP 401 permission denied` dan saldo tetap **Rp0**; semua tabel sensitif anon → **401**; ACL semua fungsi tidak lagi memuat `=X/postgres`.
+**Penjaga regresi:** `scripts/validate_security.js` (statis, masuk CI) + `scripts/validate_security_live.mjs` (produksi) — keduanya **ALL PASS**.
+**Perbaikan tambahan dari review yang sama:** kursor berkedip kini berhenti setelah jawaban selesai; jawaban multi-paragraf dirender sebagai paragraf (sebelumnya menyatu); `STREAM_TIMEOUT_MS` diturunkan 120s → **25 detik** agar fallback non-stream masih sempat jalan sebelum batas wall-clock platform.
 ## Sprint 2 — PubMed E-utilities — SELESAI (2026-09-10)
 Terverifikasi di produksi: hasil memuat sumber **pubmed** + **europepmc**, **0 duplikat DOI/PMID** pada 4 query uji (tuberculosis, dengue, stunting, hypertension), NCBI E-utilities dapat diakses (total >300 rb untuk "tuberculosis").
 Tersisa opsional: NCBI API key (naikkan batas 3→10 req/detik), dan perbaikan peringkat (PubMed saat ini muncul setelah Europe PMC).
