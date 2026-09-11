@@ -1,5 +1,5 @@
 {
-  "edition": "KMK HK.01.07/MENKES/1199/2025 (berlaku 1 April 2026)",
+  "edition": "Sampel internal 30 obat generik (atribusi Fornas KMK HK.01.07/MENKES/1199/2025 BELUM diverifikasi)",
   "source_url": "https://e-fornas.kemkes.go.id/guest/daftar-obat",
   "drugs": [
     { "slug": "parasetamol", "name": "Parasetamol", "inn": "paracetamol", "us_name": "acetaminophen", "atc": "N02BE01", "kelas": "Analgesik, antipiretik", "rute": "Oral, rektal", "aliases": ["paracetamol", "acetaminophen", "parasetamol", "obat demam", "penurun panas"], "watchouts": ["Dosis maksimum harian dewasa perlu diverifikasi pada label/Fornas (label AS 4 g).", "Risiko hepatotoksisitas bila berlebih atau kombinasi produk sejenis."] },

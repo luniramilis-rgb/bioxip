@@ -1,7 +1,10 @@
-# Review Apoteker — Kartu Obat batch 1 (30 obat Fornas)
+# Review Apoteker — Sampel Kartu Obat (30 obat generik)
 
 Tujuan: memastikan setiap kartu obat akurat, aman, dan kontekstual Indonesia sebelum dipakai pengguna.
 Status: menunggu review. Reviewer: (isi nama & nomor STRA/STRTTK bila ada).
+
+> **Catatan provenance (2026-09-11):** 30 entri ini adalah **sampel kurasi manual** (commit `3073211`), **bukan** hasil ekstraksi resmi e-Fornas. Edisi `KMK HK.01.07/MENKES/1199/2025` dipakai sebagai **rujukan**, belum diverifikasi. Daftar Fornas penuh kini tersedia lewat API resmi `https://e-fornas.kemkes.go.id/api/daftar-obat` (1.254 baris, 663 nama obat) dan diimpor ke staging (`--from-fornas-api`) menunggu review.
+
 
 ## Sumber acuan resmi
 1. **e-Fornas Kemenkes** — https://e-fornas.kemkes.go.id/guest/daftar-obat (edisi KMK HK.01.07/MENKES/1199/2025).

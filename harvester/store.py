@@ -156,17 +156,27 @@ class Store:
         return resp.json()
 
     def staging_checksums(self, kind: str) -> dict[str, str]:
-        """Peta key->checksum dari staging (semua status) untuk diff idempoten."""
+        """Peta key->checksum dari staging (semua status) untuk diff idempoten.
+
+        Diurutkan `id.desc` dan kunci unik `(kind, slug)` (migrasi 019) menjamin
+        satu baris per key; pengurutan membuatnya deterministik bila ada warisan.
+        """
         rows = self.select_rows(
             "formulary_staging",
-            {"select": "slug,checksum", "kind": f"eq.{kind}"},
+            {"select": "slug,checksum", "kind": f"eq.{kind}", "order": "id.desc"},
         )
-        return {row["slug"]: row.get("checksum") for row in rows if row.get("slug")}
+        checksums: dict[str, str] = {}
+        for row in rows:
+            slug = row.get("slug")
+            if slug and slug not in checksums:
+                checksums[slug] = row.get("checksum")
+        return checksums
 
     def insert_staging(self, rows: list[dict]) -> int:
+        """Upsert current-state: `(kind, slug)` unik, status direset ke pending."""
         if not rows:
             return 0
-        created = self.upsert_rows("formulary_staging", rows)
+        created = self.upsert_rows("formulary_staging", rows, on_conflict="kind,slug")
         return len(created)
 
     def approve_staging(self, reviewer: str, only_source_reviewed: bool = True) -> int:
@@ -182,7 +192,7 @@ class Store:
         return len(updated)
 
     def list_staging(self, status: str = "approved", kind: Optional[str] = None) -> list[dict]:
-        params = {"select": "id,kind,slug,payload,checksum", "status": f"eq.{status}"}
+        params = {"select": "id,kind,slug,payload,checksum", "status": f"eq.{status}", "order": "id.desc"}
         if kind:
             params["kind"] = f"eq.{kind}"
         return self.select_rows("formulary_staging", params)

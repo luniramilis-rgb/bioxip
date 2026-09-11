@@ -4,7 +4,7 @@ Dokumen hidup. Rencana ini **turunan** dari `docs/blueprint.md` (arsitektur), `d
 
 Prinsip arsitektur: **Postgres = satu sumber kebenaran untuk data terstruktur; edge tipis; retrieval literatur live bercache; batch hanya untuk ingest & validasi.** Parquet/R2 **belum** dipakai (lihat §F).
 
-**Status (2026-09-11):** Fase 0 selesai (`docs/formulary.md`, `docs/literature.md`); Fase 1 selesai (migrasi `017_formulary.sql` diterapkan ke produksi + terverifikasi live); **Fase 2 selesai** (importer dua-fase `harvester/providers/formulary.py` + `harvester/runners/ingest_formulary.py`, seed 30 obat dipublikasikan, 15 interaksi + 175 monitoring tertahan di staging menunggu review; migrasi `018_formulary_monitoring_unique.sql`). Impor **Fornas penuh** menunggu berkas sumber resmi via `--source`. Fase 3+ belum dikerjakan.
+**Status (2026-09-11):** Fase 0 selesai (`docs/formulary.md`, `docs/literature.md`); Fase 1 selesai (migrasi `017_formulary.sql` diterapkan ke produksi + terverifikasi live); **Fase 2 selesai** (importer dua-fase + seed, migrasi `018`/`019`). **Koreksi provenance:** katalog 30 obat adalah **sampel kurasi manual** (commit `3073211`), bukan ekstraksi Fornas; atribusi edisi Fornas **belum diverifikasi** (lihat `docs/review-drugs.md`). Sumber resmi penuh kini tersedia melalui **API e-Fornas** `https://e-fornas.kemkes.go.id/api/daftar-obat` (1.254 baris → 663 obat unik) dan diimpor ke staging via `--from-fornas-api` **menunggu review apoteker** (belum dipublikasikan). Fase 3+ belum dikerjakan.
 
 ---
 

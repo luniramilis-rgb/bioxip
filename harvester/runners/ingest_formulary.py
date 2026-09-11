@@ -65,6 +65,8 @@ def build_staging_rows(kind: str, records: list[dict]) -> list[dict]:
                 "payload": record,
                 "checksum": formulary.checksum(record),
                 "status": "pending",
+                "reviewed_by": None,
+                "reviewed_at": None,
             }
         )
     return rows
@@ -74,6 +76,7 @@ def build_staging_rows(kind: str, records: list[dict]) -> list[dict]:
 def run(
     kind: str = typer.Option("all", help="drugs|interactions|monitoring|all"),
     source: Optional[Path] = typer.Option(None, help="Berkas sumber CSV/JSON (wajib bila kind != all)"),
+    from_fornas_api: bool = typer.Option(False, "--from-fornas-api", help="Ambil daftar obat dari API e-Fornas"),
     apply: bool = typer.Option(False, "--apply", help="Tulis ke formulary_staging"),
     approve: bool = typer.Option(False, "--approve", help="Setujui staging (hanya payload reviewed=true)"),
     publish: bool = typer.Option(False, "--publish", help="Publikasikan staging approved ke tabel"),
@@ -83,8 +86,13 @@ def run(
     kinds = resolve_kinds(kind)
     if source is not None and len(kinds) != 1:
         raise typer.BadParameter("--source hanya untuk satu --kind")
+    if from_fornas_api and kinds != ("drugs",):
+        raise typer.BadParameter("--from-fornas-api hanya untuk --kind drugs")
 
-    datasets = {k: load_records(k, source) for k in kinds}
+    if from_fornas_api:
+        datasets = {"drugs": formulary.fornas_api_records()}
+    else:
+        datasets = {k: load_records(k, source) for k in kinds}
 
     if not (apply or approve or publish):
         for k, records in datasets.items():

@@ -21,7 +21,9 @@ def test_drug_normalization_fields():
     assert parasetamol["inn"] == "paracetamol"
     assert parasetamol["atc"] == "N02BE01"
     assert parasetamol["status_fornas"] is True
-    assert parasetamol["reviewed"] is True
+    # Sampel manual: menunggu review apoteker, sumber internal (bukan klaim Fornas).
+    assert parasetamol["reviewed"] is False
+    assert parasetamol["source_id"] == formulary.SAMPLE_SOURCE_ID
     assert "acetaminophen" in parasetamol["search_text"]
     assert "N02BE01" in parasetamol["search_text"]
     assert parasetamol["aliases"]
@@ -86,10 +88,41 @@ def test_key_of_monitoring():
 
 def test_fact_source_payloads():
     sources = {s["id"]: s for s in formulary.fact_source_payloads()}
-    fornas = sources[formulary.FORNAS_SOURCE_ID]
-    assert "Fornas" in fornas["nama"]
-    assert fornas["edisi"].startswith("KMK")
-    assert fornas["berlaku_dari"] == "2026-04-01"
+    sample = sources[formulary.SAMPLE_SOURCE_ID]
+    assert "Sampel" in sample["nama"]
+    assert "BELUM diverifikasi" in sample["catatan"]
+    fornas = sources[formulary.FORNAS_API_SOURCE_ID]
+    assert fornas["url"] == formulary.FORNAS_API_URL
+    assert fornas["pengelola"] == "Kemenkes RI"
+
+
+def test_map_fornas_row():
+    row = {
+        "nama_obat": "bisakodil",
+        "nama_obat_internasional": "bisacodyl",
+        "nama_kelas_terapi": "OBAT untuk SALURAN CERNA",
+        "nama_kelas_terapi_sub1": "KATARTIK",
+        "sediaan": "SUPOSITORIA",
+        "kekuatan": "10",
+        "satuan": "MILIGRAM",
+        "nama_rute1": None,
+    }
+    record = formulary.map_fornas_row(row)
+    assert record["slug"] == "bisakodil"
+    assert record["inn"] == "bisacodyl"
+    assert record["kelas"].startswith("OBAT untuk SALURAN CERNA")
+    assert record["bentuk_sediaan"] == "SUPOSITORIA"
+    assert record["kekuatan"] == "10 MILIGRAM"
+    assert record["status_fornas"] is True
+    assert record["reviewed"] is False
+    assert record["source_id"] == formulary.FORNAS_API_SOURCE_ID
+    assert "bisacodyl" in record["search_text"]
+
+
+def test_map_fornas_row_handles_na_satuan():
+    record = formulary.map_fornas_row({"nama_obat": "dialisa peritoneal", "nama_obat_internasional": "peritoneal dialysis", "kekuatan": "", "satuan": "N/A"})
+    assert record["kekuatan"] is None
+    assert record["slug"] == "dialisa-peritoneal"
 
 
 def test_csv_source(tmp_path):
@@ -121,3 +154,30 @@ def test_unsupported_format(tmp_path):
     path.write_text("x", encoding="utf-8")
     with pytest.raises(ValueError):
         formulary.load_records(path, "drugs")
+
+
+def test_bool_coercion_from_strings():
+    # bool("false") bernilai True — harus diparsing eksplisit.
+    assert formulary.normalize_drug({"nama": "X", "status_fornas": "false"})["status_fornas"] is False
+    assert formulary.normalize_drug({"nama": "Y", "status_fornas": "1"})["status_fornas"] is True
+    assert formulary.normalize_interaction({"a": "a", "b": "b", "reviewed": "false"})["reviewed"] is False
+    assert formulary.normalize_interaction({"a": "a", "b": "b", "reviewed": "true"})["reviewed"] is True
+    rows = formulary.normalize_monitoring("x", {"monitoring": ["gula"], "reviewed": "false"})
+    assert all(row["reviewed"] is False for row in rows)
+
+
+def test_monitoring_keeps_commas():
+    rows = formulary.normalize_monitoring("x", {"monitoring": "Elektrolit (K, Na, Mg); Fungsi ginjal"})
+    params = [row["parameter"] for row in rows]
+    assert "Elektrolit (K, Na, Mg)" in params
+    assert "Fungsi ginjal" in params
+
+
+def test_jsonl_source(tmp_path):
+    path = tmp_path / "drugs.jsonl"
+    path.write_text(
+        '{"nama": "Obat A", "inn": "obatum_a"}\n\n{"nama": "Obat B", "inn": "obatum_b"}\n',
+        encoding="utf-8",
+    )
+    records = formulary.load_records(path, "drugs")
+    assert [r["slug"] for r in records] == ["obat-a", "obat-b"]
