@@ -176,6 +176,16 @@ Hasil:
 - Validasi: `scripts/validate_cache.js` (wiring cache + batas throttle), `tests/functions_smoke.js` diperluas (**cache miss→hit, upstream tidak dipanggil ulang, degraded tidak disimpan, no_cache bypass**), `validate_pubmed.js` & `validate_api.js` disesuaikan agar tahan variasi sumber pendamping.
 - **Bukti produksi**: kueri dingin **0,92 s** → cache **0,32–0,41 s** (±2,6× lebih cepat); `source_counts` menampilkan komposisi sumber.
 
+### Review Sprint 9 (2026-09-11) — 4 bug ditemukan & diperbaiki
+| # | Bug | Dampak | Perbaikan |
+|---|---|---|---|
+| 1 | Kunci cache **tidak memuat `epmc_cursor`/`ct_token`** | Halaman 2+ bisa menyajikan hasil halaman 1 (stale) | Cursor + token masuk kunci cache; uji regresi ditambahkan |
+| 2 | Middleware menandai `/api/search` cacheable bahkan untuk **`no_cache=1`** dan respons **non-200** | Validator tidak benar-benar segar; error berpotensi ter-cache di CDN | Middleware hanya menandai cacheable bila **bukan** `no_cache=1` **dan** status 200 |
+| 3 | Log `ai_usage_log.provider` mencatat **"mock"** untuk cache-hit (padahal model DeepSeek) | Analitik biaya/margin menyesatkan | Label menjadi `mode === "mock" ? "mock" : "deepseek"` |
+| 4 | **Kunci Cache API memakai host sintetis** (`cache.bioxip.local`) → `cache.put()` gagal, cache tidak pernah tersimpan (hit tidak konsisten) | Cache praktis tidak berfungsi di produksi | Kunci memakai **origin asli request**; `cacheKey(namespace, params, origin)`; warning bila `put` gagal |
+
+Bukti setelah perbaikan: kueri hangat **0,07–0,16 s**; paginasi nyata — page 1 dan page 2 menghasilkan judul berbeda, page 2 dengan cursor asli `miss → hit`; cursor palsu sengaja **tidak** di-cache (respons degraded).
+
 ## Sprint 8 (arsip) — Kualitas Retrieval & Data (K2–K4)
 - Retrieval hibrida (FTS + `pgvector`) + section-aware chunking + reranker.
 - Lapisan fakta terstruktur (label, ATC, CT.gov, UniProt/GO) sebagai konteks AI.
