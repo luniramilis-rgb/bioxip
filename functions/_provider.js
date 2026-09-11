@@ -1,6 +1,7 @@
 const TIMEOUT_MS = 60000;
-// Streaming bisa berlangsung lebih lama daripada panggilan biasa (jawaban panjang).
-const STREAM_TIMEOUT_MS = 120000;
+// Streaming bisa berlangsung lebih lama daripada panggilan biasa, tetapi harus tetap
+// di bawah batas wall-clock platform (Cloudflare ~30 dtk) agar fallback masih bisa jalan.
+const STREAM_TIMEOUT_MS = 25000;
 // Model yang didukung Provider API DeepSeek (lihat pesan error provider):
 // deepseek-flash (murah/cepat) dan deepseek-v4-pro (lebih kuat).
 const DEFAULT_MODEL = "deepseek-flash";

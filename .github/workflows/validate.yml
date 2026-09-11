@@ -69,6 +69,9 @@ jobs:
       - name: Validasi cache edge & throttle NCBI
         run: node scripts/validate_cache.js
 
+      - name: Validasi keamanan (fungsi & akses klien)
+        run: node scripts/validate_security.js
+
       - name: Halaman topik tidak basi (build --check)
         run: node scripts/build_topics.js --check
 

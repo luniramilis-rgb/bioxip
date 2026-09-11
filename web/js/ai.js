@@ -96,6 +96,23 @@
     let text = "";
     const citations = new Map();
 
+    // Render jawaban sebagai paragraf (LLM memakai \n\n) + kursor saat menulis.
+    function renderAnswer(host, value, writing) {
+      if (!host) return;
+      const paragraphs = String(value || "")
+        .split(/\n{2,}/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const caret = writing ? '<span class="caret" aria-hidden="true"></span>' : "";
+      if (!paragraphs.length) {
+        host.innerHTML = writing ? `<p>${caret}</p>` : "";
+        return;
+      }
+      host.innerHTML = paragraphs
+        .map((part, index) => `<p>${esc(part)}${index === paragraphs.length - 1 ? caret : ""}</p>`)
+        .join("");
+    }
+
     C.streamChat(
       { question, feature: "chat", max_tokens: 1024, grounding: { search: true, drug: true } },
       {
@@ -108,18 +125,14 @@
         },
         onDelta(data) {
           text += data.text || "";
-          const host = document.getElementById("ai-text");
-          if (host) {
-            host.innerHTML = `<p>${esc(text)}<span class="caret" aria-hidden="true"></span></p>`;
-          }
+          renderAnswer(document.getElementById("ai-text"), text, true);
           const stream = document.getElementById("ai-stream");
           if (stream) stream.textContent = "Menulis jawaban…";
         },
         onReplace(data) {
           // Provider gagal memenuhi struktur klaim → teks yang tampil diganti jawaban ekstraktif.
           text = data.text || "";
-          const host = document.getElementById("ai-text");
-          if (host) host.innerHTML = `<p>${esc(text)}</p>`;
+          renderAnswer(document.getElementById("ai-text"), text, false);
         },
         onCitation(data) {
           citations.set(data.n, data);
@@ -151,6 +164,8 @@
         onDone(data) {
           const stream = document.getElementById("ai-stream");
           if (stream) stream.remove();
+          // Hentikan kursor berkedip: render ulang tanpa caret.
+          renderAnswer(document.getElementById("ai-text"), text, false);
           const host = document.getElementById("ai-foot");
           if (host) {
             host.insertAdjacentHTML(
