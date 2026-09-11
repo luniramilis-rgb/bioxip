@@ -73,15 +73,15 @@ export async function searchPubmed(term, options = {}) {
 function mapSummary(uid, item) {
   if (!item) return null;
   const doi = (item.articleids || []).find((a) => a.idtype === "doi")?.value || null;
-  const year = Number(String(item.pubdate || "").slice(0, 4)) || null;
+  const published = parsePubDate(item.pubdate);
   return {
     id: `pubmed|${uid}`,
     doc_type: "paper",
     title: item.title || "",
     authors: (item.authors || []).map((a) => ({ given: "", family: a.name || "" })),
     journal: item.fulljournalname || item.source || null,
-    year,
-    published_on: null,
+    year: published ? Number(published.slice(0, 4)) : null,
+    published_on: published,
     doi,
     url: `https://pubmed.ncbi.nlm.nih.gov/${uid}/`,
     source: "pubmed",
@@ -89,4 +89,22 @@ function mapSummary(uid, item) {
     citation_count: 0,
     external_ids: { pmid: uid, doi },
   };
+}
+
+/** "2024 May" / "2024" / "2024 May 12" → "2024-05-01". */
+function parsePubDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+  if (!yearMatch) return null;
+  const year = yearMatch[0];
+  const months = {
+    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+    jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+  };
+  const monthMatch = text.toLowerCase().match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/);
+  const dayMatch = text.match(/\b(\d{1,2})\b(?!\s*$)/);
+  const month = monthMatch ? months[monthMatch[1]] : "01";
+  const day = dayMatch && Number(dayMatch[1]) <= 31 ? String(dayMatch[1]).padStart(2, "0") : "01";
+  return `${year}-${month}-${day}`;
 }

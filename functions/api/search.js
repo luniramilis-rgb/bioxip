@@ -121,6 +121,21 @@ export async function onRequestGet(context) {
     }
 
     results = rankResults(results, rankText, sort);
+
+    // Jaga keberagaman sumber: bila PubMed diminta tetapi tergusur dari halaman,
+    // sisipkan hasil PubMed terbaik agar pengguna tetap melihat cakupan sumber.
+    if (needPubmed && results.length > 3) {
+      const page = results.slice(0, perPage);
+      if (!page.some((row) => row.source === "pubmed")) {
+        const pubmedRow = results.find((row) => row.source === "pubmed");
+        if (pubmedRow) {
+          const insertAt = Math.max(0, page.length - 2);
+          results.splice(results.indexOf(pubmedRow), 1);
+          results.splice(insertAt, 0, pubmedRow);
+        }
+      }
+    }
+
     const paged = results.slice(0, perPage);
 
     // Sembunyikan abstrak dari respons kecuali diminta eksplisit (abstrak hanya untuk skoring/grounded).
