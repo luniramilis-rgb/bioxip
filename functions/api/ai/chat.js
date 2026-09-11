@@ -248,7 +248,7 @@ export async function onRequestPost(context) {
         await logUsage(env, token, {
           requestId,
           feature,
-          provider: mode === "llm" ? "deepseek" : "mock",
+          provider: mode === "mock" ? "mock" : "deepseek",
           model,
           usage,
           costMicro: cost,
@@ -284,7 +284,7 @@ export async function onRequestPost(context) {
           await logUsage(env, token, {
             requestId,
             feature,
-            provider: mode === "llm" ? "deepseek" : "mock",
+          provider: mode === "mock" ? "mock" : "deepseek",
             model,
             usage,
             costMicro: 0,

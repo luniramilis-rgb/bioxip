@@ -126,6 +126,7 @@ async function main() {
   loadModule(sandbox, "_cache.js", ["cacheKey", "cacheGetJson", "cachePutJson", "resetMemoryCache"]);
   loadModule(sandbox, "_drugs.js", ["DRUGS", "FORNAS", "findDrug", "findDrugsInText", "suggestDrugs"]);
   loadModule(sandbox, "_pubmed.js", ["searchPubmed", "buildQuery"]);
+  loadModule(sandbox, "_middleware.js", ["onRequest"]);
   loadModule(sandbox, "api/search.js", ["onRequestGet"]);
 
   const context = {
@@ -190,6 +191,52 @@ async function main() {
   const bypassBody = await bypass.json();
   check("cache: no_cache=1 melewati cache", bypassBody.cache === "bypass", String(bypassBody.cache));
 
+  // no_cache tidak boleh mengisi cache: permintaan normal berikutnya tetap "miss".
+  const afterBypass = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=bypass-not-stored&per_page=5&no_cache=1" },
+    env: {},
+  });
+  await afterBypass.json();
+  const normalAfter = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=bypass-not-stored&per_page=5" },
+    env: {},
+  });
+  const normalAfterBody = await normalAfter.json();
+  check("cache: no_cache tidak mengisi cache", normalAfterBody.cache === "miss", String(normalAfterBody.cache));
+
+  // Cursor pagination harus jadi bagian kunci cache (beda cursor = beda entri).
+  sandbox.resetMemoryCache();
+  const pageOne = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=cursor-test&per_page=5&page=1" },
+    env: {},
+  });
+  await pageOne.json();
+  const pageTwoA = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=cursor-test&per_page=5&page=2&epmc_cursor=CURSOR-A" },
+    env: {},
+  });
+  const pageTwoABody = await pageTwoA.json();
+  const pageTwoB = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=cursor-test&per_page=5&page=2&epmc_cursor=CURSOR-B" },
+    env: {},
+  });
+  const pageTwoBBody = await pageTwoB.json();
+  check(
+    "cache: cursor berbeda tidak berbagi entri cache",
+    pageTwoABody.cache === "miss" && pageTwoBBody.cache === "miss",
+    `A=${pageTwoABody.cache} B=${pageTwoBBody.cache}`,
+  );
+  const pageTwoAAgain = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=cursor-test&per_page=5&page=2&epmc_cursor=CURSOR-A" },
+    env: {},
+  });
+  const pageTwoAAgainBody = await pageTwoAAgain.json();
+  check(
+    "cache: cursor sama dilayani cache pada permintaan berikutnya",
+    pageTwoAAgainBody.cache === "hit",
+    String(pageTwoAAgainBody.cache),
+  );
+
   // Respons cacat (hasil < 3 / ada notes) tidak boleh disimpan ke cache.
   sandbox.resetMemoryCache();
   sandbox.__setDegraded(true);
@@ -210,12 +257,31 @@ async function main() {
     `hasil=${(degradedBody.results || []).length} kedua=${degradedAgainBody.cache}`,
   );
 
+  // Middleware: hanya respons 200 tanpa no_cache yang boleh ditandai cacheable.
+  async function middlewareHeaders(url, status = 200) {
+    const response = await sandbox.onRequest({
+      request: { method: "GET", url },
+      env: {},
+      next: async () =>
+        new Response(JSON.stringify({ ok: true }), { status, headers: { "Content-Type": "application/json" } }),
+    });
+    return response.headers.get("Cache-Control") || "";
+  }
+
+  const cacheable = await middlewareHeaders("https://bioxip.pages.dev/api/search?q=x", 200);
+  check("middleware: search normal ditandai cacheable", cacheable.includes("max-age"), cacheable);
+  const bypassHeaders = await middlewareHeaders("https://bioxip.pages.dev/api/search?q=x&no_cache=1", 200);
+  check("middleware: no_cache=1 tidak cacheable", bypassHeaders.includes("no-store"), bypassHeaders);
+  const errorHeaders = await middlewareHeaders("https://bioxip.pages.dev/api/search?q=x", 500);
+  check("middleware: respons non-200 tidak cacheable", errorHeaders.includes("no-store"), errorHeaders);
+  const aiHeaders = await middlewareHeaders("https://bioxip.pages.dev/api/ai/chat", 200);
+  check("middleware: endpoint AI tetap no-store", aiHeaders.includes("no-store"), aiHeaders);
+
   let failed = 0;
   for (const item of results) {
     if (!item.ok) failed++;
     console.log(`${item.ok ? "PASS" : "FAIL"}  ${item.name}${item.detail ? " (" + item.detail + ")" : ""}`);
-  }
-  console.log(failed ? `\n${failed} FAILED` : "\nALL PASS");
+  }  console.log(failed ? `\n${failed} FAILED` : "\nALL PASS");
   process.exit(failed ? 1 : 0);
 }
 

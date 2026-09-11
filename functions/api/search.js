@@ -33,6 +33,9 @@ export async function onRequestGet(context) {
     sort: url.searchParams.get("sort") || "",
     abstract: url.searchParams.get("abstract") || "",
     clinical: url.searchParams.get("clinical") || "",
+    // Cursor pagination mengubah isi respons → wajib ikut jadi bagian kunci cache.
+    epmc_cursor: url.searchParams.get("epmc_cursor") || "",
+    ct_token: url.searchParams.get("ct_token") || "",
   });
 
   if (useCache) {

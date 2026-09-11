@@ -20,7 +20,9 @@ export async function onRequest(context) {
       headers.set(key, value);
     }
     // /api/search boleh di-cache di edge (TTL ditentukan fungsi); endpoint lain (termasuk SSE AI) tidak.
-    if (url.pathname === "/api/search") {
+    // `no_cache=1` dan respons non-200 TIDAK boleh ditandai cacheable agar validator selalu segar.
+    const bypass = url.searchParams.get("no_cache") === "1";
+    if (url.pathname === "/api/search" && !bypass && response.status === 200) {
       headers.set("Cache-Control", `public, max-age=${env.SEARCH_CACHE_TTL_SECONDS || 900}`);
       headers.set("Vary", "Accept-Encoding");
     } else {

@@ -21,6 +21,12 @@ const search = read("functions/api/search.js");
 for (const marker of ["cacheGetJson", "cachePutJson", "cacheKey", "SEARCH_CACHE_NAMESPACE", "no_cache", "searchCacheTtl"]) {
   if (!search.includes(marker)) problems.push(`api/search.js: tidak ada "${marker}"`);
 }
+// Cursor pagination mengubah isi respons → wajib ada di kunci cache.
+for (const cursor of ["epmc_cursor", "ct_token"]) {
+  if (!new RegExp(`${cursor}:`).test(search)) {
+    problems.push(`api/search.js: kunci cache harus memuat ${cursor} (cursor mengubah hasil)`);
+  }
+}
 if (!search.includes('cache: "hit"') || !search.includes('cache: "miss"')) {
   problems.push("api/search.js: respons harus menandai cache hit/miss");
 }
@@ -39,6 +45,13 @@ if (!middleware.includes('url.pathname === "/api/search"')) {
 if (!middleware.includes('headers.set("Cache-Control", "no-store")')) {
   problems.push("_middleware.js: endpoint non-search harus tetap no-store");
 }
+// no_cache=1 dan respons non-200 tidak boleh ditandai cacheable (integritas validator).
+if (!middleware.includes('url.searchParams.get("no_cache") === "1"')) {
+  problems.push("_middleware.js: no_cache=1 harus memaksa no-store");
+}
+if (!middleware.includes("response.status === 200")) {
+  problems.push("_middleware.js: hanya respons 200 yang boleh ditandai cacheable");
+}
 
 // 4. Cache jawaban AI di chat: hit tidak boleh memanggil provider.
 const chat = read("functions/api/ai/chat.js");
@@ -50,6 +63,10 @@ if (!chat.includes("mode !== \"cache\" && providerIsReady")) {
 }
 if (!chat.includes("await cachePutJson(cacheId")) {
   problems.push("api/ai/chat.js: jawaban LLM harus disimpan ke cache");
+}
+// Label provider pada log harus benar untuk mode cache (bukan tercatat sebagai mock).
+if (!chat.includes('provider: mode === "mock" ? "mock" : "deepseek"')) {
+  problems.push('api/ai/chat.js: provider log harus `mode === "mock" ? "mock" : "deepseek"` (cache = deepseek, bukan mock)');
 }
 
 // 5. Throttle NCBI mengikuti batas resmi (3 rps tanpa key, 10 rps dengan key).
@@ -63,7 +80,7 @@ if (!(withKey >= 100)) problems.push(`_pubmed.js: interval dengan key ${withKey}
 if (!pubmed.includes("throttle(env)")) problems.push("_pubmed.js: throttle harus menerima env untuk memilih interval");
 
 console.log(
-  `Cache: namespace search + answer · TTL default ${900}s · thruttle NCBI ${noKey}ms (tanpa key) / ${withKey}ms (dengan key)`
+  `Cache: namespace search + answer · TTL default ${900}s · throttle NCBI ${noKey}ms (tanpa key) / ${withKey}ms (dengan key)`
 );
 if (problems.length) {
   console.log("\nMASALAH:");
