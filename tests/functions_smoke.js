@@ -126,6 +126,9 @@ async function main() {
   loadModule(sandbox, "_cache.js", ["cacheKey", "cacheGetJson", "cachePutJson", "resetMemoryCache"]);
   loadModule(sandbox, "_drugs.js", ["DRUGS", "FORNAS", "findDrug", "findDrugsInText", "suggestDrugs"]);
   loadModule(sandbox, "_pubmed.js", ["searchPubmed", "buildQuery"]);
+  loadModule(sandbox, "_literature/crossref.js", ["searchCrossref", "mapCrossrefItem"]);
+  loadModule(sandbox, "_literature/doaj.js", ["searchDoaj", "mapDoajItem"]);
+  loadModule(sandbox, "_literature/linkout.js", ["linkoutEntries"]);
   loadModule(sandbox, "_middleware.js", ["onRequest"]);
   loadModule(sandbox, "api/search.js", ["onRequestGet"]);
 
@@ -161,6 +164,25 @@ async function main() {
     env: {},
   });
   check("search: q kosong ditolak 400", bad.status === 400, String(bad.status));
+
+  // Fase 5: link-out opsional via LIT_SOURCES (default OFF → tidak muncul).
+  const noLit = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=tuberkulosis%20indonesia&no_cache=1" },
+    env: {},
+  });
+  const noLitBody = await noLit.json();
+  check("lit: linkout tidak muncul saat flag OFF", !(noLitBody.results || []).some((row) => row.source === "onesearch"));
+
+  const lit = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=tuberkulosis%20indonesia&per_page=5&no_cache=1" },
+    env: { LIT_SOURCES: "linkout" },
+  });
+  const litBody = await lit.json();
+  check(
+    "lit: linkout OneSearch muncul saat flag ON",
+    (litBody.results || []).some((row) => row.source === "onesearch" && row.linkout === true),
+    JSON.stringify((litBody.results || []).map((row) => row.source)),
+  );
 
   // Cache: permintaan identik kedua harus dilayani cache (tanpa memanggil upstream lagi).
   sandbox.resetMemoryCache();

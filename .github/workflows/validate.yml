@@ -69,6 +69,9 @@ jobs:
       - name: Unit test formulary (baca DB + fallback)
         run: node tests/formulary_unit.js
 
+      - name: Unit test adapter literatur (Crossref/DOAJ/Neliti/linkout)
+        run: node tests/literature_unit.js
+
       - name: Validasi auth klien (statis)
         run: node scripts/validate_auth.js
 

@@ -4,6 +4,9 @@ import { detectQuestionType, epmcFilterFor, expansionClause, expansionSearchText
 import { findDrugsInText } from "../_drugs.js";
 import { rankResults } from "../_rank.js";
 import { cacheGetJson, cacheKey, cachePutJson } from "../_cache.js";
+import { searchCrossref } from "../_literature/crossref.js";
+import { searchDoaj } from "../_literature/doaj.js";
+import { linkoutEntries } from "../_literature/linkout.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 const CT = "https://clinicaltrials.gov/api/v2/studies";
@@ -12,7 +15,7 @@ const MAX_WANT = 500;
 // Cache pencarian di edge: memotong latensi p95 dan melindungi rate limit sumber.
 const SEARCH_CACHE_DEFAULT_TTL = 900;
 // Naikkan versi bila konstruksi query/ekspansi berubah agar hasil lama tidak tersaji.
-const SEARCH_CACHE_NAMESPACE = "search:v7";
+const SEARCH_CACHE_NAMESPACE = "search:v8";
 
 function searchCacheTtl(env) {
   const ttl = Number(env?.SEARCH_CACHE_TTL_SECONDS);
@@ -113,6 +116,8 @@ async function produceSearch(env, request) {
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
     const needTrial = !types || types.includes("trial");
     const needPubmed = needLit && (!types || types.includes("paper"));
+    // Sumber literatur tambahan bersifat opt-in (default kosong → perilaku tak berubah).
+    const litSources = parseLitSources(env?.LIT_SOURCES);
 
 
     const calls = [];
@@ -143,6 +148,12 @@ async function produceSearch(env, request) {
           countsTowardTotal: false,
         })),
       );
+    }
+    if (needLit && litSources.includes("crossref")) {
+      calls.push(searchCrossref(litQuery, { limit: perPage, indonesia, mailto: env?.CROSSREF_MAILTO || env?.OPENALEX_MAIL }));
+    }
+    if (needLit && litSources.includes("doaj")) {
+      calls.push(searchDoaj(litQuery, { limit: perPage, indonesia }));
     }
 
     const settled = await Promise.allSettled(calls.map((p) => withTimeout(p, TIMEOUT_MS)));
@@ -206,6 +217,11 @@ async function produceSearch(env, request) {
     }
 
     const paged = results.slice(0, perPage);
+
+    // Link-out ke sumber lokal (tanpa scraping) — ditambahkan di akhir, tidak menggeser hasil inti.
+    if (litSources.includes("linkout")) {
+      paged.push(...linkoutEntries(raw, env));
+    }
 
     // Sembunyikan abstrak dari respons kecuali diminta eksplisit (abstrak hanya untuk skoring/grounded).
     if (!withAbstract) {
@@ -368,7 +384,17 @@ function mapTrial(study, withAbstract = false) {
   return row;
 }
 
-const SOURCE_PRIORITY = { europepmc: 0, pubmed: 1, clinicaltrials: 2 };
+const SOURCE_PRIORITY = { europepmc: 0, pubmed: 1, clinicaltrials: 2, crossref: 3, doaj: 4, neliti: 5, onesearch: 9, garuda: 9 };
+
+function parseLitSources(value) {
+  if (!value) return [];
+  const allowed = new Set(["crossref", "doaj", "linkout"]);
+  return String(value)
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => allowed.has(s));
+}
+
 
 function dedupeResults(rows) {
   const map = new Map();
