@@ -76,6 +76,8 @@ Setelah Sprint 1A selesai dan kredensial tersedia: Google OAuth client, SMTP + d
 >
 > **Sisa prasyarat:** Resend **belum punya domain terverifikasi** → pengirim masih `onboarding@resend.dev`, yang **hanya bisa mengirim ke email pemilik akun Resend**.
 > Untuk publikasi masal wajib menambahkan domain sendiri + record **SPF/DKIM** di Resend lalu ubah `smtp_admin_email` ke `no-reply@domain`.
+>
+> **BUKTI END-TO-END OTP (2026-09-11):** email OTP diterima di `lunira.milis@gmail.com` dengan subjek `Kode masuk bioXip: 110590` dan template bioXip ter-render benar (branding + kode 6 digit). Verifikasi API `POST /auth/v1/verify` (type=email) → **HTTP 200**, sesi terbentuk, `email_confirmed=true`, `role=authenticated`, `provider=email`. Kode sekali-pakai (habis setelah verifikasi). Pengaturan sesi: `jwt_exp=3600` (1 jam), `refresh_token_rotation_enabled=true`, reuse interval 10 dtk. **Jalur email (magic link + OTP) dinyatakan SELESAI & terverifikasi.**
 > Backup konfigurasi lama tersimpan di `auth_config_backup.json` (lokal).
 >
 > **Audit Google OAuth (2026-09-11):** Bagian A & B **selesai** oleh pemilik (`external_google_enabled=true`, client ID + secret terisi; uji `/auth/v1/authorize` mengembalikan 302 ke accounts.google.com dengan `redirect_uri` = `https://nxlcosnksgbuvtiggjpw.supabase.co/auth/v1/callback`). Bagian C diperbaiki: `site_url` semula `http://localhost:3000` → **`https://bioxip.pages.dev`**; `uri_allow_list` dibersihkan (`bioxip.id` **dihapus** karena domain belum dibeli — mencegah pihak lain yang membelinya masuk daftar redirect sah).
