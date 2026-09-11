@@ -275,6 +275,7 @@ export async function onRequestPost(context) {
         }
 
         let providerError = null;
+        let cacheSaved = null;
         let providerAnswered = false;
         if (mode !== "cache" && providerIsReady) {
           const streamed = await runProviderStream(env, {
@@ -307,7 +308,7 @@ export async function onRequestPost(context) {
               claims = payload.claims || [];
               abstain = Boolean(payload.abstain);
               mode = "llm";
-              await cachePutJson(cacheId, { answer, claims, abstain, model, evidence: citationSnapshot(evidence) }, ANSWER_CACHE_TTL);
+              cacheSaved = await cachePutJson(cacheId, { answer, claims, abstain, model, evidence: citationSnapshot(evidence) }, ANSWER_CACHE_TTL);
             } else {
               // Teks sudah tampil sebagian, tetapi struktur klaim tidak dapat diparsing:
               // ganti dengan jawaban ekstraktif agar pengguna tidak melihat teks setengah jadi.
@@ -349,7 +350,7 @@ export async function onRequestPost(context) {
                 claims = payload.claims || [];
                 abstain = Boolean(payload.abstain);
                 mode = "llm";
-                await cachePutJson(cacheId, { answer, claims, abstain, model, evidence: citationSnapshot(evidence) }, ANSWER_CACHE_TTL);
+                cacheSaved = await cachePutJson(cacheId, { answer, claims, abstain, model, evidence: citationSnapshot(evidence) }, ANSWER_CACHE_TTL);
               } else {
                 const extractive = extractiveAnswer(question, evidence);
                 answer = extractive.answer;
@@ -444,6 +445,7 @@ export async function onRequestPost(context) {
           model,
           support_rate: supportRate,
           claims: claims.length,
+          cache_saved: cacheSaved,
         });
       } catch (error) {
         try {

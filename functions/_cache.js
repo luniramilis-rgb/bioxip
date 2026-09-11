@@ -55,7 +55,7 @@ export async function cachePutJson(key, value, ttlSeconds) {
         },
       });
       await caches.default.put(key, response);
-      return;
+      return "cache_api";
     } catch (error) {
       // Cache API gagal (mis. kunci lintas-origin) → jangan silent, catat sekali.
       if (!putWarned) {
@@ -69,6 +69,7 @@ export async function cachePutJson(key, value, ttlSeconds) {
     MEMORY.delete(oldest);
   }
   MEMORY.set(key, { value, expires: Date.now() + ttl * 1000 });
+  return "memory";
 }
 
 export function resetMemoryCache() {

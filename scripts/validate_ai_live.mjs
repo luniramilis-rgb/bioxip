@@ -128,7 +128,7 @@ async function readStream(resp) {
 
     console.log(`\npertanyaan : ${QUESTION}`);
     console.log(`jawaban    : ${text.slice(0, 200).replace(/\n/g, " ")}…`);
-    console.log(`run1       : ${deltas.length} potongan · pertama ${firstDelta}ms · total ${total}ms · Rp${done?.data?.charged_idr}`);
+    console.log(`run1       : ${deltas.length} potongan · pertama ${firstDelta}ms · total ${total}ms · Rp${done?.data?.charged_idr} · cache_saved=${done?.data?.cache_saved}`);
 
     // --- run 2: pertanyaan sama harus dilayani dari cache -------------------
     const startedCache = Date.now();

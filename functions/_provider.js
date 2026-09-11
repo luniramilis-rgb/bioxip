@@ -18,21 +18,80 @@ export function providerReady(env) {
 }
 
 /**
+ * Escape karakter kontrol yang tidak sah di dalam string JSON
+ * (model kadang menulis newline/tab mentah di dalam nilai string).
+ */
+function sanitizeJsonStrings(text) {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  for (const char of String(text)) {
+    if (inString) {
+      if (escaped) {
+        out += char;
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        out += char;
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        out += char;
+        inString = false;
+        continue;
+      }
+      if (char === "\n") {
+        out += "\\n";
+        continue;
+      }
+      if (char === "\r") {
+        out += "\\r";
+        continue;
+      }
+      if (char === "\t") {
+        out += "\\t";
+        continue;
+      }
+      if (char.charCodeAt(0) < 0x20) {
+        out += `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`;
+        continue;
+      }
+      out += char;
+      continue;
+    }
+    if (char === '"') inString = true;
+    out += char;
+  }
+  return out;
+}
+
+/**
  * Ambil JSON dari keluaran LLM yang mungkin dibungkus ```json, diawali teks,
- * atau terpotong. Mengembalikan null bila benar-benar tidak ada JSON valid.
+ * terpotong, atau memuat karakter kontrol mentah. Null bila benar-benar gagal.
  */
 export function extractJson(content) {
   const text = String(content || "").trim();
   if (!text) return null;
 
   const tryParse = (candidate) => {
-    try {
-      const value = JSON.parse(candidate);
-      // Skema bioXip selalu berupa objek; array/angka/string bukan jawaban valid.
-      return value && typeof value === "object" && !Array.isArray(value) ? value : null;
-    } catch {
-      return null;
+    if (!candidate) return null;
+    const variants = [
+      candidate,
+      sanitizeJsonStrings(candidate),
+      sanitizeJsonStrings(candidate).replace(/,\s*([}\]])/g, "$1"),
+    ];
+    for (const variant of variants) {
+      try {
+        const value = JSON.parse(variant);
+        // Skema bioXip selalu berupa objek; array/angka/string bukan jawaban valid.
+        if (value && typeof value === "object" && !Array.isArray(value)) return value;
+      } catch {
+        /* coba varian berikutnya */
+      }
     }
+    return null;
   };
 
   const direct = tryParse(text);
