@@ -66,6 +66,9 @@ jobs:
       - name: Unit test terminologi & ekspansi query
         run: node tests/terminology_unit.js
 
+      - name: Unit test formulary (baca DB + fallback)
+        run: node tests/formulary_unit.js
+
       - name: Validasi auth klien (statis)
         run: node scripts/validate_auth.js
 

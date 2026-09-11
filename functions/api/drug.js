@@ -1,4 +1,5 @@
 import { findDrug, suggestDrugs, FORNAS } from "../_drugs.js";
+import { findFormularyDrug, formularyEnabled } from "../_formulary.js";
 import monitoring from "../_monitoring.json";
 
 const OPENFDA = "https://api.fda.gov/drug/label.json";
@@ -27,7 +28,12 @@ export async function onRequestGet(context) {
     const q = (url.searchParams.get("q") || "").trim();
     if (!q) return json({ error: "param q wajib" }, 400);
 
-    let drug = findDrug(q);
+    // Sumber utama = Postgres (view publik) bila flag aktif; fallback = katalog JSON.
+    let dbDrug = null;
+    if (formularyEnabled(context.env)) {
+      dbDrug = await findFormularyDrug(context.env, q, url.origin).catch(() => null);
+    }
+    let drug = dbDrug || findDrug(q);
     let outsideCatalogue = false;
 
     const rxnorm = await resolveRxNorm(...rxCandidates(drug, q)).catch(() => null);
@@ -49,7 +55,7 @@ export async function onRequestGet(context) {
       }
     }
 
-    const term = String(drug.inn).split("/")[0].trim();
+    const term = String(drug.inn || drug.name || q).split("/")[0].trim();
     const [label, chemistry, mechanism] = await Promise.all([
       fetchLabel(drug, rxnorm).catch(() => null),
       fetchChemistry(term).catch(() => null),
@@ -68,7 +74,12 @@ export async function onRequestGet(context) {
       catalogue: !outsideCatalogue,
       outside_catalogue: outsideCatalogue,
       drug,
-      fornas: outsideCatalogue ? null : FORNAS,
+      fornas: outsideCatalogue
+        ? null
+        : dbDrug
+          ? { edition: `Fornas — API resmi (${dbDrug.source_tier || "official"})`, source_url: FORNAS.source_url, source_tier: dbDrug.source_tier || null }
+          : FORNAS,
+      source_tier: dbDrug ? dbDrug.source_tier : "curated",
       rxnorm,
       retrieved_at: new Date().toISOString(),
       chemistry,
