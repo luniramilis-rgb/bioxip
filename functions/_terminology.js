@@ -73,6 +73,16 @@ const EXTRA = [
   { id_term: "rantai dingin", en_terms: '"refrigeration" OR "cold chain"', mesh: [] },
   { id_term: "uji klinis", en_terms: '"clinical trials as topic" OR "clinical trial"', mesh: ["Clinical Trials as Topic"] },
   { id_term: "risiko bias", en_terms: '"bias" OR "risk of bias"', mesh: [] },
+  // Aspek yang sebelumnya tidak terpetakan → hasil topikal tapi salah fokus.
+  { id_term: "cairan", en_terms: '"fluid therapy" OR "fluid resuscitation" OR "rehydration"', mesh: ["Fluid Therapy"] },
+  { id_term: "resusitasi", en_terms: '"resuscitation" OR "fluid resuscitation"', mesh: ["Resuscitation"] },
+  { id_term: "penyesuaian dosis", en_terms: '"dose adjustment" OR "dosage adjustment" OR "drug dosage calculations"', mesh: ["Drug Dosage Calculations"] },
+  { id_term: "gangguan ginjal", en_terms: '"renal insufficiency" OR "kidney disease"', mesh: ["Renal Insufficiency"] },
+  { id_term: "hitung sampel", en_terms: '"sample size" OR "sample size determination"', mesh: ["Sample Size"] },
+  { id_term: "besar sampel", en_terms: '"sample size" OR "sample size determination"', mesh: ["Sample Size"] },
+  { id_term: "sampel", en_terms: '"sample size" OR "sampling studies"', mesh: ["Sample Size"] },
+  { id_term: "dimulai", en_terms: '"initiation" OR "initiated" OR "when to start"', mesh: [] },
+  { id_term: "inisiasi", en_terms: '"initiation" OR "when to start"', mesh: [] },
 ];
 
 export const TERMINOLOGY = [...DICTIONARY, ...EXTRA];
@@ -83,8 +93,9 @@ const QUESTION_TYPES = {
     /\b(efek samping|keamanan|toksisitas|adverse (event|effect|reaction)|safety|harm)\b/i,
   ],
   diagnosis: [
-    /\b(diagnosis|diagnostik|akurasi|sensitivitas|spesifisitas|skrining|uji|pemeriksaan|accuracy|sensitivity|specificity|screening)\b/i,
-    /\b(deteksi|menegakkan|menyingkirkan)\b/i,
+    /\b(diagnosis|diagnostik|akurasi|sensitivitas|spesifisitas|skrining|accuracy|sensitivity|specificity|screening)\b/i,
+    /\buji (diagnostik|skrining|saring)\b/i,
+    /\b(pemeriksaan|deteksi|menegakkan|menyingkirkan)\b/i,
   ],
   prognosis: [/\b(prognosis|luaran|outcome|mortalitas|kematian|kelangsungan hidup|survival|progression)\b/i],
   etiology: [/\b(penyebab|etiologi|faktor risiko|risk factor|kausalitas|causality)\b/i],

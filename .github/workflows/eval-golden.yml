@@ -1,6 +1,21 @@
 name: Eval Golden Set
 
 on:
+  push:
+    branches: [main]
+    # Jalankan (mode ekstraktif, gratis) saat berkas yang memengaruhi mutu AI/retrieval berubah.
+    paths:
+      - "scripts/eval_golden.mjs"
+      - "tests/golden/grounded_set.json"
+      - "functions/_grounded.js"
+      - "functions/_safety.js"
+      - "functions/_terminology.js"
+      - "functions/_dictionary.js"
+      - "functions/_rank.js"
+      - "functions/api/ai/chat.js"
+      - "functions/api/dev/answer.js"
+      - "functions/api/search.js"
+      - ".github/workflows/eval-golden.yml"
   schedule:
     # Mingguan, Senin 03:00 UTC (setelah housekeeping 03:00 bila kosong).
     - cron: "0 3 * * 1"

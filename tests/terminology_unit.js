@@ -56,6 +56,25 @@ check("term: GLP-1 terpetakan", /GLP-1|glucagon-like/i.test(glp), glp);
 const ibu = term.expansionClause("Apa kesenjangan riset kesehatan ibu di Indonesia?");
 check("term: kesehatan ibu terpetakan", /maternal/i.test(ibu), ibu);
 
+// --- aspek yang dulu tidak terpetakan (4 item eval yang gagal) -------------
+const cairan = term.expansionClause("Bagaimana tata laksana cairan pada dengue dengan syok?");
+check("term: cairan → fluid therapy", /fluid (therapy|resuscitation)|rehydration/i.test(cairan), cairan);
+
+const dosis = term.expansionClause("Bagaimana penyesuaian dosis obat pada gangguan ginjal?");
+check("term: penyesuaian dosis terpetakan", /dose adjustment|dosage adjustment|drug dosage calculations/i.test(dosis), dosis);
+check("term: gangguan ginjal terpetakan", /renal insufficiency|kidney disease/i.test(dosis), dosis);
+
+const sampel = term.expansionClause("Bagaimana cara menghitung sampel untuk uji klinis?");
+check("term: hitung sampel terpetakan", /sample size/i.test(sampel), sampel);
+
+const mulai = term.expansionClause("Kapan terapi antiretroviral HIV sebaiknya dimulai?");
+check("term: 'dimulai' → initiation", /initiation|when to start/i.test(mulai), mulai);
+
+// --- klasifikasi: 'uji klinis' bukan diagnosis, 'uji diagnostik' diagnosis --
+check("term: uji klinis bukan diagnosis", term.detectQuestionType("Bagaimana cara menghitung sampel untuk uji klinis?") !== "diagnosis", term.detectQuestionType("Bagaimana cara menghitung sampel untuk uji klinis?"));
+check("term: uji diagnostik tetap diagnosis", term.detectQuestionType("Apa hasil uji diagnostik tuberkulosis?") === "diagnosis");
+check("term: akurasi tetap diagnosis", term.detectQuestionType("Apa akurasi USG untuk kolesistitis?") === "diagnosis");
+
 // --- batas maksimum konsep (AND tidak berlebihan) --------------------------
 const many = term.expandTerms("efektivitas metformin pada diabetes dengan hipertensi dan anemia pada lansia");
 check("term: maksimum 3 konsep", many.entries.length <= 3, String(many.entries.length));

@@ -20,7 +20,7 @@ const MAX_TOKENS_LIMIT = 2048;
 const ANSWER_CACHE_TTL = 7 * 24 * 3600;
 const ANSWER_CACHE_NAMESPACE = "answer:v2";
 // Naikkan bila prompt/skema berubah, agar jawaban lama tidak tersaji.
-const PROMPT_VERSION = "2026-09-11b";
+const PROMPT_VERSION = "2026-09-11c";
 
 function citationSnapshot(evidence) {
   return evidence.map((item) => ({
