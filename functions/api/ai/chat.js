@@ -303,7 +303,9 @@ export async function onRequestPost(context) {
           tokens: { in: usage.input_tokens, out: usage.output_tokens },
           abstain,
           mode,
+          model,
           support_rate: supportRate,
+          claims: claims.length,
         });
       } catch (error) {
         try {
