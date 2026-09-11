@@ -148,7 +148,19 @@ Hasil:
 - **Temuan & perbaikan penting**: RPC `fn_topup_create` gagal karena **OUT parameter bernama `status` bentrok dengan kolom `topups.status`** ("column reference status is ambiguous"); `create or replace` juga tidak dapat mengubah return type → migrasi diubah memakai `drop function` + nama OUT `topup_status` + kualifikasi `t.status`. Tambah `notify pgrst, 'reload schema'`.
 - Validasi live (`scripts/validate_topup.js`): saldo awal 0 · tolak nominal/kanal tidak valid · buat topup mock · pakai ulang pending · status pending · **webhook kredit Rp100.000** · **webhook dobel diabaikan** · saldo & ledger tepat sekali · gate 401 → **ALL PASS (12/12)**.
 
-## Sprint 8 — Kualitas Retrieval & Data (K2–K4)
+## Sprint 8 — Kualitas Retrieval & Data (K2–K4) — SELESAI (2026-09-10, adaptasi Live murni)
+**Catatan arsitektur penting:** spesifikasi asli (FTS + vektor) mengasumsikan **index lokal**, sedangkan bioXip memakai arsitektur **Live murni (tanpa index/storage)**. Sprint 8 karena itu diadaptasi: kualitas ditingkatkan di **lapisan live** (ekspansi terminologi, filter klinis sumber, reranker, snippet section-aware) tanpa menyimpan korpus.
+Hasil:
+- `functions/_terminology.js`: perluasan istilah Indonesia→Inggris + **MeSH** (±50 konsep: penyakit, organ, pemeriksaan, obat, gejala), `detectQuestionType` (therapy/diagnosis/prognosis/etiology/harm), `epmcFilterFor` + `pubmedCategoryFor` (Clinical Queries), `expansionClause` (**AND antar-konsep**, bukan OR lebar), `expansionSearchText` (konsep paling spesifik untuk skoring).
+- `functions/_rank.js`: reranker heuristik (relevansi judul/abstrak 0.42, kebaruan 0.20, kualitas sumber 0.18, sitasi 0.14, OA 0.06), `rankResults` dengan **guard "jangan reorder bila skor nol"** (mempertahankan urutan upstream), dan `sectionSnippet` (pilih kalimat Results/Conclusion, buang Background/Methods, prioritas istilah pertanyaan).
+- `functions/api/search.js`: abstrak **selalu diambil untuk skoring** lalu **dibuang dari respons** bila tidak diminta; judul dibersihkan dari HTML (**decode entitas dulu, baru strip tag**); ekspansi nama obat Indonesia via `findDrugsInText`; pelonggaran bertahap (filter klinis → ekspansi AND → pencarian bebas) bila hasil terlalu sedikit; `clinical=1` untuk jalur AI.
+- `functions/_grounded.js`: bukti memakai `sectionSnippet` + `clinical=1` (kutipan lebih informatif & relevan).
+- **Golden set diperluas ke 205 item** (40 kurasi manual + 165 draft dari template), `build_golden.js` + `--check` di CI; item draft **ditandai jelas belum direview**.
+- Unit test baru: `tests/rank_unit.js` (17 cek ranking/snippet/kategori/ekspansi), `tests/drugs_unit.js` (6 cek pencarian obat dalam teks), `tests/functions_smoke.js` (7 cek menjalankan `onRequestGet` dengan fetch tiruan — **menangkap ReferenceError runtime yang lolos dari `--check`**).
+- **Bug yang ditemukan & diperbaiki selama Sprint 8**: (1) abstrak tidak pernah diteruskan ke pipeline grounded → jawaban AI tanpa konteks; (2) judul bocor `<b>` karena urutan decode/strip salah; (3) ekspansi OR terlalu lebar → hasil tidak relevan (mis. kueri hipertensi); (4) `drugTerm` vs `drugTerms` → **500 pada `/api/search`** (tertangkap smoke test setelah ditambahkan).
+- Bukti produksi: `parasetamol dosis ginjal` → hasil paracetamol; `akurasi USG diagnosis kolesistitis` → paper USG diagnostik; kueri topik (TB/DBD/stunting/hipertensi) relevan.
+
+## Sprint 8 (arsip) — Kualitas Retrieval & Data (K2–K4)
 - Retrieval hibrida (FTS + `pgvector`) + section-aware chunking + reranker.
 - Lapisan fakta terstruktur (label, ATC, CT.gov, UniProt/GO) sebagai konteks AI.
 - Golden set diperluas 150–300 + review ahli + regresi CI.
@@ -185,4 +197,4 @@ Hasil:
 | 5 AI proxy ✅ | `validate_ai.js` (statis + live mock) — **ALL PASS** | uji 10 pertanyaan nyata (setelah `DEEPSEEK_API_KEY`) |
 | 6 UI ✅ | `ui_harness.js` (segmented, estimasi, terkunci, saldo, harga) — **ALL PASS** | uji mobile |
 | 7 Xendit ✅ | `validate_topup.js` (statis + live mock) — **ALL PASS 12/12** | transaksi sandbox Xendit (setelah kunci) |
-| 8 Kualitas | regresi golden 150+ di CI | review ahli per domain |
+| 8 Kualitas ✅ | `rank_unit` + `drugs_unit` + `functions_smoke` + `validate_grounded` (golden 205) — **ALL PASS** | review ahli per domain |
