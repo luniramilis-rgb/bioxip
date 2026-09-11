@@ -4,6 +4,8 @@ Dokumen hidup. Rencana ini **turunan** dari `docs/blueprint.md` (arsitektur), `d
 
 Prinsip arsitektur: **Postgres = satu sumber kebenaran untuk data terstruktur; edge tipis; retrieval literatur live bercache; batch hanya untuk ingest & validasi.** Parquet/R2 **belum** dipakai (lihat §F).
 
+**Status (2026-09-11):** Fase 0 selesai (`docs/formulary.md`, `docs/literature.md`); Fase 1 selesai (migrasi `017_formulary.sql` diterapkan ke produksi + terverifikasi live). Fase 2+ belum dikerjakan.
+
 ---
 
 ## A. Prinsip keamanan implementasi (berlaku semua fase)

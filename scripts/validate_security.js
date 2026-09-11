@@ -58,6 +58,41 @@ if (/delete\s+from\s+answer_cache\s+where\s+expires_at\s*<\s*now\(\)\s*;/i.test(
   problems.push("016_housekeeping.sql: DELETE answer_cache tidak boleh tanpa batas (harus dibatch)");
 }
 
+// 1c. Formulary (017): tabel dasar tertutup; anon hanya membaca view publik.
+const formulary = read("supabase/migrations/017_formulary.sql");
+const formularyTables = [
+  "fact_sources",
+  "drug_products",
+  "drug_doses",
+  "drug_interactions",
+  "drug_monitoring",
+  "drug_crosswalk",
+  "formulary_staging",
+  "formulary_meta",
+];
+for (const table of formularyTables) {
+  if (!new RegExp(`alter table public\\.${table} enable row level security`, "i").test(formulary)) {
+    problems.push(`017_formulary.sql: RLS belum diaktifkan untuk ${table}`);
+  }
+}
+if (!/revoke all on table public\.fact_sources[\s\S]*?from anon, authenticated/i.test(formulary)) {
+  problems.push("017_formulary.sql: tabel dasar harus dicabut dari anon/authenticated");
+}
+for (const view of ["drug_products_public", "drug_doses_public", "drug_interactions_public", "drug_monitoring_public"]) {
+  if (!new RegExp(`grant select on[\\s\\S]*?public\\.${view}`, "i").test(formulary)) {
+    problems.push(`017_formulary.sql: view ${view} harus di-grant SELECT ke anon/authenticated`);
+  }
+}
+if (/grant\s+(?:all|select|insert|update|delete)[^;]*on table public\.(?:drug_products|drug_doses|drug_interactions|drug_monitoring)\b[^;]*to\s+(?:anon|authenticated)/i.test(formulary)) {
+  problems.push("017_formulary.sql: tabel dasar tidak boleh di-grant langsung ke anon/authenticated");
+}
+if (!/generated always as \(to_tsvector\('simple'/i.test(formulary)) {
+  problems.push("017_formulary.sql: kolom search_tsv (tsvector generated) tidak ditemukan");
+}
+if (!/notify pgrst, 'reload schema'/i.test(formulary)) {
+  problems.push("017_formulary.sql: harus notify pgrst reload schema");
+}
+
 // 2. Fungsi paling sensitif harus muncul di migrasi keamanan (agar tidak terlewat).
 for (const fn of ["fn_credit_grant", "fn_topup_mark_paid", "fn_answer_cache_hit"]) {
   if (!migration.includes(fn)) problems.push(`014_function_security.sql: tidak menyebut ${fn}`);
