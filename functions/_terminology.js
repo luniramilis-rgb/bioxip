@@ -22,6 +22,34 @@ const EXTRA = [
   { id_term: "antibiotik", en_terms: '"anti-bacterial agents" OR "antibiotics"', mesh: ["Anti-Bacterial Agents"] },
   { id_term: "nyeri", en_terms: '"pain"', mesh: ["Pain"] },
   { id_term: "kolesterol", en_terms: '"cholesterol" OR "lipids"', mesh: ["Cholesterol"] },
+  { id_term: "kolesistitis", en_terms: '"cholecystitis"', mesh: ["Cholecystitis"] },
+  { id_term: "batu empedu", en_terms: '"cholelithiasis" OR "gallstones"', mesh: ["Cholelithiasis"] },
+  { id_term: "apendisitis", en_terms: '"appendicitis"', mesh: ["Appendicitis"] },
+  { id_term: "usg", en_terms: '"ultrasonography" OR "ultrasound"', mesh: ["Ultrasonography"] },
+  { id_term: "ultrasonografi", en_terms: '"ultrasonography" OR "ultrasound"', mesh: ["Ultrasonography"] },
+  { id_term: "rontgen", en_terms: '"radiography" OR "x-ray"', mesh: ["Radiography"] },
+  { id_term: "ct scan", en_terms: '"tomography, x-ray computed"', mesh: ["Tomography, X-Ray Computed"] },
+  { id_term: "mri", en_terms: '"magnetic resonance imaging"', mesh: ["Magnetic Resonance Imaging"] },
+  { id_term: "biopsi", en_terms: '"biopsy"', mesh: ["Biopsy"] },
+  { id_term: "endoskopi", en_terms: '"endoscopy"', mesh: ["Endoscopy"] },
+  { id_term: "infeksi", en_terms: '"infection"', mesh: ["Infections"] },
+  { id_term: "sepsis", en_terms: '"sepsis"', mesh: ["Sepsis"] },
+  { id_term: "syok", en_terms: '"shock"', mesh: ["Shock"] },
+  { id_term: "kejang", en_terms: '"seizures"', mesh: ["Seizures"] },
+  { id_term: "alergi", en_terms: '"hypersensitivity" OR "allergy"', mesh: ["Hypersensitivity"] },
+  { id_term: "tumor", en_terms: '"neoplasms" OR "tumor"', mesh: ["Neoplasms"] },
+  { id_term: "batuk", en_terms: '"cough"', mesh: ["Cough"] },
+  { id_term: "demam", en_terms: '"fever"', mesh: ["Fever"] },
+  { id_term: "sesak", en_terms: '"dyspnea"', mesh: ["Dyspnea"] },
+  { id_term: "mual", en_terms: '"nausea"', mesh: ["Nausea"] },
+  { id_term: "kreatinin", en_terms: '"creatinine"', mesh: ["Creatinine"] },
+  { id_term: "hemoglobin", en_terms: '"hemoglobin"', mesh: ["Hemoglobin"] },
+  { id_term: "trombosit", en_terms: '"blood platelets"', mesh: ["Blood Platelets"] },
+  { id_term: "leukemia", en_terms: '"leukemia"', mesh: ["Leukemia"] },
+  { id_term: "paru", en_terms: '"lung" OR "pulmonary"', mesh: ["Lung"] },
+  { id_term: "hati", en_terms: '"liver" OR "hepatic"', mesh: ["Liver"] },
+  { id_term: "jantung", en_terms: '"heart" OR "cardiac"', mesh: ["Heart"] },
+  { id_term: "darah", en_terms: '"blood"', mesh: ["Blood"] },
 ];
 
 export const TERMINOLOGY = [...DICTIONARY, ...EXTRA];
@@ -56,9 +84,18 @@ export function expandTerms(text) {
   const matched = TERMINOLOGY.filter((entry) => value.includes(entry.id_term)).slice(0, 4);
   return {
     entries: matched,
-    english: matched.flatMap((entry) => entry.en_terms.replaceAll('"', "").split(" OR ")),
-    mesh: matched.flatMap((entry) => entry.mesh || []).slice(0, 5),
+    english: [...new Set(matched.flatMap((entry) => entry.en_terms.replaceAll('"', "").split(" OR ")))].slice(0, 10),
+    mesh: [...new Set(matched.flatMap((entry) => entry.mesh || []))].slice(0, 5),
   };
+}
+
+/** Bangun klausa tambahan (Inggris + MeSH) untuk query Europe PMC. */
+export function expansionClause(text) {
+  const { english, mesh } = expandTerms(text);
+  const parts = [];
+  if (english.length) parts.push(english.map((term) => `"${term}"`).join(" OR "));
+  if (mesh.length) parts.push(mesh.map((term) => `MESH:"${term}"`).join(" OR "));
+  return parts.length ? `(${parts.join(" OR ")})` : "";
 }
 
 // Filter Europe PMC sesuai jenis pertanyaan klinis.

@@ -1,6 +1,6 @@
 import { expandQuery, expandQueryEnglish } from "../_dictionary.js";
 import { searchPubmed } from "../_pubmed.js";
-import { detectQuestionType, epmcFilterFor, pubmedCategoryFor } from "../_terminology.js";
+import { detectQuestionType, epmcFilterFor, expansionClause, pubmedCategoryFor } from "../_terminology.js";
 import { rankResults } from "../_rank.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
@@ -31,6 +31,8 @@ export async function onRequestGet(context) {
     const pubmedCategory = clinical ? pubmedCategoryFor(questionType) : null;
 
     const query = expandQuery(raw);
+    const extraClause = expansionClause(raw);
+    const litQuery = extraClause ? `(${query}) OR ${extraClause}` : query;
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
     const needTrial = !types || types.includes("trial");
     const needPubmed = needLit && (!types || types.includes("paper"));
@@ -39,7 +41,7 @@ export async function onRequestGet(context) {
     const calls = [];
     if (needLit) {
       calls.push(
-        fetchEpmc(query, {
+        fetchEpmc(litQuery, {
           oa,
           indonesia,
           types,
@@ -52,11 +54,12 @@ export async function onRequestGet(context) {
       );
     }
     if (needTrial) {
-      calls.push(fetchTrials(query, { oa, indonesia, types, sort, limit: perPage, token: ctToken, withAbstract }));
+      calls.push(fetchTrials(litQuery, { oa, indonesia, types, sort, limit: perPage, token: ctToken, withAbstract }));
     }
     if (needPubmed) {
+      const pubmedQuery = extraClause ? `(${expandQueryEnglish(raw)}) OR ${extraClause}` : expandQueryEnglish(raw);
       calls.push(
-        searchPubmed(expandQueryEnglish(raw), { retmax: perPage, category: pubmedCategory, env }).then((data) => ({
+        searchPubmed(pubmedQuery, { retmax: perPage, category: pubmedCategory, env }).then((data) => ({
           total: data.total,
           results: data.results,
           pagination: { pubmedHasMore: false },
