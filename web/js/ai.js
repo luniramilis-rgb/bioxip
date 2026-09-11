@@ -26,7 +26,11 @@
       ask.innerHTML = `
         <div class="locked">
           <p><strong>Tanya AI memerlukan akun.</strong> Masuk dulu untuk memakai jawaban AI bersitasi.</p>
-          <p class="muted">Masuk (Google/magic link) sedang disiapkan. Sementara itu, pencarian & kartu obat tetap gratis.</p>
+          <p class="actions">
+            <a class="btn small" href="#/masuk">Masuk</a>
+            <a class="btn small ghost" href="#/saldo">Lihat paket saldo</a>
+          </p>
+          <p class="muted">Pencarian, jawaban PICO, dan kartu obat tetap gratis tanpa akun.</p>
         </div>`;
       return;
     }
@@ -57,14 +61,16 @@
     const balance = account.body?.balance_idr ?? 0;
 
     if (balance < estimateIdr) {
-      status.innerHTML = `<span class="muted">Saldo ${esc(C.formatIdr(balance))} kurang dari estimasi.</span>`;
+      status.innerHTML = `<span class="muted">Saldo Anda <strong>${esc(C.formatIdr(balance))}</strong> — kurang dari estimasi.</span>`;
       ask.innerHTML = `
         <div class="locked">
-          <p><strong>Saldo tidak cukup</strong> untuk pertanyaan ini (estimasi ${esc(C.formatIdr(estimateIdr))}).</p>
+          <p><strong>Tanya AI terkunci.</strong> Butuh sekitar ${esc(C.formatIdr(estimateIdr))} untuk pertanyaan ini,
+             sedangkan saldo Anda ${esc(C.formatIdr(balance))}.</p>
           <p class="actions">
             <a class="btn small" href="#/saldo">Isi saldo</a>
-            <a class="btn small ghost" href="#/saldo">Lihat riwayat</a>
+            <a class="btn small ghost" href="#/saldo">Lihat paket &amp; riwayat</a>
           </p>
+          <p class="muted">Pencarian gratis tetap tersedia — cukup ganti ke mode "Cari bukti".</p>
         </div>`;
       return;
     }

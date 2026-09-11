@@ -18,11 +18,16 @@
       <section class="hero">
         <h1>Literatur medis dunia,<br/>untuk peneliti Indonesia.</h1>
         <p class="muted">Pencarian langsung ke Europe PMC (PubMed, preprint), ClinicalTrials.gov, PubChem, ChEMBL &amp; Open Targets.</p>
+        <div class="segmented" id="home-mode" role="tablist" aria-label="Mode pencarian">
+          <button role="tab" data-home-mode="search" class="active" aria-selected="true">Cari bukti · gratis</button>
+          <button role="tab" data-home-mode="ai" aria-selected="false">Tanya AI · saldo</button>
+        </div>
         <form id="search-form" class="searchbox">
           <input id="q" name="q" type="search" autocomplete="off"
                  placeholder="mis. obat diabetes untuk PCOS" aria-label="Pertanyaan riset" />
           <button type="submit">Cari</button>
         </form>
+        <p id="ai-hint" class="ai-hint muted" role="status" aria-live="polite">Pencarian gratis untuk semua pengguna.</p>
         <div class="quick">
           <label class="check"><input type="checkbox" id="f-oa" /> Open Access saja</label>
           <label class="check"><input type="checkbox" id="f-indonesia" /> Penelitian Indonesia</label>
@@ -37,6 +42,71 @@
         <h2>Sumber yang dijelajahi</h2>
         <div id="stats" class="stats"><span class="muted">Memuat…</span></div>
       </section>`;
+  }
+
+  function homeMode() {
+    const active = document.querySelector("[data-home-mode].active");
+    return active?.dataset.homeMode === "ai" ? "ai" : "search";
+  }
+
+  function initHomeMode() {
+    const host = document.getElementById("home-mode");
+    if (!host) return;
+    host.querySelectorAll("[data-home-mode]").forEach((button) => {
+      button.addEventListener("click", () => {
+        host.querySelectorAll("[data-home-mode]").forEach((item) => {
+          const isActive = item === button;
+          item.classList.toggle("active", isActive);
+          item.setAttribute("aria-selected", String(isActive));
+        });
+        const submit = document.querySelector("#search-form button[type=submit]");
+        if (submit) submit.textContent = homeMode() === "ai" ? "Siapkan AI" : "Cari";
+        const input = document.getElementById("q");
+        if (input) {
+          input.placeholder =
+            homeMode() === "ai" ? "mis. metformin vs insulin untuk DM tipe 2" : "mis. obat diabetes untuk PCOS";
+        }
+        updateAiHint();
+      });
+    });
+    updateAiHint();
+  }
+
+  async function updateAiHint() {
+    const host = document.getElementById("ai-hint");
+    if (!host) return;
+    const mode = homeMode();
+    const C = window.BIOXIP_CREDITS;
+    const A = window.BIOXIP_AUTH;
+    const loggedIn = Boolean(A?.getAccessToken?.() || A?.getUser?.());
+
+    if (!loggedIn) {
+      host.innerHTML =
+        mode === "ai"
+          ? 'Tanya AI memerlukan akun. <a href="#/masuk">Masuk</a> dulu (Google atau kode email) — pencarian tetap gratis.'
+          : 'Pencarian gratis. <a href="#/masuk">Masuk</a> untuk memakai Tanya AI bersitasi.';
+      return;
+    }
+
+    let balance = 0;
+    try {
+      const me = await C.me();
+      balance = me.body?.balance_idr ?? 0;
+    } catch {
+      balance = 0;
+    }
+
+    if (mode === "ai") {
+      host.innerHTML =
+        balance > 0
+          ? `Tanya AI aktif · saldo <strong>${esc(C.formatIdr(balance))}</strong>.`
+          : `Saldo Anda <strong>Rp 0</strong> — Tanya AI terkunci. <a href="#/saldo">Isi saldo</a> lalu coba lagi.`;
+    } else {
+      host.innerHTML =
+        balance > 0
+          ? `Saldo <strong>${esc(C.formatIdr(balance))}</strong> · <a href="#/search?mode=ai">pakai Tanya AI</a>.`
+          : 'Pencarian gratis. <a href="#/saldo">Isi saldo</a> untuk membuka Tanya AI.';
+    }
   }
 
   function topicChips() {
@@ -111,7 +181,9 @@
       const current = new URLSearchParams(location.hash.split("?")[1] || "");
       const params = new URLSearchParams();
       params.set("q", q);
-      if (current.get("mode") === "ai") params.set("mode", "ai");
+      // Mode AI: dari segmented beranda atau dari hash hasil yang sudah ada.
+      const mode = homeMode() === "ai" || current.get("mode") === "ai" ? "ai" : null;
+      if (mode) params.set("mode", "ai");
       if (document.getElementById("f-oa")?.checked) params.set("oa", "true");
       if (document.getElementById("f-indonesia")?.checked) params.set("indonesia", "true");
       if (document.getElementById("f-paper")?.checked) params.set("f-paper", "true");
@@ -298,6 +370,7 @@
       topicChips();
       stats();
       searchFormHandler();
+      initHomeMode();
     } else if (path[0] === "search") {
       view.innerHTML = resultsHTML();
       searchFormHandler();

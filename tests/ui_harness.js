@@ -66,6 +66,9 @@ const AUTH_PAYLOAD = {
   },
 };
 
+// null = endpoint kredit mengembalikan 401 (belum masuk).
+let creditBalance = null;
+
 const ANSWER_PAYLOAD = {
   question: "metformin vs insulin diabetes",
   pico: { intervention: "metformin", comparison: "insulin", terms: ["diabetes"] },
@@ -130,6 +133,14 @@ const INTER_PAYLOAD = {
 
 async function fetchStub(url) {
   const href = String(url);
+  if (href.includes("/api/credits/me") && creditBalance !== null) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ balance_idr: creditBalance, balance_micro_idr: creditBalance * 1_000_000, plan: "free", ai_locked: creditBalance <= 0 }),
+      text: async () => JSON.stringify({ balance_idr: creditBalance }),
+    };
+  }
   if (href.includes("/auth/v1/token") || href.includes("/auth/v1/verify")) {
     return { ok: true, status: 200, json: async () => AUTH_PAYLOAD, text: async () => JSON.stringify(AUTH_PAYLOAD) };
   }
@@ -180,6 +191,9 @@ const sandbox = {
 sandbox.window = sandbox;
 sandbox.window.addEventListener = (event, cb) => { (handlers[event] = handlers[event] || []).push(cb); };
 sandbox.globalThis = sandbox;
+sandbox.__setBalance = (value) => {
+  creditBalance = value;
+};
 
 vm.createContext(sandbox);
 
@@ -202,6 +216,17 @@ async function dispatchHash(hash) {
   const home = registry.get("view").innerHTML;
   results.push(["home renders hero", home.includes("Literatur medis dunia")]);
   results.push(["home topics dari JSON (fallback aman)", home.includes("Tuberkulosis (TB)") || home.includes("topics") || home.includes("topic")]);
+  results.push([
+    "home: segmented AI tampil (bukan hanya di hasil)",
+    home.includes('data-home-mode="ai"') && home.includes("Tanya AI"),
+  ]);
+  results.push(["home: status AI tampil (ai-hint)", home.includes("ai-hint")]);
+  const homeHint = registry.get("ai-hint")?.innerHTML || "";
+  results.push([
+    "home: pengguna belum masuk diarahkan ke #/masuk",
+    homeHint.includes('href="#/masuk"'),
+    homeHint.slice(0, 90),
+  ]);
 
   await dispatchHash("#/answer?q=metformin%20vs%20insulin%20diabetes");
   const answer = registry.get("answer-body")?.innerHTML || "";
@@ -303,6 +328,29 @@ async function dispatchHash(hash) {
     account.slice(0, 60),
   ]);
   results.push(["masuk: tombol keluar", account.includes("auth-signout") || account.includes("Keluar")]);
+
+  // Pengguna login dengan saldo Rp0: beranda harus menjelaskan AI terkunci + arahkan isi saldo.
+  sandbox.__setBalance(0);
+  await dispatchHash("#/");
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const homeZero = registry.get("ai-hint")?.innerHTML || registry.get("view").innerHTML;
+  results.push([
+    "home: saldo Rp0 → AI terkunci + arahkan isi saldo",
+    homeZero.includes("Isi saldo") || homeZero.includes("terkunci"),
+    homeZero.slice(0, 90),
+  ]);
+
+  // Pengguna login dengan saldo tersedia: beranda menawarkan Tanya AI.
+  sandbox.__setBalance(50000);
+  await dispatchHash("#/");
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const homeFunded = registry.get("ai-hint")?.innerHTML || registry.get("view").innerHTML;
+  results.push([
+    "home: saldo tersedia → tawarkan Tanya AI",
+    homeFunded.includes("Tanya AI") || homeFunded.includes("pakai Tanya AI"),
+    homeFunded.slice(0, 90),
+  ]);
+  sandbox.__setBalance(null);
 
   let failed = 0;
   for (const [name, ok] of results) {
