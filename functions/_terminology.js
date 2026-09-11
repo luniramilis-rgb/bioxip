@@ -110,11 +110,14 @@ export function expansionClause(text) {
   return groups.join(" AND ");
 }
 
-/** Teks untuk skoring ranking: utamakan istilah Inggris/MeSH hasil ekspansi. */
+/** Teks untuk skoring ranking: pakai konsep paling spesifik (2 entri terpanjang), bukan kata umum. */
 export function expansionSearchText(text) {
-  const { english, mesh } = expandTerms(text);
-  const words = [...english, ...mesh].join(" ").trim();
-  return words || String(text || "");
+  const { entries } = expandTerms(text);
+  if (!entries.length) return String(text || "");
+  return entries
+    .slice(0, 2)
+    .flatMap((entry) => entry.en_terms.replaceAll('"', "").split(" OR ").concat(entry.mesh || []))
+    .join(" ");
 }
 
 // Filter Europe PMC sesuai jenis pertanyaan klinis.
