@@ -59,7 +59,7 @@ if (!middleware.includes("response.status === 200")) {
 
 // 4. Cache jawaban AI di chat: hit tidak boleh memanggil provider.
 const chat = read("functions/api/ai/chat.js");
-for (const marker of ["ANSWER_CACHE_NAMESPACE", "cacheGetJson", "cachePutJson", 'mode = "cache"', "hashKey"]) {
+for (const marker of ["ANSWER_CACHE_NAMESPACE", "cacheGetJson", "cachePutJson", 'mode = "cache"', "citationSnapshot", "PROMPT_VERSION"]) {
   if (!chat.includes(marker)) problems.push(`api/ai/chat.js: tidak ada "${marker}"`);
 }
 if (!chat.includes("mode !== \"cache\" && providerIsReady")) {
@@ -83,8 +83,26 @@ if (!(noKey >= 334)) problems.push(`_pubmed.js: interval tanpa key ${noKey}ms te
 if (!(withKey >= 100)) problems.push(`_pubmed.js: interval dengan key ${withKey}ms terlalu cepat (butuh >= 100ms untuk 10 rps)`);
 if (!pubmed.includes("throttle(env)")) problems.push("_pubmed.js: throttle harus menerima env untuk memilih interval");
 
+// 6. Cache jawaban L2 (Postgres) sebagai lapisan andal.
+const answerCache = read("functions/_answercache.js");
+for (const marker of ["answerHash", "answerCacheGet", "answerCachePut", "answer_cache", "fn_answer_cache_hit"]) {
+  if (!answerCache.includes(marker)) problems.push(`_answercache.js: tidak ada "${marker}"`);
+}
+const chatSrc = read("functions/api/ai/chat.js");
+if (!chatSrc.includes("answerCacheGet") || !chatSrc.includes("answerCachePut")) {
+  problems.push("api/ai/chat.js: harus memakai cache L2 (answerCacheGet/answerCachePut)");
+}
+if (!chatSrc.includes('cache_layer')) problems.push("api/ai/chat.js: meta harus melaporkan lapisan cache (l1/l2)");
+const migration013 = read("supabase/migrations/013_answer_cache.sql");
+for (const marker of ["create table if not exists answer_cache", "enable row level security", "fn_answer_cache_hit"]) {
+  if (!migration013.includes(marker)) problems.push(`013_answer_cache.sql: tidak ada "${marker}"`);
+}
+if (!migration013.includes("revoke execute on function fn_answer_cache_hit")) {
+  problems.push("013_answer_cache.sql: fn_answer_cache_hit harus dicabut dari anon/authenticated");
+}
+
 console.log(
-  `Cache: namespace search + answer · TTL default ${900}s · throttle NCBI ${noKey}ms (tanpa key) / ${withKey}ms (dengan key)`
+  `Cache: search + answer L1(Cache API) + L2(Postgres) · TTL default ${900}s · throttle NCBI ${noKey}ms (tanpa key) / ${withKey}ms (dengan key)`
 );
 if (problems.length) {
   console.log("\nMASALAH:");

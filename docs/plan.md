@@ -109,6 +109,21 @@ Hasil:
 - Unit test baru `tests/provider_unit.js` (**20 cek**: parse JSON, retry mode JSON, retry token terpotong dengan cap, HTTP error tanpa retry, tanpa key) — masuk CI.
 - **Bukti produksi:** Q1 dengue → `mode=llm`, model `deepseek-flash`, 5 claims, support 0,8, 1.357 token keluar, biaya **Rp328**; Q2 metformin vs sulfonilurea → **abstain jujur** (0 claims) karena konteks tidak memuat perbandingan langsung.
 - Catatan: latensi jawaban pertama 5–22 dtk (model penalaran + keluaran panjang); jawaban berulang menjadi instan karena **cache 7 hari**. Streaming token real-time dari provider masuk backlog.
+## Streaming token + cache jawaban dua lapis — SELESAI (2026-09-11)
+**Tujuan:** pengguna mulai membaca dalam ~1-3 dtk (bukan menunggu 5-22 dtk), dan pertanyaan populer tidak memanggil LLM berulang.
+Hasil:
+- **Streaming dari provider**: `_provider.js` → `streamDeepseek` (`stream: true`, `stream_options.include_usage`) + `parseOpenAiSse`; timeout khusus 120 dtk.
+- **Ekstraksi inkremental**: `_grounded.js` → `extractAnswerText` + `AnswerExtractor` mengeluarkan isi field `answer` saat JSON masih setengah jadi, sehingga klien menerima **teks jawaban**, bukan JSON mentah (menangani escape kutip/newline/unicode, menahan escape yang belum lengkap).
+- **Fallback berlapis**: (1) json_object → (2) tanpa json_object bila HTTP 400 → (3) non-streaming `callDeepseek` bila stream kosong/gagal → (4) jawaban ekstraktif + event `replace` bila struktur klaim tetap tak dapat diparsing (UI menimpa teks, tidak menampilkan JSON setengah jadi).
+- **UI**: kursor berkedip saat menulis (`prefers-reduced-motion` dihormati), event `replace` ditangani, status "dari cache" ditampilkan.
+- **Cache jawaban dua lapis**: L1 = Cloudflare Cache API (cepat, per-colo); L2 = tabel `answer_cache` di Postgres (migrasi 013, andal lintas-colo, hanya `service_role`). Kunci = pertanyaan + model + `PROMPT_VERSION`; **snapshot sitasi ikut disimpan** agar nomor referensi tetap konsisten walau hasil pencarian live berubah.
+- **4 bug ditemukan & diperbaiki selama pengerjaan**:
+  1. Jawaban **terkirim dua kali** (streaming + loop `chunkText` lama) → guard `deltasSent`.
+  2. `streamed` dirujuk di luar scope → **ReferenceError setelah settle** (`done` tidak pernah terkirim) → diagnostik dipindah ke variabel luar scope.
+  3. **Temporal dead zone**: `cacheSaved` di-assign sebelum dideklarasikan → stream **kosong total** saat cache hit → deklarasi dipindah ke atas.
+  4. Model kadang menulis **newline/tab mentah di dalam string JSON** → `sanitizeJsonStrings` + pembersihan trailing comma.
+- Validasi: unit test baru `tests/stream_unit.js` (**20 cek**) dan `tests/provider_unit.js`; skrip produksi `scripts/validate_ai_live.mjs` (2x pertanyaan sama).
+- **Bukti produksi**: run1 `mode=llm` 258 potongan, token pertama **1,95 dtk** dari total 7,38 dtk, Rp222, `cache_saved=cache_api`; run2 `mode=cache` (L1) **0,55 dtk** (13x lebih cepat), jawaban identik, sitasi tetap 8, tagihan **Rp100**.
 ## Sprint 2 — PubMed E-utilities — SELESAI (2026-09-10)
 Terverifikasi di produksi: hasil memuat sumber **pubmed** + **europepmc**, **0 duplikat DOI/PMID** pada 4 query uji (tuberculosis, dengue, stunting, hypertension), NCBI E-utilities dapat diakses (total >300 rb untuk "tuberculosis").
 Tersisa opsional: NCBI API key (naikkan batas 3→10 req/detik), dan perbaikan peringkat (PubMed saat ini muncul setelah Europe PMC).
