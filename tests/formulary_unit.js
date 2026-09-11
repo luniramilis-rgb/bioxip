@@ -140,9 +140,12 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
     check("suggest: OFF → []", off.length === 0);
 
     const inst2 = loadFormulary();
+    inst2.state.rpcImpl = async () => {
+      throw new Error("rpc tidak tersedia");
+    };
     inst2.state.selectImpl = async () => [{ slug: "parasetamol", nama: "Parasetamol", inn: "paracetamol", atc: "N02BE01" }];
     const items = await inst2.api.suggestFormularyDrugs({ FORMULARY_DB: "on" }, "para", "https://x.test");
-    check("suggest: DB items", items.length === 1 && items[0].name === "Parasetamol" && items[0].slug === "parasetamol");
+    check("suggest: fallback ILIKE saat RPC gagal", items.length === 1 && items[0].name === "Parasetamol" && items[0].slug === "parasetamol");
 
     const short = await inst2.api.suggestFormularyDrugs({ FORMULARY_DB: "on" }, "p", "https://x.test");
     check("suggest: query <2 huruf → []", short.length === 0);
@@ -172,6 +175,31 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
     };
     const none = await inst3.api.searchFormularyDrugs({ FORMULARY_DB: "on" }, "metformin", "https://x.test");
     check("search: RPC error → []", none.length === 0);
+    check("search: error tidak di-cache", inst3.state.cache.size === 0);
+  }
+
+  // --- hardening input & negative-cache ---
+  {
+    const inst = loadFormulary();
+    await inst.api.findFormularyDrug({ FORMULARY_DB: "on" }, "para%_,x(", "https://x.test");
+    check("filter: wildcard/pemisah dibersihkan", inst.state.calls[1] && inst.state.calls[1].params.inn === "ilike.para x");
+
+    const instErr = loadFormulary();
+    instErr.state.selectImpl = async () => {
+      throw new Error("db down");
+    };
+    const failed = await instErr.api.findFormularyDrug({ FORMULARY_DB: "on" }, "x", "https://x.test");
+    check("find: error DB → null & tidak di-cache", failed === null && instErr.state.cache.size === 0);
+
+    const instErr2 = loadFormulary();
+    instErr2.state.rpcImpl = async () => {
+      throw new Error("rpc down");
+    };
+    instErr2.state.selectImpl = async () => {
+      throw new Error("db down");
+    };
+    const sugErr = await instErr2.api.suggestFormularyDrugs({ FORMULARY_DB: "on" }, "para", "https://x.test");
+    check("suggest: error → [] & tidak di-cache", sugErr.length === 0 && instErr2.state.cache.size === 0);
   }
 
   let failed = 0;

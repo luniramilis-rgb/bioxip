@@ -35,6 +35,14 @@ function clean(value) {
   return String(value || "").trim();
 }
 
+/**
+ * Bersihkan input sebelum masuk grammar filter PostgREST/LIKE: buang pemisah
+ * `,()`, wildcard `%_`, escape `\`, dan kutip — mencegah manipulasi filter.
+ */
+function filterSafe(value) {
+  return clean(value).replace(/[,()%_\\*"']/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function slugify(value) {
   return clean(value)
     .toLowerCase()
@@ -43,20 +51,30 @@ function slugify(value) {
     .replace(/^-|-$/g, "");
 }
 
+async function safeSelect(env, table, params) {
+  try {
+    const rows = await select(env, table, params);
+    return { ok: true, rows: rows || [] };
+  } catch {
+    return { ok: false, rows: [] };
+  }
+}
+
 async function queryDrug(env, query) {
   const q = clean(query);
-  if (!q) return null;
-  const fields = { select: "*", limit: "1" };
-  // 1) slug persis → 2) INN persis → 3) nama mengandung.
-  let rows = await select(env, "drug_products_public", { ...fields, slug: `eq.${slugify(q)}` }).catch(() => null);
-  if (!rows || !rows.length) {
-    rows = await select(env, "drug_products_public", { ...fields, inn: `ilike.${q}` }).catch(() => null);
+  if (!q) return { ok: true, drug: null };
+  const safe = filterSafe(q);
+  const attempts = [
+    { slug: `eq.${slugify(q)}` },
+    safe ? { inn: `ilike.${safe}` } : null,
+    safe ? { nama: `ilike.%${safe}%` } : null,
+  ].filter(Boolean);
+  for (const filter of attempts) {
+    const result = await safeSelect(env, "drug_products_public", { select: "*", limit: "5", ...filter });
+    if (!result.ok) return { ok: false, drug: null }; // error → jangan dianggap miss
+    if (result.rows.length) return { ok: true, drug: mapFormularyRow(result.rows[0]) };
   }
-  if (!rows || !rows.length) {
-    rows = await select(env, "drug_products_public", { ...fields, limit: "5", nama: `ilike.%${q}%` }).catch(() => null);
-  }
-  if (!rows || !rows.length) return null;
-  return mapFormularyRow(rows[0]);
+  return { ok: true, drug: null };
 }
 
 export async function findFormularyDrug(env, query, origin) {
@@ -64,9 +82,10 @@ export async function findFormularyDrug(env, query, origin) {
   const key = cacheKey("formulary", { q: clean(query).toLowerCase() }, origin);
   const cached = await cacheGetJson(key).catch(() => null);
   if (cached) return cached.miss ? null : cached.drug || null;
-  const drug = await queryDrug(env, query).catch(() => null);
-  await cachePutJson(key, drug ? { drug } : { miss: true }, drug ? CACHE_TTL : MISS_TTL).catch(() => undefined);
-  return drug;
+  const result = await queryDrug(env, query);
+  if (!result.ok) return null; // kegagalan DB tidak boleh di-cache sebagai miss
+  await cachePutJson(key, result.drug ? { drug: result.drug } : { miss: true }, result.drug ? CACHE_TTL : MISS_TTL).catch(() => undefined);
+  return result.drug;
 }
 
 export async function suggestFormularyDrugs(env, query, origin, limit = 6) {
@@ -76,18 +95,33 @@ export async function suggestFormularyDrugs(env, query, origin, limit = 6) {
   const key = cacheKey("formulary", { suggest: q.toLowerCase(), limit }, origin);
   const cached = await cacheGetJson(key).catch(() => null);
   if (cached) return cached.items || [];
-  // Utamakan pencarian berperingkat (FTS + trigram) via RPC; fallback ke ILIKE.
-  let rows = await rpc(env, "fn_drug_search", { p_query: q, p_limit: limit }).catch(() => null);
-  if (!Array.isArray(rows) || !rows.length) {
-    rows = await select(env, "drug_products_public", {
-      select: "slug,nama,inn,atc",
-      or: `(nama.ilike.%${q}%,inn.ilike.%${q}%)`,
-      order: "nama.asc",
-      limit: String(limit),
-    }).catch(() => []);
+
+  let ok = false;
+  let rows = [];
+  try {
+    const result = await rpc(env, "fn_drug_search", { p_query: q, p_limit: limit });
+    if (Array.isArray(result)) {
+      rows = result;
+      ok = true;
+    }
+  } catch {
+    ok = false;
   }
-  const items = (rows || []).map((row) => ({ name: row.nama, slug: row.slug, inn: row.inn || null, atc: row.atc || null }));
-  await cachePutJson(key, { items }, CACHE_TTL).catch(() => undefined);
+  if (!ok) {
+    const safe = filterSafe(q);
+    const fallback = safe
+      ? await safeSelect(env, "drug_products_public", {
+          select: "slug,nama,inn,atc",
+          or: `(nama.ilike.%${safe}%,inn.ilike.%${safe}%)`,
+          order: "nama.asc",
+          limit: String(limit),
+        })
+      : { ok: true, rows: [] };
+    rows = fallback.rows;
+    ok = fallback.ok;
+  }
+  const items = rows.map((row) => ({ name: row.nama, slug: row.slug, inn: row.inn || null, atc: row.atc || null }));
+  if (ok) await cachePutJson(key, { items }, CACHE_TTL).catch(() => undefined);
   return items;
 }
 
@@ -102,8 +136,15 @@ export async function searchFormularyDrugs(env, query, origin, limit = 8) {
   const key = cacheKey("formulary", { search: q.toLowerCase(), limit }, origin);
   const cached = await cacheGetJson(key).catch(() => null);
   if (cached) return cached.items || [];
-  const rows = await rpc(env, "fn_drug_search", { p_query: q, p_limit: limit }).catch(() => null);
-  const items = (Array.isArray(rows) ? rows : []).map(mapFormularyRow).filter(Boolean);
+  let rows = null;
+  try {
+    const result = await rpc(env, "fn_drug_search", { p_query: q, p_limit: limit });
+    if (Array.isArray(result)) rows = result;
+  } catch {
+    rows = null;
+  }
+  if (rows === null) return []; // jangan cache kegagalan sebagai hasil kosong
+  const items = rows.map(mapFormularyRow).filter(Boolean);
   await cachePutJson(key, { items }, CACHE_TTL).catch(() => undefined);
   return items;
 }

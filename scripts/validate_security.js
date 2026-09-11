@@ -125,6 +125,18 @@ for (const marker of [
 if (/grant execute on function public\.fn_drug_search[^;]*to public/i.test(drugSearch)) {
   problems.push("021_drug_search.sql: fn_drug_search tidak boleh di-grant ke PUBLIC");
 }
+// 1f. Hardening pencarian (022): prefix aman + index trigram untuk INN.
+const searchHardening = read("supabase/migrations/022_drug_search_hardening.sql");
+for (const marker of [
+  "drug_products_inn_trgm_idx",
+  "create or replace function public.fn_drug_search",
+  "starts_with(lower(v.nama), p.low)",
+]) {
+  if (!searchHardening.includes(marker)) problems.push(`022_drug_search_hardening.sql: tidak ada "${marker}"`);
+}
+if (/like\s+p\.low\s*\|\|\s*'%'/i.test(searchHardening)) {
+  problems.push("022_drug_search_hardening.sql: prefix masih memakai LIKE (rawan wildcard)");
+}
 
 // 2. Fungsi paling sensitif harus muncul di migrasi keamanan (agar tidak terlewat).
 for (const fn of ["fn_credit_grant", "fn_topup_mark_paid", "fn_answer_cache_hit"]) {
