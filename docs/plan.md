@@ -66,8 +66,17 @@ Setelah Sprint 1A selesai dan kredensial tersedia: Google OAuth client, SMTP + d
 > **Temuan prasyarat (2026-09-11):** template email **tidak dapat diedit** pada proyek free tier yang memakai SMTP bawaan →
 > API mengembalikan `Email template modification is not available for free tier projects using the default email provider`.
 > Konsekuensi: fitur **OTP 6 digit tidak terlihat pengguna** karena template default hanya memuat `{{ .ConfirmationURL }}` (tanpa `{{ .Token }}`).
-> Perbaikan wajib: **konfigurasi custom SMTP** (Resend/Postmark/Brevo) **atau** upgrade ke Pro. Setelah custom SMTP aktif, template dapat di-patch via Management API.
-> Sudah dilakukan lewat Management API: `mailer_otp_length` 8 → **6** (berhasil, `mailer_otp_exp` tetap 3600).
+>
+> **TERATASI (2026-09-11):** custom SMTP **Resend** terpasang (`smtp.resend.com:465`, sender `onboarding@resend.dev`, `smtp_sender_name=bioXip`).
+> Setelah itu template dapat diedit via Management API:
+> - `mailer_subjects_magic_link` → `Kode masuk bioXip: {{ .Token }}`
+> - `mailer_templates_magic_link_content` → template Indonesia dengan blok kode OTP `{{ .Token }}` + tombol `{{ .ConfirmationURL }}`
+> - `mailer_subjects_confirmation` / `mailer_templates_confirmation_content` → versi pendaftaran (`Kode verifikasi bioXip: {{ .Token }}`)
+> - `mailer_otp_length` = **6**, `mailer_otp_exp` = 3600
+>
+> **Sisa prasyarat:** Resend **belum punya domain terverifikasi** → pengirim masih `onboarding@resend.dev`, yang **hanya bisa mengirim ke email pemilik akun Resend**.
+> Untuk publikasi masal wajib menambahkan domain sendiri + record **SPF/DKIM** di Resend lalu ubah `smtp_admin_email` ke `no-reply@domain`.
+> Backup konfigurasi lama tersimpan di `auth_config_backup.json` (lokal).
 
 ## Sprint 2 — PubMed E-utilities — SELESAI (2026-09-10)
 Terverifikasi di produksi: hasil memuat sumber **pubmed** + **europepmc**, **0 duplikat DOI/PMID** pada 4 query uji (tuberculosis, dengue, stunting, hypertension), NCBI E-utilities dapat diakses (total >300 rb untuk "tuberculosis").
