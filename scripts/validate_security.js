@@ -93,6 +93,25 @@ if (!/notify pgrst, 'reload schema'/i.test(formulary)) {
   problems.push("017_formulary.sql: harus notify pgrst reload schema");
 }
 
+// 1d. Gate review dihapus (020): view publik TIDAK boleh memfilter `reviewed`,
+//     dan wajib menyertakan provenance `source_tier`.
+const reviewGate = read("supabase/migrations/020_formulary_remove_review_gate.sql");
+for (const view of ["drug_products_public", "drug_doses_public", "drug_interactions_public", "drug_monitoring_public"]) {
+  if (!new RegExp(`create view public\\.${view}`, "i").test(reviewGate)) {
+    problems.push(`020_formulary_remove_review_gate.sql: view ${view} harus dibuat ulang`);
+  }
+}
+const viewBodies = reviewGate.split(/create view/i).slice(1);
+for (const body of viewBodies) {
+  if (/\breviewed\b/i.test(body)) {
+    problems.push("020_formulary_remove_review_gate.sql: view publik masih memfilter `reviewed`");
+    break;
+  }
+}
+if (!/add column if not exists source_tier/i.test(reviewGate)) {
+  problems.push("020_formulary_remove_review_gate.sql: kolom source_tier tidak ditemukan");
+}
+
 // 2. Fungsi paling sensitif harus muncul di migrasi keamanan (agar tidak terlewat).
 for (const fn of ["fn_credit_grant", "fn_topup_mark_paid", "fn_answer_cache_hit"]) {
   if (!migration.includes(fn)) problems.push(`014_function_security.sql: tidak menyebut ${fn}`);

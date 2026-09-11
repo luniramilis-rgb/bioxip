@@ -181,3 +181,20 @@ def test_jsonl_source(tmp_path):
     )
     records = formulary.load_records(path, "drugs")
     assert [r["slug"] for r in records] == ["obat-a", "obat-b"]
+
+
+def test_source_tier():
+    drugs = {d["slug"]: d for d in formulary.bundled_records("drugs")}
+    assert drugs["parasetamol"]["source_tier"] == "curated"  # sampel manual
+    assert formulary.map_fornas_row({"nama_obat": "x", "nama_obat_internasional": "xum"})["source_tier"] == "official"
+    assert formulary.normalize_interaction({"a": "a", "b": "b"})["source_tier"] == "curated"
+
+
+def test_validate_records():
+    assert formulary.validate_records("drugs", [{"slug": "a", "nama": "A"}]) == []
+    assert formulary.validate_records("drugs", [{"slug": "", "nama": "A"}])
+    assert formulary.validate_records("interactions", [{"a_slug": "a", "b_slug": "b", "severity": "tinggi"}]) == []
+    assert formulary.validate_records("interactions", [{"a_slug": "a", "b_slug": "a", "severity": "tinggi"}])
+    assert formulary.validate_records("interactions", [{"a_slug": "a", "b_slug": "b", "severity": "x"}])
+    assert formulary.validate_records("monitoring", [{"drug_slug": "a", "parameter": "p", "kategori": "umum"}]) == []
+    assert formulary.validate_records("monitoring", [{"drug_slug": "", "parameter": ""}])

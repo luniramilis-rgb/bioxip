@@ -1,9 +1,10 @@
-# Review Apoteker — Sampel Kartu Obat (30 obat generik)
+# Review Apoteker — DIHENTIKAN (gate review dihapus 2026-09-11)
 
-Tujuan: memastikan setiap kartu obat akurat, aman, dan kontekstual Indonesia sebelum dipakai pengguna.
-Status: menunggu review. Reviewer: (isi nama & nomor STRA/STRTTK bila ada).
+> **Dokumen ini tidak lagi menjadi gate.** Keputusan produk 2026-09-11: gate review manusia dihapus dari pipeline formulary; publikasi dipandu **validasi otomatis + provenance** (lihat `docs/formulary.md` §6, migrasi `020`).
+>
+> Isi checklist di bawah tetap berguna sebagai **rujukan** bila suatu saat dilakukan audit sukarela, tetapi tidak menghalangi publikasi.
 
-> **Catatan provenance (2026-09-11):** 30 entri ini adalah **sampel kurasi manual** (commit `3073211`), **bukan** hasil ekstraksi resmi e-Fornas. Edisi `KMK HK.01.07/MENKES/1199/2025` dipakai sebagai **rujukan**, belum diverifikasi. Daftar Fornas penuh kini tersedia lewat API resmi `https://e-fornas.kemkes.go.id/api/daftar-obat` (1.254 baris, 663 nama obat) dan diimpor ke staging (`--from-fornas-api`) menunggu review.
+---
 
 
 ## Sumber acuan resmi

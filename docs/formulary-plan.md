@@ -4,7 +4,7 @@ Dokumen hidup. Rencana ini **turunan** dari `docs/blueprint.md` (arsitektur), `d
 
 Prinsip arsitektur: **Postgres = satu sumber kebenaran untuk data terstruktur; edge tipis; retrieval literatur live bercache; batch hanya untuk ingest & validasi.** Parquet/R2 **belum** dipakai (lihat §F).
 
-**Status (2026-09-11):** Fase 0 selesai (`docs/formulary.md`, `docs/literature.md`); Fase 1 selesai (migrasi `017_formulary.sql` diterapkan ke produksi + terverifikasi live); **Fase 2 selesai** (importer dua-fase + seed, migrasi `018`/`019`). **Koreksi provenance:** katalog 30 obat adalah **sampel kurasi manual** (commit `3073211`), bukan ekstraksi Fornas; atribusi edisi Fornas **belum diverifikasi** (lihat `docs/review-drugs.md`). Sumber resmi penuh kini tersedia melalui **API e-Fornas** `https://e-fornas.kemkes.go.id/api/daftar-obat` (1.254 baris → 663 obat unik) dan diimpor ke staging via `--from-fornas-api` **menunggu review apoteker** (belum dipublikasikan). Fase 3+ belum dikerjakan.
+**Status (2026-09-11):** Fase 0–2 selesai; **gate review manusia DIHAPUS** (keputusan produk) → publikasi dipandu validasi otomatis + provenance (migrasi `020`, runner `--validate` internal saat `--publish`, kolom `source_tier`/`retrieved_at`). Sumber resmi penuh dari **API e-Fornas** (`/api/daftar-obat`, 1.254 baris → 663 obat unik) diimpor via `--from-fornas-api` dan **dipublikasikan otomatis**. Prinsip aman-tervalidasi tetap: migrasi aditif, validasi `validate_records` sebelum publish, provenance/`source_tier`, versioning `dataset_version`, fallback `_drugs.json`, dry-run. Fase 3+ (API baca DB) belum dikerjakan. Catatan: ATC belum tersedia dari API Fornas.
 
 ---
 

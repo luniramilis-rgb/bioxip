@@ -36,10 +36,13 @@ Dokumen hidup. Turunan dari `docs/formulary-plan.md` (Fase 0) dan pelengkap `doc
 - Bila sumber berbeda, catat perbedaan (di `catatan`/`sumber`), jangan pilih diam-diam.
 - Bila data tidak ada: tandai eksplisit, jangan diisi nilai default.
 
-## 6. Tata kelola review
-- Hanya baris `reviewed = true` (dengan `reviewed_by` + `reviewed_at`) yang tersaji publik.
-- Reviewer: 1 apoteker (+ 1 dokter bila menyangkut keputusan klinis).
+## 6. Validasi otomatis & provenance (menggantikan review manusia)
+- **Keputusan 2026-09-11:** gate review manusia dihapus. Publikasi dipandu **validasi otomatis** + provenance.
+- `source_tier`: `official` (API/label resmi) · `curated` (kurasi internal) · `derived`.
+- Validasi sebelum publish: field wajib, slug unik, severitas valid, pasangan interaksi tidak diri sendiri, kelengkapan monitoring (`formulary.validate_records`). Gagal → publish dibatalkan (`--allow-invalid` untuk memaksa).
+- Setiap baris menyimpan `source_id`, `source_tier`, `retrieved_at`, `checksum`, `valid_from/valid_to`.
 - Perubahan edisi: tutup baris lama (`valid_to`) dan sisip baris baru — jangan menimpa riwayat.
+- Disclaimer wajib di UI: data referensi, bukan pengganti penilaian klinis. Label sumber ditampilkan (mis. "Fornas (API resmi)" vs "Kurasi internal").
 
 ## 7. Akses & keamanan
 - `anon`/`authenticated`: **hanya SELECT lewat view publik** (`drug_products_public`, dst.).

@@ -110,7 +110,7 @@ def _search_text(*parts: Any) -> str:
     return " ".join(out)
 
 
-def normalize_drug(raw: dict, source_id: str = FORNAS_SOURCE_ID, reviewed: bool = True) -> dict:
+def normalize_drug(raw: dict, source_id: str = FORNAS_SOURCE_ID, reviewed: bool = True, source_tier: str = "official") -> dict:
     nama = str(raw.get("nama") or raw.get("name") or "").strip()
     inn = str(raw.get("inn") or "").strip() or None
     us_name = str(raw.get("us_name") or "").strip() or None
@@ -134,6 +134,7 @@ def normalize_drug(raw: dict, source_id: str = FORNAS_SOURCE_ID, reviewed: bool 
         "aliases": aliases,
         "search_text": search_text,
         "source_id": source_id,
+        "source_tier": source_tier,
         "reviewed": _as_bool(raw.get("reviewed"), reviewed),
     }
 
@@ -148,6 +149,7 @@ def normalize_interaction(raw: dict, source_id: str = KURASI_SOURCE_ID) -> dict:
         "mekanisme": str(raw.get("mechanism") or raw.get("mekanisme") or "").strip() or None,
         "saran": str(raw.get("advice") or raw.get("saran") or "").strip() or None,
         "source_id": source_id,
+        "source_tier": "curated",
         "reviewed": _as_bool(raw.get("reviewed"), False),
     }
 
@@ -178,6 +180,7 @@ def _monitoring_row(slug: str, parameter: str, kategori: str, catatan, source_id
         "kategori": kategori,
         "catatan": catatan,
         "source_id": source_id,
+        "source_tier": "curated",
         "reviewed": reviewed,
     }
 
@@ -210,6 +213,31 @@ def diff(existing: dict[str, str], records: Iterable[dict], kind: str) -> dict[s
     return {"new": new, "changed": changed, "unchanged": unchanged}
 
 
+def validate_records(kind: str, records: Iterable[dict]) -> list[str]:
+    """Validasi otomatis (pengganti review manusia). Kembalikan daftar masalah."""
+    errors: list[str] = []
+    for record in records:
+        if kind == "drugs":
+            if not record.get("slug"):
+                errors.append("drug tanpa slug")
+            elif not record.get("nama"):
+                errors.append(f"drug tanpa nama: {record['slug']}")
+        elif kind == "interactions":
+            a, b = record.get("a_slug"), record.get("b_slug")
+            if not a or not b:
+                errors.append(f"interaksi tanpa pasangan: {a}+{b}")
+            elif a == b:
+                errors.append(f"interaksi diri sendiri: {a}")
+            if record.get("severity") not in ("tinggi", "sedang", "rendah"):
+                errors.append(f"severitas tidak valid: {record.get('severity')}")
+        elif kind == "monitoring":
+            if not record.get("drug_slug") or not record.get("parameter"):
+                errors.append(f"monitoring tidak lengkap: {record.get('drug_slug')}")
+        else:
+            errors.append(f"kind tidak dikenal: {kind}")
+    return errors
+
+
 # ---------------------------------------------------------------------------
 # Pembacaan sumber
 # ---------------------------------------------------------------------------
@@ -227,7 +255,7 @@ def bundled_records(kind: str, functions_dir: Path = FUNCTIONS) -> list[dict]:
     """
     if kind == "drugs":
         payload = _drug_source(functions_dir / "_drugs.json")
-        return [normalize_drug(item, SAMPLE_SOURCE_ID, reviewed=False) for item in payload["items"]]
+        return [normalize_drug(item, SAMPLE_SOURCE_ID, reviewed=False, source_tier="curated") for item in payload["items"]]
     if kind == "interactions":
         data = json.loads((functions_dir / "_interactions.json").read_text(encoding="utf-8"))
         return [normalize_interaction(item) for item in data.get("pairs", [])]
@@ -266,6 +294,7 @@ def map_fornas_row(row: dict) -> dict:
             "reviewed": False,
         },
         source_id=FORNAS_API_SOURCE_ID,
+        source_tier="official",
     )
 
 

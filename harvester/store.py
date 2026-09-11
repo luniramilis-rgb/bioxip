@@ -180,6 +180,7 @@ class Store:
         return len(created)
 
     def approve_staging(self, reviewer: str, only_source_reviewed: bool = True) -> int:
+        """Legacy: gate review dihapus 2026-09-11 (lihat migrasi 020). Tidak dipakai runner."""
         params = {"status": "eq.pending"}
         if only_source_reviewed:
             params["payload->>reviewed"] = "eq.true"
@@ -191,8 +192,10 @@ class Store:
         )
         return len(updated)
 
-    def list_staging(self, status: str = "approved", kind: Optional[str] = None) -> list[dict]:
-        params = {"select": "id,kind,slug,payload,checksum", "status": f"eq.{status}", "order": "id.desc"}
+    def list_staging(self, status: Optional[str] = None, kind: Optional[str] = None) -> list[dict]:
+        params = {"select": "id,kind,slug,payload,checksum", "order": "id.desc"}
+        if status:
+            params["status"] = f"eq.{status}"
         if kind:
             params["kind"] = f"eq.{kind}"
         return self.select_rows("formulary_staging", params)
@@ -204,9 +207,11 @@ class Store:
         prepared = []
         for row in rows:
             item = dict(row)
+            # Gate review dihapus: publikasi otomatis, provenance yang menyatakan asal.
             item["reviewed"] = True
-            item["reviewed_by"] = reviewer or "system"
+            item["reviewed_by"] = reviewer or "auto"
             item["reviewed_at"] = now
+            item["retrieved_at"] = now
             prepared.append(item)
         created = self.upsert_rows(table, prepared, on_conflict=on_conflict)
         return len(created)

@@ -78,10 +78,8 @@ def run(
     source: Optional[Path] = typer.Option(None, help="Berkas sumber CSV/JSON (wajib bila kind != all)"),
     from_fornas_api: bool = typer.Option(False, "--from-fornas-api", help="Ambil daftar obat dari API e-Fornas"),
     apply: bool = typer.Option(False, "--apply", help="Tulis ke formulary_staging"),
-    approve: bool = typer.Option(False, "--approve", help="Setujui staging (hanya payload reviewed=true)"),
-    publish: bool = typer.Option(False, "--publish", help="Publikasikan staging approved ke tabel"),
-    reviewer: str = typer.Option("", help="Nama reviewer (jejak audit)"),
-    force: bool = typer.Option(False, "--force", help="Setujui semua pending tanpa memandang reviewed"),
+    publish: bool = typer.Option(False, "--publish", help="Validasi & publikasikan staging ke tabel"),
+    allow_invalid: bool = typer.Option(False, "--allow-invalid", help="Paksa publish walau validasi menemukan masalah"),
 ) -> None:
     kinds = resolve_kinds(kind)
     if source is not None and len(kinds) != 1:
@@ -94,13 +92,16 @@ def run(
     else:
         datasets = {k: load_records(k, source) for k in kinds}
 
-    if not (apply or approve or publish):
+    if not (apply or publish):
         for k, records in datasets.items():
-            print(f"[dry-run] {k}: {len(records)} record")
+            errors = formulary.validate_records(k, records)
+            print(f"[dry-run] {k}: {len(records)} record, {len(errors)} masalah validasi")
             for record in records[:3]:
                 stamp = formulary.checksum(record)[:12]
                 print(f"    - {formulary.key_of(k, record)} (checksum {stamp})")
-        print("Tidak ada perubahan. Tambahkan --apply/--approve/--publish untuk mengeksekusi.")
+            for err in errors[:5]:
+                print(f"    ! {err}")
+        print("Tidak ada perubahan. Tambahkan --apply / --publish untuk mengeksekusi.")
         return
 
     store = Store()
@@ -109,6 +110,10 @@ def run(
             sources = store.upsert_rows("fact_sources", formulary.fact_source_payloads(), on_conflict="id")
             print(f"fact_sources: {len(sources)} baris")
             for k, records in datasets.items():
+                errors = formulary.validate_records(k, records)
+                if errors and not allow_invalid:
+                    print(f"{k}: DIBATALKAN — {len(errors)} masalah validasi (contoh: {errors[0]})")
+                    continue
                 existing = store.staging_checksums(k)
                 delta = formulary.diff(existing, records, k)
                 rows = build_staging_rows(k, delta["new"] + delta["changed"])
@@ -118,22 +123,22 @@ def run(
                     f"tetap={len(delta['unchanged'])} -> staging +{inserted}"
                 )
 
-        if approve:
-            count = store.approve_staging(reviewer or "reviewer", only_source_reviewed=not force)
-            print(f"approved: {count} baris staging")
-
         if publish:
             total = 0
             for k in kinds:
-                staged = store.list_staging("approved", k)
+                staged = store.list_staging(kind=k)  # semua status; tidak ada gate review
                 rows = []
                 for item in staged:
                     payload = dict(item.get("payload") or {})
                     payload["checksum"] = item.get("checksum")
                     rows.append(payload)
-                written = store.publish_rows(TABLE[k], rows, CONFLICT[k], reviewer or "reviewer")
+                errors = formulary.validate_records(k, rows)
+                if errors and not allow_invalid:
+                    print(f"publish {k}: DIBATALKAN — {len(errors)} masalah validasi (contoh: {errors[0]})")
+                    continue
+                written = store.publish_rows(TABLE[k], rows, CONFLICT[k], "auto")
                 total += written
-                print(f"publish {k} -> {TABLE[k]}: {written} baris")
+                print(f"publish {k} -> {TABLE[k]}: {written} baris (source_tier dari payload)")
             current = store.get_meta("dataset_version") or "0"
             try:
                 nxt = str(int(current) + 1)

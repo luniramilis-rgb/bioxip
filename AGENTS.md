@@ -5,7 +5,7 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 ## Komando
 
 - Harvester (lokal): `python -m harvester.runners.harvest_delta --provider europepmc`
-- Ingest formulary (dua-fase): `python -m harvester.runners.ingest_formulary --kind all` (dry-run) → `--apply` → `--approve --reviewer "Nama"` → `--publish --reviewer "Nama"`; sumber penuh via `--kind drugs --source fornas.csv` atau API resmi `--kind drugs --from-fornas-api`
+- Ingest formulary (validasi otomatis, tanpa gate review): `python -m harvester.runners.ingest_formulary --kind all` (dry-run) → `--apply` → `--publish`; validasi otomatis dijalankan sebelum publish (`--allow-invalid` untuk memaksa). Sumber: `--kind drugs --from-fornas-api` (API resmi e-Fornas) atau `--kind drugs --source fornas.csv`
 - Syntax check tanpa deps: `python -m compileall harvester tests scripts`
 - Test: `python -m pytest` (di lingkungan dengan deps terpasang)
 - Migrasi: `supabase db push` (perlu Supabase CLI)
