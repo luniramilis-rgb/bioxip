@@ -160,6 +160,22 @@ Hasil:
 - **Bug yang ditemukan & diperbaiki selama Sprint 8**: (1) abstrak tidak pernah diteruskan ke pipeline grounded → jawaban AI tanpa konteks; (2) judul bocor `<b>` karena urutan decode/strip salah; (3) ekspansi OR terlalu lebar → hasil tidak relevan (mis. kueri hipertensi); (4) `drugTerm` vs `drugTerms` → **500 pada `/api/search`** (tertangkap smoke test setelah ditambahkan).
 - Bukti produksi: `parasetamol dosis ginjal` → hasil paracetamol; `akurasi USG diagnosis kolesistitis` → paper USG diagnostik; kueri topik (TB/DBD/stunting/hipertensi) relevan.
 
+## Sprint 9 — Cache edge & kepatuhan throttle (SELESAI 2026-09-11)
+**Tujuan:** memotong latensi p95 pencarian & melindungi rate limit sumber, tanpa mengubah keputusan Live murni.
+Hasil:
+- **Throttle NCBI diperbaiki**: `_pubmed.js` kini memakai **350 ms tanpa API key (≈3 rps)** dan **100 ms dengan API key (≈10 rps)** — sebelumnya 150 ms (≈6,7 rps) yang melanggar batas resmi dan berisiko 429.
+- **Edge cache `/api/search`** (`functions/_cache.js`, Cloudflare **Cache API** + fallback memori untuk dev/test):
+  - Kunci cache memuat `q`, filter, `per_page`, `sort`, `abstract`, `clinical` + versi namespace (`search:v4`);
+  - TTL dari env `SEARCH_CACHE_TTL_SECONDS` (default 900 dtk, maks 24 jam);
+  - Param `no_cache=1` untuk melewati cache (dipakai validator);
+  - Respons menandai `cache: hit|miss|bypass`;
+  - **Guard anti-cache-cacat**: respons **tidak** disimpan bila ada `notes`, hasil < 3, atau korpus utama Europe PMC < 3 — mencegah kegagalan sementara upstream membeku 15 menit.
+- **Cache jawaban AI** (`/api/ai/chat`): kunci = pertanyaan + `max_tokens` + model + **fingerprint konteks bukti**; saat hit, **provider tidak dipanggil**, usage 0 → tagihan jatuh ke **minimum Rp100** (margin utuh, pengguna lebih murah). TTL 7 hari.
+- **Middleware**: `/api/search` tidak lagi `no-store` (TTL ditentukan fungsi); endpoint lain tetap `no-store` (termasuk SSE AI).
+- Dokumentasi env: `SEARCH_CACHE_TTL_SECONDS`.
+- Validasi: `scripts/validate_cache.js` (wiring cache + batas throttle), `tests/functions_smoke.js` diperluas (**cache miss→hit, upstream tidak dipanggil ulang, degraded tidak disimpan, no_cache bypass**), `validate_pubmed.js` & `validate_api.js` disesuaikan agar tahan variasi sumber pendamping.
+- **Bukti produksi**: kueri dingin **0,92 s** → cache **0,32–0,41 s** (±2,6× lebih cepat); `source_counts` menampilkan komposisi sumber.
+
 ## Sprint 8 (arsip) — Kualitas Retrieval & Data (K2–K4)
 - Retrieval hibrida (FTS + `pgvector`) + section-aware chunking + reranker.
 - Lapisan fakta terstruktur (label, ATC, CT.gov, UniProt/GO) sebagai konteks AI.
