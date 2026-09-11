@@ -4,7 +4,7 @@
  * jatuh ke katalog JSON bawaan → nol perubahan perilaku produksi.
  */
 import { cacheGetJson, cacheKey, cachePutJson } from "./_cache.js";
-import { select } from "./api/_db.js";
+import { rpc, select } from "./api/_db.js";
 
 const CACHE_TTL = 3600;
 const MISS_TTL = 300;
@@ -76,13 +76,34 @@ export async function suggestFormularyDrugs(env, query, origin, limit = 6) {
   const key = cacheKey("formulary", { suggest: q.toLowerCase(), limit }, origin);
   const cached = await cacheGetJson(key).catch(() => null);
   if (cached) return cached.items || [];
-  const rows = await select(env, "drug_products_public", {
-    select: "slug,nama,inn,atc",
-    or: `(nama.ilike.%${q}%,inn.ilike.%${q}%)`,
-    order: "nama.asc",
-    limit: String(limit),
-  }).catch(() => []);
+  // Utamakan pencarian berperingkat (FTS + trigram) via RPC; fallback ke ILIKE.
+  let rows = await rpc(env, "fn_drug_search", { p_query: q, p_limit: limit }).catch(() => null);
+  if (!Array.isArray(rows) || !rows.length) {
+    rows = await select(env, "drug_products_public", {
+      select: "slug,nama,inn,atc",
+      or: `(nama.ilike.%${q}%,inn.ilike.%${q}%)`,
+      order: "nama.asc",
+      limit: String(limit),
+    }).catch(() => []);
+  }
   const items = (rows || []).map((row) => ({ name: row.nama, slug: row.slug, inn: row.inn || null, atc: row.atc || null }));
+  await cachePutJson(key, { items }, CACHE_TTL).catch(() => undefined);
+  return items;
+}
+
+/**
+ * Pencarian berperingkat (Fase 4). Mengembalikan drug ternormalisasi lengkap
+ * dengan skor dari `fn_drug_search`. Dipakai untuk suggest & pencocokan longgar.
+ */
+export async function searchFormularyDrugs(env, query, origin, limit = 8) {
+  if (!formularyEnabled(env)) return [];
+  const q = clean(query);
+  if (q.length < 2) return [];
+  const key = cacheKey("formulary", { search: q.toLowerCase(), limit }, origin);
+  const cached = await cacheGetJson(key).catch(() => null);
+  if (cached) return cached.items || [];
+  const rows = await rpc(env, "fn_drug_search", { p_query: q, p_limit: limit }).catch(() => null);
+  const items = (Array.isArray(rows) ? rows : []).map(mapFormularyRow).filter(Boolean);
   await cachePutJson(key, { items }, CACHE_TTL).catch(() => undefined);
   return items;
 }

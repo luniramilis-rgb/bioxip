@@ -5,10 +5,10 @@ const vm = require("vm");
 const ROOT = path.join(__dirname, "..");
 
 function loadFormulary() {
-  const state = { selectImpl: async () => [], cache: new Map(), calls: [] };
+  const state = { selectImpl: async () => [], rpcImpl: async () => [], cache: new Map(), calls: [], rpcCalls: [] };
   let source = fs.readFileSync(path.join(ROOT, "functions", "_formulary.js"), "utf8");
   source = source.replace(/^import\s+.*?;\s*$/gm, "").replace(/export /g, "");
-  source += "\nglobalThis.__f = { formularyEnabled, mapFormularyRow, findFormularyDrug, suggestFormularyDrugs };\n";
+  source += "\nglobalThis.__f = { formularyEnabled, mapFormularyRow, findFormularyDrug, suggestFormularyDrugs, searchFormularyDrugs };\n";
   const sandbox = {
     console,
     JSON,
@@ -23,6 +23,10 @@ function loadFormulary() {
     select: async (env, table, params) => {
       state.calls.push({ table, params });
       return state.selectImpl(env, table, params);
+    },
+    rpc: async (env, name, args) => {
+      state.rpcCalls.push({ name, args });
+      return state.rpcImpl(env, name, args);
     },
     cacheKey: (ns, params) => `key:${ns}:${JSON.stringify(params)}`,
     cacheGetJson: async (key) => (state.cache.has(key) ? state.cache.get(key) : null),
@@ -142,6 +146,32 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
 
     const short = await inst2.api.suggestFormularyDrugs({ FORMULARY_DB: "on" }, "p", "https://x.test");
     check("suggest: query <2 huruf → []", short.length === 0);
+
+    // Fase 4: suggest memakai RPC (FTS/trigram) lebih dulu, tanpa query select.
+    const inst3 = loadFormulary();
+    inst3.state.rpcImpl = async () => [row];
+    const viaRpc = await inst3.api.suggestFormularyDrugs({ FORMULARY_DB: "on" }, "para", "https://x.test");
+    check("suggest: pakai RPC lebih dulu", viaRpc.length === 1 && viaRpc[0].name === "Parasetamol" && inst3.state.calls.length === 0);
+  }
+
+  // --- search (Fase 4): FTS/trigram via RPC ---
+  {
+    const inst = loadFormulary();
+    const off = await inst.api.searchFormularyDrugs({ FORMULARY_DB: "off" }, "paracetamol", "https://x.test");
+    check("search: OFF → []", off.length === 0);
+
+    const inst2 = loadFormulary();
+    inst2.state.rpcImpl = async () => [row];
+    const items = await inst2.api.searchFormularyDrugs({ FORMULARY_DB: "on" }, "metformin", "https://x.test");
+    check("search: RPC items ternormalisasi", items.length === 1 && items[0].slug === "parasetamol" && items[0].source_tier === "official");
+    check("search: memanggil fn_drug_search", inst2.state.rpcCalls[0] && inst2.state.rpcCalls[0].name === "fn_drug_search" && inst2.state.rpcCalls[0].args.p_query === "metformin");
+
+    const inst3 = loadFormulary();
+    inst3.state.rpcImpl = async () => {
+      throw new Error("rpc down");
+    };
+    const none = await inst3.api.searchFormularyDrugs({ FORMULARY_DB: "on" }, "metformin", "https://x.test");
+    check("search: RPC error → []", none.length === 0);
   }
 
   let failed = 0;

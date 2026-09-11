@@ -112,6 +112,20 @@ if (!/add column if not exists source_tier/i.test(reviewGate)) {
   problems.push("020_formulary_remove_review_gate.sql: kolom source_tier tidak ditemukan");
 }
 
+// 1e. Pencarian obat (021): RPC read-only, boleh anon/authenticated, bukan PUBLIC.
+const drugSearch = read("supabase/migrations/021_drug_search.sql");
+for (const marker of [
+  "create or replace function public.fn_drug_search",
+  "revoke execute on function public.fn_drug_search(text, int) from public",
+  "revoke execute on function public.fn_drug_search(text, int) from anon, authenticated",
+  "grant execute on function public.fn_drug_search(text, int) to anon, authenticated",
+]) {
+  if (!drugSearch.includes(marker)) problems.push(`021_drug_search.sql: tidak ada "${marker}"`);
+}
+if (/grant execute on function public\.fn_drug_search[^;]*to public/i.test(drugSearch)) {
+  problems.push("021_drug_search.sql: fn_drug_search tidak boleh di-grant ke PUBLIC");
+}
+
 // 2. Fungsi paling sensitif harus muncul di migrasi keamanan (agar tidak terlewat).
 for (const fn of ["fn_credit_grant", "fn_topup_mark_paid", "fn_answer_cache_hit"]) {
   if (!migration.includes(fn)) problems.push(`014_function_security.sql: tidak menyebut ${fn}`);
