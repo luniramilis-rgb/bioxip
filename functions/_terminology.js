@@ -132,16 +132,23 @@ function escapeRegExp(value) {
 }
 
 /**
- * Pencocokan istilah: istilah tanpa spasi harus cocok sebagai kata utuh, agar
- * tidak salah tangkap di dalam kata lain (mis. "hati" di "diperhatikan",
- * "mdr" di "kamdrx"). Frasa multi-kata tetap dicocokkan sebagai substring.
+ * Pencocokan istilah:
+ * - Frasa multi-kata dicocokkan sebagai substring.
+ * - Istilah ≤3 huruf (mis. "mdr"/"hiv"/"asi") harus utuh sebagai kata, agar tidak
+ *   salah tangkap di dalam kata lain ("asisten", "hives").
+ * - Istilah lebih panjang: batas depan wajib (mencegah "hati" di "diperhatikan"),
+ *   tetapi akhiran Indonesia yang umum diizinkan (mis. "nyerinya", "vaksinasi").
  */
+const ID_SUFFIX = "(?:nya|kah|lah|pun|ku|mu|asi|isasi)";
 export function containsTerm(text, term) {
   const value = String(text || "").toLowerCase();
   const needle = String(term || "").toLowerCase();
   if (!needle) return false;
   if (needle.includes(" ")) return value.includes(needle);
-  return new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}([^a-z0-9]|$)`, "i").test(value);
+  if (needle.length <= 3) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}([^a-z0-9]|$)`, "i").test(value);
+  }
+  return new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}(?:${ID_SUFFIX})?([^a-z0-9]|$)`, "i").test(value);
 }
 
 export function expandTerms(text) {

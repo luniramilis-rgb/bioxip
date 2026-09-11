@@ -31,6 +31,10 @@ check("term: 'asi' cocok sebagai kata", term.containsTerm("pemberian ASI eksklus
 check("term: 'asi' tidak cocok di dalam kata lain", term.containsTerm("diagnosis banding", "asi") === false);
 check("term: 'hati' tidak cocok di dalam 'diperhatikan'", term.containsTerm("perlu diperhatikan", "hati") === false);
 check("term: 'hati' cocok sebagai kata", term.containsTerm("gangguan ginjal atau hati", "hati") === true);
+check("term: akhiran -nya tetap cocok (nyerinya)", term.containsTerm("nyerinya hebat", "nyeri") === true);
+check("term: bentuk vaksinasi tetap cocok", term.containsTerm("program vaksinasi", "vaksin") === true);
+check("term: 'asi' tetap tidak cocok di 'asisten'", term.containsTerm("asisten apoteker", "asi") === false);
+check("term: 'hiv' tetap tidak cocok di 'hives'", term.containsTerm("urtikaria hives", "hiv") === false);
 check("term: istilah panjang cocok sebagai substring", term.containsTerm("pengobatan hipertensi", "hipertensi") === true);
 
 // --- konsep generik tidak boleh jadi klausa tunggal ------------------------
