@@ -1,8 +1,8 @@
 const PATIENT_DATA = [
-  /\b\d{16}\b/, // NIK
-  /\b\d{10,15}\b/, // nomor rekam medis / telepon panjang
+  /\b\d{16}\b/, // NIK (16 digit)
+  /\b(?:no\.?|nomor)\s*(?:rm|rekam medis|mrn)\b/i, // nomor rekam medis eksplisit
+  /\b(?:rm|mrn)\s*[:#]?\s*\d{4,}/i, // penulisan singkat RM: 12345
   /(\+62|62|0)8\d{7,12}\b/, // nomor HP
-  /nomor rekam medis|no\.?\s*rm|mrn\b/i,
   /tanggal lahir|tgl\.?\s*lahir|\bdob\b/i,
   /nama pasien|pasien saya bernama/i,
 ];
