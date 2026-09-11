@@ -77,6 +77,8 @@ Setelah Sprint 1A selesai dan kredensial tersedia: Google OAuth client, SMTP + d
 > **Sisa prasyarat:** Resend **belum punya domain terverifikasi** → pengirim masih `onboarding@resend.dev`, yang **hanya bisa mengirim ke email pemilik akun Resend**.
 > Untuk publikasi masal wajib menambahkan domain sendiri + record **SPF/DKIM** di Resend lalu ubah `smtp_admin_email` ke `no-reply@domain`.
 > Backup konfigurasi lama tersimpan di `auth_config_backup.json` (lokal).
+>
+> **Audit Google OAuth (2026-09-11):** Bagian A & B **selesai** oleh pemilik (`external_google_enabled=true`, client ID + secret terisi; uji `/auth/v1/authorize` mengembalikan 302 ke accounts.google.com dengan `redirect_uri` = `https://nxlcosnksgbuvtiggjpw.supabase.co/auth/v1/callback`). Bagian C diperbaiki: `site_url` semula `http://localhost:3000` → **`https://bioxip.pages.dev`**; `uri_allow_list` dibersihkan (`bioxip.id` **dihapus** karena domain belum dibeli — mencegah pihak lain yang membelinya masuk daftar redirect sah).
 
 ## Sprint 2 — PubMed E-utilities — SELESAI (2026-09-10)
 Terverifikasi di produksi: hasil memuat sumber **pubmed** + **europepmc**, **0 duplikat DOI/PMID** pada 4 query uji (tuberculosis, dengue, stunting, hypertension), NCBI E-utilities dapat diakses (total >300 rb untuk "tuberculosis").
