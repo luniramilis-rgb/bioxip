@@ -89,16 +89,27 @@ export async function onRequestGet(context) {
 
     let results = dedupeResults(collected);
 
-    // Bila filter klinis terlalu sempit, ulangi tanpa filter agar bukti tetap ada.
-    if (clinical && results.length < 5) {
+    // Bila ekspansi AND terlalu sempit, longgarkan bertahap: filter klinis → ekspansi penuh.
+    if (results.length < 5 && clinical) {
       const relaxed = await Promise.allSettled([
-        fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }),
+        fetchEpmc(litQuery, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }),
       ]);
       for (const item of relaxed) {
         if (item.status === "fulfilled") collected.push(...item.value.results);
       }
       results = dedupeResults(collected);
       notes.push("filter klinis dilonggarkan karena hasil sedikit");
+    }
+
+    if (results.length < 3 && extraClause) {
+      const fallback = await Promise.allSettled([
+        fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }),
+      ]);
+      for (const item of fallback) {
+        if (item.status === "fulfilled") collected.push(...item.value.results);
+      }
+      results = dedupeResults(collected);
+      notes.push("pencarian dilonggarkan (istilah Inggris terlalu spesifik)");
     }
 
     results = rankResults(results, rankText, sort);

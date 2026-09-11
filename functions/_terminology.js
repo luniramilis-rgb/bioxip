@@ -84,7 +84,10 @@ export function detectQuestionType(text) {
 
 export function expandTerms(text) {
   const value = String(text || "").toLowerCase();
-  const matched = TERMINOLOGY.filter((entry) => value.includes(entry.id_term)).slice(0, 4);
+  const matched = TERMINOLOGY.filter((entry) => value.includes(entry.id_term))
+    // istilah lebih panjang (lebih spesifik) didahulukan, maksimum 3 konsep untuk AND
+    .sort((a, b) => b.id_term.length - a.id_term.length)
+    .slice(0, 3);
   return {
     entries: matched,
     english: [...new Set(matched.flatMap((entry) => entry.en_terms.replaceAll('"', "").split(" OR ")))].slice(0, 10),
@@ -92,13 +95,19 @@ export function expandTerms(text) {
   };
 }
 
-/** Bangun klausa tambahan (Inggris + MeSH) untuk query Europe PMC. */
+/**
+ * Klausa query Europe PMC: gabungkan konsep dengan AND agar presisi.
+ * Contoh: "obat hipertensi" → (drug OR medication …) AND (hypertension OR MESH:"Hypertension").
+ */
 export function expansionClause(text) {
-  const { english, mesh } = expandTerms(text);
-  const parts = [];
-  if (english.length) parts.push(english.map((term) => `"${term}"`).join(" OR "));
-  if (mesh.length) parts.push(mesh.map((term) => `MESH:"${term}"`).join(" OR "));
-  return parts.length ? `(${parts.join(" OR ")})` : "";
+  const { entries } = expandTerms(text);
+  if (!entries.length) return "";
+  const groups = entries.map((entry) => {
+    const parts = [entry.en_terms];
+    if (entry.mesh?.length) parts.push(entry.mesh.map((term) => `MESH:"${term}"`).join(" OR "));
+    return `(${parts.join(" OR ")})`;
+  });
+  return groups.join(" AND ");
 }
 
 /** Teks untuk skoring ranking: utamakan istilah Inggris/MeSH hasil ekspansi. */
