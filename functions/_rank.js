@@ -48,13 +48,22 @@ export function rankScore(row, tokens, now = Date.now()) {
 export function rankResults(rows, query, sort = "relevance") {
   const tokens = tokenize(query);
   const scored = rows.map((row) => ({ row, score: rankScore(row, tokens) }));
+
   if (sort === "date") {
     scored.sort((a, b) => String(b.row.published_on || "").localeCompare(String(a.row.published_on || "")));
-  } else if (sort === "citations") {
-    scored.sort((a, b) => (b.row.citation_count || 0) - (a.row.citation_count || 0));
-  } else {
-    scored.sort((a, b) => b.score - a.score);
+    return scored.map((entry) => entry.row);
   }
+  if (sort === "citations") {
+    scored.sort((a, b) => (b.row.citation_count || 0) - (a.row.citation_count || 0));
+    return scored.map((entry) => entry.row);
+  }
+
+  // Bila tidak ada satu pun hasil yang cocok di judul/abstrak (mis. cocok hanya di
+  // full-text/MeSH), pertahankan urutan asli dari sumber agar tidak merusak relevansi upstream.
+  const best = scored.reduce((max, entry) => Math.max(max, entry.score), 0);
+  if (best === 0) return rows;
+
+  scored.sort((a, b) => b.score - a.score);
   return scored.map((entry) => entry.row);
 }
 

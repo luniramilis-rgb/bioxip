@@ -121,6 +121,11 @@ export async function onRequestGet(context) {
     results = rankResults(results, rankText, sort);
     const paged = results.slice(0, perPage);
 
+    // Sembunyikan abstrak dari respons kecuali diminta eksplisit (abstrak hanya untuk skoring/grounded).
+    if (!withAbstract) {
+      for (const row of paged) delete row.abstract;
+    }
+
     return json({
       query: raw,
       total: Math.max(total, results.length),
@@ -242,7 +247,8 @@ function mapEpmcHit(hit, withAbstract = false) {
     citation_count: Number(hit.citedByCount) || 0,
     external_ids: { pmid: hit.pmid || null, pmcid: hit.pmcid || null, doi: hit.doi || null },
   };
-  if (withAbstract) row.abstract = cleanText(hit.abstractText, 900);
+  // Abstrak selalu diambil (dipakai skoring & grounded); dibuang dari respons bila tidak diminta.
+  row.abstract = cleanText(hit.abstractText, 900);
   return row;
 }
 
@@ -270,7 +276,8 @@ function mapTrial(study, withAbstract = false) {
     meta: { phase, status: status.overallStatus, conditions: cond.conditions || [], nct_id: ident.nctId },
     external_ids: { nctid: ident.nctId },
   };
-  if (withAbstract) row.abstract = cleanText(proto.descriptionModule?.briefSummary, 900);
+  // Abstrak selalu diambil untuk skoring; dibuang dari respons bila tidak diminta.
+  row.abstract = cleanText(proto.descriptionModule?.briefSummary, 900);
   return row;
 }
 
