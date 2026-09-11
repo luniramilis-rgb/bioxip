@@ -185,6 +185,7 @@ export async function onRequestPost(context) {
           }
         }
 
+        let providerError = null;
         if (mode !== "cache" && providerIsReady) {
           const result = await callDeepseek(env, {
             system: SYSTEM_PROMPT,
@@ -205,6 +206,11 @@ export async function onRequestPost(context) {
               cache_miss_tokens: result.usage.cache_miss_tokens,
             };
             await cachePutJson(cacheId, { answer, claims, abstain, model }, ANSWER_CACHE_TTL);
+          } else {
+            // Provider gagal (key/model/kuota) → jangan diam-diam; laporkan agar terlihat.
+            providerError = { error: result.error, detail: result.detail || null };
+            console.warn("bioxip: provider gagal", JSON.stringify(providerError));
+            send("provider_error", providerError);
           }
         }
 
