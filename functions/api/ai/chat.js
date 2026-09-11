@@ -446,6 +446,7 @@ export async function onRequestPost(context) {
           support_rate: supportRate,
           claims: claims.length,
           cache_saved: cacheSaved,
+          debug: { raw_len: streamed?.raw?.length ?? 0, extracted_len: streamed?.extracted?.length ?? 0, answer_len: answer.length },
         });
       } catch (error) {
         try {

@@ -140,7 +140,7 @@ async function readStream(resp) {
     const cacheEvents = await readStream(respCache);
     const cacheTotal = Date.now() - startedCache;
     const cacheDone = cacheEvents.find((e) => e.event === "done");
-    const cacheMeta = cacheEvents.find((e) => e.event === "meta");
+    const cacheMeta = cacheEvents.find((e) => e.event === "meta" && e.data?.cached === true);
     const cacheCitations = cacheEvents.filter((e) => e.event === "citation");
     const cacheText = cacheEvents.filter((e) => e.event === "delta").map((e) => e.data.text).join("");
 
