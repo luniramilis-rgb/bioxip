@@ -1,6 +1,7 @@
 import { expandQuery, expandQueryEnglish } from "../_dictionary.js";
 import { searchPubmed } from "../_pubmed.js";
 import { detectQuestionType, epmcFilterFor, expansionClause, expansionSearchText, pubmedCategoryFor } from "../_terminology.js";
+import { findDrug } from "../_drugs.js";
 import { rankResults } from "../_rank.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
@@ -32,10 +33,15 @@ export async function onRequestGet(context) {
 
     const query = expandQuery(raw);
     const extraClause = expansionClause(raw);
+    // Nama obat Indonesia (mis. "parasetamol") diperluas ke INN/nama Inggris.
+    const drug = findDrug(raw);
+    const drugTerm = drug?.inn ? String(drug.inn).split("/")[0].trim() : null;
+    const drugClause = drugTerm ? `(("${drugTerm}") OR MESH:"${drugTerm}")` : "";
+    const conceptClause = [extraClause, drugClause].filter(Boolean).join(" AND ");
     // Bila istilah Indonesia dikenali, pakai HANYA ekspansi Inggris+MeSH agar token
     // Indonesia (mis. "diagnosis"/"akurasi") tidak mendominasi hasil.
-    const litQuery = extraClause || query;
-    const rankText = expansionSearchText(raw);
+    const litQuery = conceptClause || query;
+    const rankText = [expansionSearchText(raw), drugTerm].filter(Boolean).join(" ");
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
     const needTrial = !types || types.includes("trial");
     const needPubmed = needLit && (!types || types.includes("paper"));
@@ -60,7 +66,7 @@ export async function onRequestGet(context) {
       calls.push(fetchTrials(litQuery, { oa, indonesia, types, sort, limit: perPage, token: ctToken, withAbstract }));
     }
     if (needPubmed) {
-      const pubmedQuery = extraClause || expandQueryEnglish(raw);
+      const pubmedQuery = conceptClause || expandQueryEnglish(raw);
       calls.push(
         searchPubmed(pubmedQuery, { retmax: perPage, category: pubmedCategory, env }).then((data) => ({
           total: data.total,
@@ -101,7 +107,7 @@ export async function onRequestGet(context) {
       notes.push("filter klinis dilonggarkan karena hasil sedikit");
     }
 
-    if (results.length < 3 && extraClause) {
+    if (results.length < 3 && conceptClause) {
       const fallback = await Promise.allSettled([
         fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }),
       ]);
