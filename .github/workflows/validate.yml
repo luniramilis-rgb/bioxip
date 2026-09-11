@@ -54,6 +54,9 @@ jobs:
       - name: Unit test autentikasi (auth klien)
         run: node tests/auth_unit.js
 
+      - name: Unit test provider LLM (parse & retry)
+        run: node tests/provider_unit.js
+
       - name: Validasi auth klien (statis)
         run: node scripts/validate_auth.js
 

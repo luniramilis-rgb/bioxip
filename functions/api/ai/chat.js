@@ -169,7 +169,7 @@ export async function onRequestPost(context) {
         const cacheId = cacheKey(ANSWER_CACHE_NAMESPACE, {
           q: question.toLowerCase().replace(/\s+/g, " ").trim(),
           max: maxTokens,
-          model: providerIsReady ? env.DEEPSEEK_MODEL || "deepseek-v4.1-flash" : "mock",
+          model: providerIsReady ? env.DEEPSEEK_MODEL || "deepseek-flash" : "mock",
           ev: hashKey(evidence.map((item) => item.id || item.title).join("|")),
         }, origin);
         if (providerIsReady) {
@@ -186,6 +186,7 @@ export async function onRequestPost(context) {
         }
 
         let providerError = null;
+        let providerAnswered = false;
         if (mode !== "cache" && providerIsReady) {
           const result = await callDeepseek(env, {
             system: SYSTEM_PROMPT,
@@ -193,19 +194,39 @@ export async function onRequestPost(context) {
             maxTokens,
           });
           if (result.ok) {
-            const payload = result.parsed || extractiveAnswer(question, evidence);
-            answer = String(payload.answer || "");
-            claims = payload.claims || [];
-            abstain = Boolean(payload.abstain);
-            mode = "llm";
-            model = result.model;
+            // Token terpakai apa pun hasilnya → catat usage sebenarnya.
+            providerAnswered = true;
+            model = result.model || model;
             usage = {
               input_tokens: result.usage.input_tokens,
               output_tokens: result.usage.output_tokens,
               cache_hit_tokens: result.usage.cache_hit_tokens,
               cache_miss_tokens: result.usage.cache_miss_tokens,
             };
-            await cachePutJson(cacheId, { answer, claims, abstain, model }, ANSWER_CACHE_TTL);
+            if (result.parsed) {
+              const payload = result.parsed;
+              answer = String(payload.answer || "");
+              claims = payload.claims || [];
+              abstain = Boolean(payload.abstain);
+              mode = "llm";
+              await cachePutJson(cacheId, { answer, claims, abstain, model }, ANSWER_CACHE_TTL);
+            } else {
+              // Provider menjawab tetapi keluarannya tidak dapat diparsing (mis. terpotong).
+              // Jangan mengaku "llm": sajikan ekstraktif dan laporkan kejadiannya.
+              const extractive = extractiveAnswer(question, evidence);
+              answer = extractive.answer;
+              claims = extractive.claims;
+              abstain = Boolean(extractive.abstain);
+              mode = "extractive";
+              providerError = {
+                error: "provider_parse_failed",
+                finish_reason: result.finish_reason || null,
+                output_tokens: result.usage.output_tokens,
+                max_tokens: maxTokens,
+              };
+              console.warn("bioxip: keluaran provider tidak dapat diparsing", JSON.stringify(providerError));
+              send("provider_parse_error", providerError);
+            }
           } else {
             // Provider gagal (key/model/kuota) → jangan diam-diam; laporkan agar terlihat.
             providerError = { error: result.error, detail: result.detail || null };
@@ -214,7 +235,7 @@ export async function onRequestPost(context) {
           }
         }
 
-        if (mode === "mock") {
+        if (!providerAnswered && mode === "mock") {
           const extractive = extractiveAnswer(question, evidence);
           answer = extractive.answer;
           claims = extractive.claims;

@@ -15,9 +15,53 @@ export function providerReady(env) {
   return Boolean(providerConfig(env).apiKey);
 }
 
-export async function callDeepseek(env, { system, user, maxTokens = 1024, temperature = 0.2 }) {
-  const config = providerConfig(env);
-  if (!config.apiKey) return { ok: false, error: "provider_not_configured" };
+/**
+ * Ambil JSON dari keluaran LLM yang mungkin dibungkus ```json, diawali teks,
+ * atau terpotong. Mengembalikan null bila benar-benar tidak ada JSON valid.
+ */
+export function extractJson(content) {
+  const text = String(content || "").trim();
+  if (!text) return null;
+
+  const tryParse = (candidate) => {
+    try {
+      const value = JSON.parse(candidate);
+      // Skema bioXip selalu berupa objek; array/angka/string bukan jawaban valid.
+      return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const direct = tryParse(text);
+  if (direct) return direct;
+
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) {
+    const parsed = tryParse(fenced[1].trim());
+    if (parsed) return parsed;
+  }
+
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first >= 0 && last > first) {
+    const parsed = tryParse(text.slice(first, last + 1));
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+async function requestCompletion(config, { system, user, maxTokens, temperature, jsonMode }) {
+  const body = {
+    model: config.model,
+    temperature,
+    max_tokens: maxTokens,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  };
+  if (jsonMode) body.response_format = { type: "json_object" };
 
   const resp = await fetch(`${config.baseUrl}/chat/completions`, {
     method: "POST",
@@ -25,16 +69,7 @@ export async function callDeepseek(env, { system, user, maxTokens = 1024, temper
       Authorization: `Bearer ${config.apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: config.model,
-      temperature,
-      max_tokens: maxTokens,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
 
@@ -44,18 +79,13 @@ export async function callDeepseek(env, { system, user, maxTokens = 1024, temper
   }
 
   const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content || "";
+  const choice = data.choices?.[0] || {};
+  const content = choice.message?.content || "";
   const usage = data.usage || {};
-  let parsed = null;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    parsed = null;
-  }
   return {
     ok: true,
-    raw: content,
-    parsed,
+    content,
+    finish_reason: choice.finish_reason || null,
     model: data.model || config.model,
     usage: {
       input_tokens: Number(usage.prompt_tokens || 0),
@@ -63,5 +93,47 @@ export async function callDeepseek(env, { system, user, maxTokens = 1024, temper
       cache_hit_tokens: Number(usage.prompt_cache_hit_tokens || 0),
       cache_miss_tokens: Number(usage.prompt_cache_miss_tokens || 0),
     },
+  };
+}
+
+export async function callDeepseek(env, { system, user, maxTokens = 1024, temperature = 0.2 }) {
+  const config = providerConfig(env);
+  if (!config.apiKey) return { ok: false, error: "provider_not_configured" };
+
+  // Percobaan 1: mode JSON (paling patuh skema). Percobaan 2: tanpa mode JSON
+  // bila model tidak mendukungnya atau keluaran tidak dapat diparsing.
+  const attempts = [true, false];
+  let last = null;
+  for (const jsonMode of attempts) {
+    const result = await requestCompletion(config, { system, user, maxTokens, temperature, jsonMode });
+    if (!result.ok) return result;
+
+    const parsed = extractJson(result.content);
+    last = { ...result, parsed, json_mode: jsonMode };
+
+    if (parsed) {
+      return {
+        ok: true,
+        raw: result.content,
+        parsed,
+        model: result.model,
+        finish_reason: result.finish_reason,
+        json_mode: jsonMode,
+        usage: result.usage,
+      };
+    }
+    // Terpotong (finish_reason=length) tidak akan membaik dengan mengubah mode JSON.
+    if (result.finish_reason === "length") break;
+  }
+
+  return {
+    ok: true,
+    raw: last?.content || "",
+    parsed: null,
+    model: last?.model || config.model,
+    finish_reason: last?.finish_reason || null,
+    json_mode: last?.json_mode ?? null,
+    parse_failed: true,
+    usage: last?.usage || { input_tokens: 0, output_tokens: 0, cache_hit_tokens: 0, cache_miss_tokens: 0 },
   };
 }
