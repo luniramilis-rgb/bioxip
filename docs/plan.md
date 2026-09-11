@@ -63,6 +63,12 @@ Hasil (terverifikasi di produksi `bioxip.pages.dev`):
 ## Sprint 1 — (lanjutan) Auth + gating — blokir kredensial
 Setelah Sprint 1A selesai dan kredensial tersedia: Google OAuth client, SMTP + domain pengirim (SPF/DKIM), Turnstile. Lanjut ke deliverable auth/gating di atas.
 
+> **Temuan prasyarat (2026-09-11):** template email **tidak dapat diedit** pada proyek free tier yang memakai SMTP bawaan →
+> API mengembalikan `Email template modification is not available for free tier projects using the default email provider`.
+> Konsekuensi: fitur **OTP 6 digit tidak terlihat pengguna** karena template default hanya memuat `{{ .ConfirmationURL }}` (tanpa `{{ .Token }}`).
+> Perbaikan wajib: **konfigurasi custom SMTP** (Resend/Postmark/Brevo) **atau** upgrade ke Pro. Setelah custom SMTP aktif, template dapat di-patch via Management API.
+> Sudah dilakukan lewat Management API: `mailer_otp_length` 8 → **6** (berhasil, `mailer_otp_exp` tetap 3600).
+
 ## Sprint 2 — PubMed E-utilities — SELESAI (2026-09-10)
 Terverifikasi di produksi: hasil memuat sumber **pubmed** + **europepmc**, **0 duplikat DOI/PMID** pada 4 query uji (tuberculosis, dengue, stunting, hypertension), NCBI E-utilities dapat diakses (total >300 rb untuk "tuberculosis").
 Tersisa opsional: NCBI API key (naikkan batas 3→10 req/detik), dan perbaikan peringkat (PubMed saat ini muncul setelah Europe PMC).
