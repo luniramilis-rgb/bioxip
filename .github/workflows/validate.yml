@@ -88,3 +88,18 @@ jobs:
           for f in $(find functions web -name "*.js"); do node --check "$f" || exit 1; done
           node --check scripts/housekeeping.mjs
           node --check scripts/eval_golden.mjs
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Pasang dependensi Python
+        run: python -m pip install -e ".[dev]"
+
+      - name: Cek sintaks Python
+        run: python -m compileall -q harvester tests scripts
+
+      - name: Unit test Python (harvester & formulary)
+        run: python -m pytest -q
+
