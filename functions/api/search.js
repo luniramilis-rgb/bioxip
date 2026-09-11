@@ -11,7 +11,7 @@ const TIMEOUT_MS = 10000;
 const MAX_WANT = 500;
 // Cache pencarian di edge: memotong latensi p95 dan melindungi rate limit sumber.
 const SEARCH_CACHE_DEFAULT_TTL = 900;
-const SEARCH_CACHE_NAMESPACE = "search:v3";
+const SEARCH_CACHE_NAMESPACE = "search:v4";
 
 function searchCacheTtl(env) {
   const ttl = Number(env?.SEARCH_CACHE_TTL_SECONDS);
