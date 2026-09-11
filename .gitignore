@@ -16,7 +16,7 @@ venv/
 .dev.vars
 
 # laporan evaluasi golden set (dihasilkan CI, bukan sumber)
-tests/golden/last_report.json
+tests/golden/last_report*.json
 
 # os
 Thumbs.db
