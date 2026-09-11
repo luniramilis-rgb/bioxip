@@ -10,7 +10,7 @@ export const DICTIONARY = [
   { id_term: "stroke", en_terms: '"stroke" OR "cerebrovascular accident" OR "cerebral infarction"', kind: "disease" },
   { id_term: "hiv", en_terms: '"hiv" OR "human immunodeficiency virus"', kind: "disease" },
   { id_term: "imunisasi", en_terms: '"immunization" OR "vaccination" OR "vaccines"', kind: "intervention" },
-  { id_term: "obat", en_terms: '"drug" OR "medication" OR "pharmaceutical"', kind: "intervention" },
+  { id_term: "obat", en_terms: '"drug" OR "medication" OR "pharmaceutical"', kind: "intervention", generic: true },
   { id_term: "vaksin", en_terms: '"vaccine" OR "vaccination"', kind: "intervention" },
   { id_term: "kehamilan", en_terms: '"pregnancy" OR "antenatal" OR "maternal"', kind: "disease" },
   { id_term: "asi", en_terms: '"breastfeeding" OR "breast milk" OR "lactation"', kind: "intervention" },

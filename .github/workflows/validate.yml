@@ -63,6 +63,9 @@ jobs:
       - name: Unit test grounded (abstain & red flag)
         run: node tests/grounded_unit.js
 
+      - name: Unit test terminologi & ekspansi query
+        run: node tests/terminology_unit.js
+
       - name: Validasi auth klien (statis)
         run: node scripts/validate_auth.js
 

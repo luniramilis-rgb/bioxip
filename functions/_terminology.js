@@ -53,6 +53,26 @@ const EXTRA = [
   { id_term: "akurasi", en_terms: '"diagnostic accuracy"', mesh: ["Sensitivity and Specificity"] },
   { id_term: "sensitivitas", en_terms: '"sensitivity and specificity"', mesh: ["Sensitivity and Specificity"] },
   { id_term: "spesifisitas", en_terms: '"sensitivity and specificity"', mesh: ["Sensitivity and Specificity"] },
+  // Konsep yang sebelumnya tidak dikenali → query jatuh ke klausa generik/Indonesia.
+  { id_term: "resisten obat", en_terms: '"drug resistance" OR "drug-resistant tuberculosis" OR "MDR-TB"', mesh: ["Tuberculosis, Multidrug-Resistant"] },
+  { id_term: "mdr", en_terms: '"MDR-TB" OR "multidrug-resistant tuberculosis"', mesh: ["Tuberculosis, Multidrug-Resistant"] },
+  { id_term: "sglt2", en_terms: '"SGLT2 inhibitor" OR "sodium-glucose cotransporter 2 inhibitor"', mesh: ["Sodium-Glucose Transporter 2 Inhibitors"] },
+  { id_term: "glp-1", en_terms: '"glucagon-like peptide-1 receptor agonist" OR "GLP-1 receptor agonist"', mesh: [] },
+  { id_term: "dpp-4", en_terms: '"dipeptidyl peptidase-4 inhibitor" OR "DPP-4 inhibitor"', mesh: [] },
+  { id_term: "statin", en_terms: '"hydroxymethylglutaryl-CoA reductase inhibitors" OR "statins"', mesh: ["Hydroxymethylglutaryl-CoA Reductase Inhibitors"] },
+  { id_term: "kortikosteroid", en_terms: '"adrenal cortex hormones" OR "corticosteroids"', mesh: ["Adrenal Cortex Hormones"] },
+  { id_term: "kesehatan mental", en_terms: '"mental health" OR "mental disorders"', mesh: ["Mental Disorders"] },
+  { id_term: "kesehatan ibu", en_terms: '"maternal health" OR "maternal"', mesh: ["Maternal Health"] },
+  { id_term: "d-dimer", en_terms: '"fibrin fragment D" OR "D-dimer"', mesh: ["Fibrin Fibrinogen Degradation Products"] },
+  { id_term: "trombosis vena", en_terms: '"venous thrombosis" OR "deep vein thrombosis"', mesh: ["Venous Thrombosis"] },
+  { id_term: "aktivitas fisik", en_terms: '"exercise" OR "physical activity"', mesh: ["Exercise"] },
+  { id_term: "polusi udara", en_terms: '"air pollution" OR "particulate matter"', mesh: ["Air Pollution"] },
+  { id_term: "hipoglikemia", en_terms: '"hypoglycemia"', mesh: ["Hypoglycemia"] },
+  { id_term: "antiretroviral", en_terms: '"antiretroviral therapy" OR "anti-retroviral agents"', mesh: ["Anti-Retroviral Agents"] },
+  { id_term: "nsaid", en_terms: '"anti-inflammatory agents, non-steroidal" OR "NSAID"', mesh: ["Anti-Inflammatory Agents, Non-Steroidal"] },
+  { id_term: "rantai dingin", en_terms: '"refrigeration" OR "cold chain"', mesh: [] },
+  { id_term: "uji klinis", en_terms: '"clinical trials as topic" OR "clinical trial"', mesh: ["Clinical Trials as Topic"] },
+  { id_term: "risiko bias", en_terms: '"bias" OR "risk of bias"', mesh: [] },
 ];
 
 export const TERMINOLOGY = [...DICTIONARY, ...EXTRA];
@@ -82,16 +102,38 @@ export function detectQuestionType(text) {
   return "therapy";
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Pencocokan istilah: istilah pendek (<=3 huruf, mis. "mdr"/"hiv"/"asi") harus
+ * cocok sebagai kata utuh agar tidak salah tangkap di dalam kata lain.
+ */
+export function containsTerm(text, term) {
+  const value = String(text || "").toLowerCase();
+  const needle = String(term || "").toLowerCase();
+  if (!needle) return false;
+  if (needle.length <= 3) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}([^a-z0-9]|$)`, "i").test(value);
+  }
+  return value.includes(needle);
+}
+
 export function expandTerms(text) {
   const value = String(text || "").toLowerCase();
-  const matched = TERMINOLOGY.filter((entry) => value.includes(entry.id_term))
+  const matched = TERMINOLOGY.filter((entry) => containsTerm(value, entry.id_term))
     // istilah lebih panjang (lebih spesifik) didahulukan, maksimum 3 konsep untuk AND
-    .sort((a, b) => b.id_term.length - a.id_term.length)
-    .slice(0, 3);
+    .sort((a, b) => b.id_term.length - a.id_term.length);
+  // Konsep generik (mis. "obat") tidak boleh menjadi klausa tunggal: itu menghasilkan
+  // hasil acak (mis. makalah farmasi apa pun). Buang bila ada konsep spesifik; jika
+  // hanya generik yang cocok, biarkan kosong agar pencarian memakai query asli.
+  const specific = matched.filter((entry) => !entry.generic);
+  const entries = (specific.length ? specific : []).slice(0, 3);
   return {
-    entries: matched,
-    english: [...new Set(matched.flatMap((entry) => entry.en_terms.replaceAll('"', "").split(" OR ")))].slice(0, 10),
-    mesh: [...new Set(matched.flatMap((entry) => entry.mesh || []))].slice(0, 5),
+    entries,
+    english: [...new Set(entries.flatMap((entry) => entry.en_terms.replaceAll('"', "").split(" OR ")))].slice(0, 10),
+    mesh: [...new Set(entries.flatMap((entry) => entry.mesh || []))].slice(0, 5),
   };
 }
 
