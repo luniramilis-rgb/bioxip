@@ -1,4 +1,6 @@
 const TIMEOUT_MS = 60000;
+// Streaming bisa berlangsung lebih lama daripada panggilan biasa (jawaban panjang).
+const STREAM_TIMEOUT_MS = 120000;
 // Model yang didukung Provider API DeepSeek (lihat pesan error provider):
 // deepseek-flash (murah/cepat) dan deepseek-v4-pro (lebih kuat).
 const DEFAULT_MODEL = "deepseek-flash";
@@ -160,4 +162,76 @@ export async function callDeepseek(env, { system, user, maxTokens = 1024, temper
     parse_failed: true,
     usage: last?.usage || { input_tokens: 0, output_tokens: 0, cache_hit_tokens: 0, cache_miss_tokens: 0 },
   };
+}
+
+/** Baca SSE OpenAI-compatible (DeepSeek) menjadi potongan JSON bertahap. */
+export async function* parseOpenAiSse(body) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let index;
+    while ((index = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, index).trim();
+      buffer = buffer.slice(index + 1);
+      if (!line || line.startsWith(":")) continue; // komentar / keep-alive
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (payload === "[DONE]") return;
+      try {
+        yield JSON.parse(payload);
+      } catch {
+        /* lewati baris yang tidak valid */
+      }
+    }
+  }
+}
+
+/**
+ * Panggil provider dengan stream: true. Mengembalikan iterator potongan.
+ * Bila permintaan ditolak karena opsi tidak didukung, kembalikan error agar
+ * pemanggil dapat menurunkan mode (mis. tanpa json_object) atau fallback.
+ */
+export async function streamDeepseek(env, { system, user, maxTokens = 1024, temperature = 0.2, jsonMode = true, includeUsage = true }) {
+  const config = providerConfig(env);
+  if (!config.apiKey) return { ok: false, error: "provider_not_configured" };
+
+  const body = {
+    model: config.model,
+    temperature,
+    max_tokens: maxTokens,
+    stream: true,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+  };
+  if (jsonMode) body.response_format = { type: "json_object" };
+  if (includeUsage) body.stream_options = { include_usage: true };
+
+  const resp = await fetch(`${config.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+  });
+
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => "");
+    return {
+      ok: false,
+      error: `provider_http_${resp.status}`,
+      status: resp.status,
+      detail: detail.slice(0, 300),
+    };
+  }
+
+  return { ok: true, model: config.model, events: parseOpenAiSse(resp.body) };
 }

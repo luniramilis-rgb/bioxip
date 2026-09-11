@@ -1,8 +1,15 @@
 import { bearerToken, fetchAccount, holdCredits, refundCredits, settleCredits, json } from "../../_credits.js";
 import { chargedMicroIdr, costMicroIdr, estimateMicroIdr, microToIdr } from "../../_pricing.js";
 import { estimateInputTokens } from "../../_estimate.js";
-import { callDeepseek, providerReady } from "../../_provider.js";
-import { buildUserPrompt, gatherEvidence, extractiveAnswer, verifyClaims, SYSTEM_PROMPT } from "../../_grounded.js";
+import { callDeepseek, extractJson, providerReady, streamDeepseek } from "../../_provider.js";
+import {
+  AnswerExtractor,
+  buildUserPrompt,
+  extractiveAnswer,
+  gatherEvidence,
+  verifyClaims,
+  SYSTEM_PROMPT,
+} from "../../_grounded.js";
 import { classifyInput, redFlagNotice } from "../../_safety.js";
 import { cacheGetJson, cacheKey, cachePutJson } from "../../_cache.js";
 
@@ -24,6 +31,80 @@ function hashKey(text) {
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(16);
+}
+
+/**
+ * Streaming provider dengan penurunan mode bertahap:
+ *  1) json_object + include_usage
+ *  2) tanpa json_object (bila provider menolak opsi 1 dengan HTTP 400)
+ * Potongan teks jawaban dikirim ke klien lewat onDelta selama proses berlangsung.
+ */
+async function runProviderStream(env, { system, user, maxTokens, onDelta }) {
+  const attempts = [
+    { jsonMode: true, includeUsage: true },
+    { jsonMode: false, includeUsage: true },
+  ];
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    let session;
+    try {
+      session = await streamDeepseek(env, { system, user, maxTokens, ...attempt });
+    } catch (error) {
+      lastError = { error: "provider_exception", detail: String(error?.message || error) };
+      continue;
+    }
+
+    if (!session.ok) {
+      lastError = { error: session.error, detail: session.detail || null, status: session.status };
+      // Hanya turunkan mode bila provider menolak opsi (400); 401/429/5xx tidak diulang.
+      if (session.status === 400) continue;
+      return { ok: false, ...lastError };
+    }
+
+    const extractor = new AnswerExtractor();
+    let usage = null;
+    let finishReason = null;
+    let chunks = 0;
+
+    for await (const event of session.events) {
+      chunks += 1;
+      const choice = event.choices?.[0];
+      const piece = choice?.delta?.content;
+      if (piece) {
+        const text = extractor.push(piece);
+        if (text) onDelta(text);
+      }
+      if (choice?.finish_reason) finishReason = choice.finish_reason;
+      if (event.usage) usage = event.usage;
+    }
+
+    if (chunks === 0) {
+      lastError = { error: "provider_empty_stream" };
+      continue;
+    }
+
+    return {
+      ok: true,
+      raw: extractor.raw,
+      extracted: extractor.answer,
+      parsed: extractJson(extractor.raw),
+      finish_reason: finishReason,
+      usage: usage
+        ? {
+            input_tokens: Number(usage.prompt_tokens || 0),
+            output_tokens: Number(usage.completion_tokens || 0),
+            cache_hit_tokens: Number(usage.prompt_cache_hit_tokens || 0),
+            cache_miss_tokens: Number(usage.prompt_cache_miss_tokens || 0),
+          }
+        : null,
+      model: session.model,
+      json_mode: attempt.jsonMode,
+      usage_estimated: !usage,
+    };
+  }
+
+  return { ok: false, ...(lastError || { error: "provider_failed" }) };
 }
 
 function chunkText(text, size = 90) {
@@ -163,7 +244,7 @@ export async function onRequestPost(context) {
           evidence_count: evidence.length,
         });
 
-        const providerIsReady = useProvider && providerReady(env);
+        const providerIsReady = providerOk;
 
         // Cache jawaban: pertanyaan + konteks bukti sama → tidak perlu memanggil LLM lagi.
         const cacheId = cacheKey(ANSWER_CACHE_NAMESPACE, {
@@ -188,50 +269,99 @@ export async function onRequestPost(context) {
         let providerError = null;
         let providerAnswered = false;
         if (mode !== "cache" && providerIsReady) {
-          const result = await callDeepseek(env, {
+          const streamed = await runProviderStream(env, {
             system: SYSTEM_PROMPT,
             user: buildUserPrompt(question, evidence),
             maxTokens,
+            onDelta: (text) => send("delta", { text }),
           });
-          if (result.ok) {
-            // Token terpakai apa pun hasilnya → catat usage sebenarnya.
+
+          if (streamed.ok) {
             providerAnswered = true;
-            model = result.model || model;
-            usage = {
-              input_tokens: result.usage.input_tokens,
-              output_tokens: result.usage.output_tokens,
-              cache_hit_tokens: result.usage.cache_hit_tokens,
-              cache_miss_tokens: result.usage.cache_miss_tokens,
-            };
-            if (result.parsed) {
-              const payload = result.parsed;
-              answer = String(payload.answer || "");
+            model = streamed.model || model;
+            if (streamed.usage) {
+              usage = streamed.usage;
+            } else {
+              // Provider tidak mengirim usage (mis. di tengah stream) → estimasi terkendali.
+              const inputTokens = estimateInputTokens(question, evidence);
+              const hit = Math.round(inputTokens * 0.7);
+              usage = {
+                input_tokens: inputTokens,
+                output_tokens: Math.max(1, Math.ceil((streamed.extracted || "").length / 4)),
+                cache_hit_tokens: hit,
+                cache_miss_tokens: Math.max(0, inputTokens - hit),
+              };
+            }
+
+            if (streamed.parsed) {
+              const payload = streamed.parsed;
+              answer = String(payload.answer || streamed.extracted || "");
               claims = payload.claims || [];
               abstain = Boolean(payload.abstain);
               mode = "llm";
               await cachePutJson(cacheId, { answer, claims, abstain, model }, ANSWER_CACHE_TTL);
             } else {
-              // Provider menjawab tetapi keluarannya tidak dapat diparsing (mis. terpotong).
-              // Jangan mengaku "llm": sajikan ekstraktif dan laporkan kejadiannya.
+              // Teks sudah tampil sebagian, tetapi struktur klaim tidak dapat diparsing:
+              // ganti dengan jawaban ekstraktif agar pengguna tidak melihat teks setengah jadi.
               const extractive = extractiveAnswer(question, evidence);
               answer = extractive.answer;
               claims = extractive.claims;
               abstain = Boolean(extractive.abstain);
               mode = "extractive";
+              send("replace", { text: answer });
               providerError = {
                 error: "provider_parse_failed",
-                finish_reason: result.finish_reason || null,
-                output_tokens: result.usage.output_tokens,
-                requested_max_tokens: result.requested_max_tokens || maxTokens,
+                finish_reason: streamed.finish_reason || null,
+                output_tokens: usage.output_tokens,
+                streamed: true,
               };
-              console.warn("bioxip: keluaran provider tidak dapat diparsing", JSON.stringify(providerError));
+              console.warn("bioxip: keluaran stream tidak dapat diparsing", JSON.stringify(providerError));
               send("provider_parse_error", providerError);
             }
           } else {
-            // Provider gagal (key/model/kuota) → jangan diam-diam; laporkan agar terlihat.
-            providerError = { error: result.error, detail: result.detail || null };
-            console.warn("bioxip: provider gagal", JSON.stringify(providerError));
-            send("provider_error", providerError);
+            // Streaming gagal total → fallback ke panggilan non-streaming yang sudah terbukti.
+            console.warn("bioxip: streaming gagal, fallback non-stream", JSON.stringify(streamed));
+            const result = await callDeepseek(env, {
+              system: SYSTEM_PROMPT,
+              user: buildUserPrompt(question, evidence),
+              maxTokens,
+            });
+            if (result.ok) {
+              providerAnswered = true;
+              model = result.model || model;
+              usage = {
+                input_tokens: result.usage.input_tokens,
+                output_tokens: result.usage.output_tokens,
+                cache_hit_tokens: result.usage.cache_hit_tokens,
+                cache_miss_tokens: result.usage.cache_miss_tokens,
+              };
+              if (result.parsed) {
+                const payload = result.parsed;
+                answer = String(payload.answer || "");
+                claims = payload.claims || [];
+                abstain = Boolean(payload.abstain);
+                mode = "llm";
+                await cachePutJson(cacheId, { answer, claims, abstain, model }, ANSWER_CACHE_TTL);
+              } else {
+                const extractive = extractiveAnswer(question, evidence);
+                answer = extractive.answer;
+                claims = extractive.claims;
+                abstain = Boolean(extractive.abstain);
+                mode = "extractive";
+                providerError = {
+                  error: "provider_parse_failed",
+                  finish_reason: result.finish_reason || null,
+                  output_tokens: result.usage.output_tokens,
+                  requested_max_tokens: result.requested_max_tokens || maxTokens,
+                };
+                console.warn("bioxip: keluaran provider tidak dapat diparsing", JSON.stringify(providerError));
+                send("provider_parse_error", providerError);
+              }
+            } else {
+              providerError = { error: result.error, detail: result.detail || null };
+              console.warn("bioxip: provider gagal", JSON.stringify(providerError));
+              send("provider_error", providerError);
+            }
           }
         }
 

@@ -124,8 +124,77 @@ export function extractiveAnswer(question, evidence) {
   };
 }
 
-export function verifyClaims(claims, evidenceCount) {
-  const verified = [];
+const ESCAPES = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+
+/**
+ * Ambil nilai field "answer" dari JSON yang mungkin BELUM lengkap.
+ * Mengembalikan null bila kunci belum muncul.
+ */
+export function extractAnswerText(raw) {
+  const text = String(raw || "");
+  const match = text.match(/"answer"\s*:\s*"/);
+  if (!match) return null;
+
+  let index = match.index + match[0].length;
+  let value = "";
+  let closed = false;
+
+  while (index < text.length) {
+    const char = text[index];
+    if (char === "\\") {
+      const next = text[index + 1];
+      if (next === undefined) break; // escape belum lengkap → tunggu potongan berikutnya
+      if (next === "u") {
+        const hex = text.slice(index + 2, index + 6);
+        if (hex.length < 4 || !/^[0-9a-fA-F]{4}$/.test(hex)) break;
+        value += String.fromCharCode(parseInt(hex, 16));
+        index += 6;
+        continue;
+      }
+      value += ESCAPES[next] ?? next;
+      index += 2;
+      continue;
+    }
+    if (char === '"') {
+      closed = true;
+      break;
+    }
+    value += char;
+    index += 1;
+  }
+
+  return { value, closed };
+}
+
+/**
+ * Menerima potongan JSON dari provider dan mengeluarkan bagian teks jawaban
+ * yang baru tersedia, sehingga pengguna melihat tulisan bertahap (bukan JSON mentah).
+ */
+export class AnswerExtractor {
+  constructor() {
+    this.raw = "";
+    this.emitted = 0;
+    this.finished = false;
+  }
+
+  push(chunk) {
+    this.raw += String(chunk || "");
+    const partial = extractAnswerText(this.raw);
+    if (!partial) return "";
+    if (partial.closed) this.finished = true;
+    if (partial.value.length <= this.emitted) return "";
+    const piece = partial.value.slice(this.emitted);
+    this.emitted = partial.value.length;
+    return piece;
+  }
+
+  get answer() {
+    const partial = extractAnswerText(this.raw);
+    return partial ? partial.value : "";
+  }
+}
+
+export function verifyClaims(claims, evidenceCount) {  const verified = [];
   for (const claim of claims || []) {
     const citations = (claim.citations || []).filter((n) => Number.isInteger(n) && n >= 1 && n <= evidenceCount);
     verified.push({

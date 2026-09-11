@@ -57,6 +57,9 @@ jobs:
       - name: Unit test provider LLM (parse & retry)
         run: node tests/provider_unit.js
 
+      - name: Unit test streaming jawaban (ekstraksi inkremental)
+        run: node tests/stream_unit.js
+
       - name: Validasi auth klien (statis)
         run: node scripts/validate_auth.js
 

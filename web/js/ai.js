@@ -101,11 +101,23 @@
       {
         onMeta(data) {
           if (status) {
-            status.innerHTML = `<span class="muted">Estimasi ${esc(C.formatIdr(data.estimate_idr))} · ${data.evidence_count} sumber bukti</span>`;
+            status.innerHTML = `<span class="muted">Estimasi ${esc(C.formatIdr(data.estimate_idr))} · ${data.evidence_count} sumber bukti${
+              data.cached ? " · dari cache" : ""
+            }</span>`;
           }
         },
         onDelta(data) {
           text += data.text || "";
+          const host = document.getElementById("ai-text");
+          if (host) {
+            host.innerHTML = `<p>${esc(text)}<span class="caret" aria-hidden="true"></span></p>`;
+          }
+          const stream = document.getElementById("ai-stream");
+          if (stream) stream.textContent = "Menulis jawaban…";
+        },
+        onReplace(data) {
+          // Provider gagal memenuhi struktur klaim → teks yang tampil diganti jawaban ekstraktif.
+          text = data.text || "";
           const host = document.getElementById("ai-text");
           if (host) host.innerHTML = `<p>${esc(text)}</p>`;
         },

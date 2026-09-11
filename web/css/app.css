@@ -316,6 +316,25 @@ table.ledger td.neg { color: #9b2c1f; font-weight: 600; }
 }
 .ai-hint a { color: var(--accent); font-weight: 600; }
 
+/* Kursor berkedip saat jawaban AI sedang ditulis bertahap. */
+.caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: currentColor;
+  opacity: 0.6;
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+@keyframes caret-blink {
+  0%, 50% { opacity: 0.6; }
+  50.01%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .caret { animation: none; opacity: 0; }
+}
+
 .chip.sev-high { background: #f7d9d5; color: #9b2c1f; }
 .chip.sev-moderate { background: #fbeccb; color: #8a5a00; }
 .chip.sev-low { background: var(--chip); color: var(--muted); }

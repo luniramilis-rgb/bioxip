@@ -135,6 +135,7 @@
         }
         if (event === "meta") handlers.onMeta?.(data);
         else if (event === "delta") handlers.onDelta?.(data);
+        else if (event === "replace") handlers.onReplace?.(data);
         else if (event === "citation") handlers.onCitation?.(data);
         else if (event === "citation_summary") handlers.onCitations?.(data);
         else if (event === "red_flag") handlers.onRedFlag?.(data);

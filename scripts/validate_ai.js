@@ -53,6 +53,23 @@ for (const marker of [
 if (!chat.includes("chargedMicro > estimate")) fail("api/ai/chat.js: harus menjamin tagihan tidak melebihi hold");
 if (!chat.includes("refundCredits")) fail("api/ai/chat.js: harus refund saat gagal");
 
+// Streaming token: provider dipanggil dengan stream, teks diteruskan bertahap,
+// dan ada fallback bila streaming gagal / struktur klaim tidak dapat diparsing.
+for (const marker of ["runProviderStream", "streamDeepseek", 'send("replace"', "AnswerExtractor", "provider_empty_stream"]) {
+  if (!chat.includes(marker)) fail(`api/ai/chat.js: tidak ada penanda streaming "${marker}"`);
+}
+const providerSrc = fs.readFileSync(path.join(ROOT, "functions", "_provider.js"), "utf8");
+for (const marker of ["stream: true", "parseOpenAiSse", "stream_options", "STREAM_TIMEOUT_MS"]) {
+  if (!providerSrc.includes(marker)) fail(`_provider.js: tidak ada penanda streaming "${marker}"`);
+}
+const groundedSrc = fs.readFileSync(path.join(ROOT, "functions", "_grounded.js"), "utf8");
+for (const marker of ["AnswerExtractor", "extractAnswerText", "this.emitted"]) {
+  if (!groundedSrc.includes(marker)) fail(`_grounded.js: tidak ada "${marker}" untuk streaming`);
+}
+const aiUi = fs.readFileSync(path.join(ROOT, "web", "js", "ai.js"), "utf8");
+if (!aiUi.includes("onReplace")) fail("ai.js: harus menangani event replace (ganti teks saat parse gagal)");
+if (!aiUi.includes("caret")) fail("ai.js: indikator menulis (caret) tidak ditemukan");
+
 const pricing = fs.readFileSync(path.join(ROOT, "functions", "_pricing.js"), "utf8");
 if (!pricing.includes("safety")) fail("_pricing.js: estimate harus mendukung faktor keamanan (safety)");
 
