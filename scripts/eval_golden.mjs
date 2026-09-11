@@ -32,6 +32,7 @@ const valueOf = (name, fallback) => {
 };
 
 const USE_PROVIDER = hasFlag("--provider");
+const CURATED_ONLY = hasFlag("--curated");
 const LIMIT = Number(valueOf("--limit", "0")) || 0;
 const CONCURRENCY = Math.max(1, Math.min(Number(valueOf("--concurrency", "4")) || 4, 12));
 const OUT = valueOf("--out", path.join(ROOT, "tests", "golden", "last_report.json"));
@@ -64,6 +65,10 @@ if (!TOKEN) {
 
 const golden = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "golden", "grounded_set.json"), "utf8"));
 const allItems = golden.items || [];
+// `curated` = item yang sudah direview manusia. Item `draft` (auto-generate, banyak
+// yang tidak bermakna, mis. "diagnosis imunisasi & vaksin") tetap dijalankan dan
+// dilaporkan, tetapi tidak digerbang mutu jawabannya — ia backlog kurasi.
+const curatedCount = allItems.filter((item) => item.curated === true).length;
 
 // Sampel terstratifikasi per peran: setiap peran mendapat porsi sebelum sisa dibulatkan.
 function stratify(items, limit) {
@@ -87,7 +92,8 @@ function stratify(items, limit) {
   return picked;
 }
 
-const items = stratify(allItems, LIMIT);
+const pool = CURATED_ONLY ? allItems.filter((item) => item.curated === true) : allItems;
+const items = stratify(pool, LIMIT);
 
 async function askDev(question) {
   try {
@@ -143,6 +149,7 @@ const outcomes = await runPool(
       id: item.id,
       role: item.role,
       question: item.question,
+      curated: item.curated === true,
       draft: Boolean(item.draft),
       expect: item.expect || {},
       status,
@@ -175,7 +182,12 @@ const citationOk = (row) => {
   }
   return true;
 };
-const answeredCorrect = answered.filter(citationOk);
+// Gate citation_rate hanya pada item yang sudah direview manusia (curated).
+// Item draft dilaporkan terpisah sebagai backlog kurasi, bukan kegagalan mutu.
+const curatedAnswered = answered.filter((row) => row.curated);
+const draftAnswered = answered.filter((row) => !row.curated);
+const answeredCorrect = curatedAnswered.filter(citationOk);
+const draftCorrect = draftAnswered.filter(citationOk);
 
 const abstainItems = byRole("abstain");
 const abstainCorrect = abstainItems.filter((row) => row.status === 200 && row.abstain === true);
@@ -203,7 +215,13 @@ const unexpectedStatus = (row) => {
 const metrics = {
   total_items: outcomes.length,
   answered_items: answered.length,
-  citation_rate: ratio(answeredCorrect.length, answered.length),
+  curated_answered: curatedAnswered.length,
+  draft_answered: draftAnswered.length,
+  // Gate: hanya item yang sudah direview manusia.
+  citation_rate: ratio(answeredCorrect.length, curatedAnswered.length),
+  // Info: item draft (auto-generate) — backlog kurasi, bukan kegagalan mutu.
+  citation_rate_draft: ratio(draftCorrect.length, draftAnswered.length),
+  citation_rate_all: ratio(answeredCorrect.length + draftCorrect.length, answered.length),
   abstain_accuracy: abstainItems.length ? abstainCorrect.length / abstainItems.length : null,
   unsafe_422_accuracy: ratio(unsafeCorrect.length, unsafeItems.length),
   red_flag_recall: ratio(redFlagDetected.length, redFlagItems.length),
@@ -221,6 +239,7 @@ for (const [metric, minimum] of Object.entries(THRESHOLDS)) {
 // Daftar item yang tidak memenuhi harapan per peran (untuk ditindaklanjuti).
 // citationMisses hanya digerbang di jalur provider; safetyMisses selalu penting.
 const citationMisses = [];
+const draftMisses = [];
 for (const row of answered) {
   if (!citationOk(row)) {
     const reasons = [];
@@ -232,7 +251,7 @@ for (const row of answered) {
     if (Array.isArray(mustSources) && mustSources.length && !mustSources.some((source) => row.sources.includes(source))) {
       reasons.push(`sources=[${row.sources.join(",")}] butuh [${mustSources.join(",")}]`);
     }
-    citationMisses.push({ id: row.id, role: row.role, reason: reasons.join(" · ") || "tidak memenuhi harapan" });
+    (row.curated ? citationMisses : draftMisses).push({ id: row.id, role: row.role, reason: reasons.join(" · ") || "tidak memenuhi harapan" });
   }
 }
 const safetyMisses = [];
@@ -251,12 +270,15 @@ const report = {
   ran_at: new Date().toISOString(),
   base: BASE,
   mode: USE_PROVIDER ? "provider" : "extractive",
+  curated_only: CURATED_ONLY,
+  curated_total: curatedCount,
   citation_gate: REQUIRE_CITATION,
   thresholds: THRESHOLDS,
   metrics,
   pass: failed.length === 0,
   failures: failed,
-  misses,
+  misses: [...safetyMisses, ...citationMisses],
+  draft_misses: draftMisses,
   per_role: {
     klinis: { total: byRole("klinis").length, cited: byRole("klinis").filter(citationOk).length },
     farmasi: { total: byRole("farmasi").length, cited: byRole("farmasi").filter(citationOk).length },
@@ -273,9 +295,9 @@ if (!NO_WRITE) {
 }
 
 const pct = (value) => (value === null ? "-" : `${(value * 100).toFixed(1)}%`);
-console.log(`Evaluasi golden set (${report.mode}) · ${metrics.total_items} item · ${BASE}`);
+console.log(`Evaluasi golden set (${report.mode}${CURATED_ONLY ? ", curated" : ""}) · ${metrics.total_items} item · ${BASE}`);
 console.log(
-  `  citation_rate      : ${pct(metrics.citation_rate)} (${
+  `  citation_rate      : ${pct(metrics.citation_rate)} (curated ${metrics.curated_answered} item; ${
     REQUIRE_CITATION ? `ambang >= ${THRESHOLDS.citation_rate}` : "info saja — mode ekstraktif lintas-bahasa tidak bisa memenuhi ini"
   })`,
 );
@@ -284,18 +306,24 @@ console.log(`  red_flag_recall    : ${pct(metrics.red_flag_recall)} (ambang >= $
 console.log(
   `  info: abstain_accuracy=${pct(metrics.abstain_accuracy)} · support_rate_avg=${pct(metrics.support_rate_avg)} · errors=${metrics.errors}`,
 );
+console.log(
+  `  draft (bukan gate): citation_rate=${pct(metrics.citation_rate_draft)} dari ${metrics.draft_answered} item belum direview · all=${pct(metrics.citation_rate_all)}`,
+);
 if (safetyMisses.length) {
   console.log(`\nPelanggaran keselamatan (${safetyMisses.length}):`);
   for (const miss of safetyMisses.slice(0, 25)) console.log(`  - ${miss.id} [${miss.role}] ${miss.reason}`);
 }
 if (citationMisses.length) {
   if (REQUIRE_CITATION) {
-    console.log(`\nTidak memenuhi harapan sitasi (${citationMisses.length}):`);
+    console.log(`\nTidak memenuhi harapan sitasi — curated (${citationMisses.length}):`);
     for (const miss of citationMisses.slice(0, 25)) console.log(`  - ${miss.id} [${miss.role}] ${miss.reason}`);
     if (citationMisses.length > 25) console.log(`  … dan ${citationMisses.length - 25} lainnya (lihat ${path.relative(ROOT, OUT)}).`);
   } else {
-    console.log(`\nInfo: ${citationMisses.length} item tidak menghasilkan sitasi (diharapkan pada mode ekstraktif lintas-bahasa; lihat laporan).`);
+    console.log(`\nInfo: ${citationMisses.length} item curated tidak menghasilkan sitasi (lihat laporan).`);
   }
+}
+if (draftMisses.length) {
+  console.log(`Info: ${draftMisses.length} item draft tidak bersitasi → backlog kurasi (bukan kegagalan gate).`);
 }
 if (!NO_WRITE) console.log(`\nLaporan: ${path.relative(ROOT, OUT)}`);
 
