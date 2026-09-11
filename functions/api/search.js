@@ -43,7 +43,7 @@ export async function onRequestGet(context) {
     // Bila istilah Indonesia dikenali, pakai HANYA ekspansi Inggris+MeSH agar token
     // Indonesia (mis. "diagnosis"/"akurasi") tidak mendominasi hasil.
     const litQuery = conceptClause || query;
-    const rankText = [expansionSearchText(raw), drugTerm].filter(Boolean).join(" ");
+    const rankText = [expansionSearchText(raw), ...drugTerms].filter(Boolean).join(" ");
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
     const needTrial = !types || types.includes("trial");
     const needPubmed = needLit && (!types || types.includes("paper"));

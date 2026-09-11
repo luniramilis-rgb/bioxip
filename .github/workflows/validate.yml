@@ -51,6 +51,9 @@ jobs:
       - name: Unit test pencarian obat dalam teks
         run: node tests/drugs_unit.js
 
+      - name: Smoke test fungsi edge (tanpa jaringan)
+        run: node tests/functions_smoke.js
+
       - name: Halaman topik tidak basi (build --check)
         run: node scripts/build_topics.js --check
 
