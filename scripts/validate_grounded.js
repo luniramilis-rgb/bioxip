@@ -56,11 +56,11 @@ check(
 
 // --- 2. Penanda sumber wajib -----------------------------------------------
 const grounded = fs.readFileSync(path.join(ROOT, "functions", "_grounded.js"), "utf8");
-for (const marker of ["SYSTEM_PROMPT", "gatherEvidence", "extractiveAnswer", "verifyClaims", "groundAnswer", "abstain"]) {
+for (const marker of ["SYSTEM_PROMPT", "gatherEvidence", "extractiveAnswer", "verifyClaims", "groundAnswer", "abstain", "resolveAbstain"]) {
   if (!grounded.includes(marker)) fail(`_grounded.js: tidak ada "${marker}"`);
 }
 const safety = fs.readFileSync(path.join(ROOT, "functions", "_safety.js"), "utf8");
-for (const marker of ["patient_data", "diagnosis_request", "prescription_request", "red_flags"]) {
+for (const marker of ["patient_data", "diagnosis_request", "prescription_request", "red_flags", "mergeRedFlags"]) {
   if (!safety.includes(marker)) fail(`_safety.js: tidak ada "${marker}"`);
 }
 const devEndpoint = fs.readFileSync(path.join(ROOT, "functions", "api", "dev", "answer.js"), "utf8");

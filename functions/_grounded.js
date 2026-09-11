@@ -1,6 +1,6 @@
 import { chargedMicroIdr, costMicroIdr } from "./_pricing.js";
 import { callDeepseek, providerReady } from "./_provider.js";
-import { classifyInput, redFlagNotice } from "./_safety.js";
+import { classifyInput, mergeRedFlags, redFlagNotice } from "./_safety.js";
 import { findDrug } from "./_drugs.js";
 import { sectionSnippet } from "./_rank.js";
 
@@ -12,9 +12,10 @@ export const SYSTEM_PROMPT = [
   "1. Jawab HANYA berdasarkan KONTEKS yang diberikan.",
   "2. Setiap klaim harus punya sitasi angka [n] yang menunjuk item konteks.",
   "3. Dilarang mengarang angka, dosis, nama obat, atau hasil studi.",
-  "4. Bila konteks tidak cukup, set abstain=true dan jelaskan singkat.",
+  "4. Set abstain=true HANYA bila tidak ada satu pun klaim yang bisa didukung konteks. Bila ada klaim bersitasi, set abstain=false dan tulis keterbatasan pada field uncertainty.",
   "5. Bahasa Indonesia, ringkas, tanpa klaim diagnosis pasien atau perintah peresepan.",
-  "6. Keluarkan JSON valid dengan skema:",
+  "6. red_flags hanya berisi frasa gejala singkat (mis. 'nyeri dada'), bukan kalimat penjelasan.",
+  "7. Keluarkan JSON valid dengan skema:",
   '{"answer":string,"claims":[{"text":string,"citations":number[]}],"uncertainty":"tinggi|sedang|rendah","abstain":boolean,"red_flags":string[]}',
 ].join("\n");
 
@@ -212,6 +213,15 @@ export function verifyClaims(claims, evidenceCount) {  const verified = [];
   };
 }
 
+/**
+ * Abstain HANYA bila tidak ada klaim yang bersitasi. Permintaan abstain dari LLM
+ * diabaikan bila ada ≥1 klaim bersitasi, agar jawaban berbukti tidak disembunyikan.
+ */
+export function resolveAbstain(requestedAbstain, verified) {
+  const supported = (verified?.claims || []).filter((claim) => claim.supported).length;
+  return supported > 0 ? false : true;
+}
+
 export function usageBreakdown(usage = {}) {
   const inputHit = Number(usage.cache_hit_tokens || 0);
   const inputMiss = Number(usage.cache_miss_tokens || (usage.input_tokens || 0) - inputHit || 0);
@@ -231,13 +241,14 @@ export async function groundAnswer(env, question, options = {}) {
 
   const origin = options.origin;
   const evidence = await gatherEvidence(origin, question, { limit: options.limit || MAX_EVIDENCE });
-  const redFlags = safety.red_flags.length ? safety.red_flags : [];
-  const base = {
+  const safetyFlags = safety.red_flags || [];
+
+  const base = (redFlags) => ({
     question,
     evidence,
     safety: { blocked: false, red_flags: redFlags },
     red_flag_notice: redFlags.length ? redFlagNotice() : null,
-  };
+  });
 
   if (providerReady(env) && options.useProvider !== false) {
     const result = await callDeepseek(env, {
@@ -248,11 +259,13 @@ export async function groundAnswer(env, question, options = {}) {
     if (result.ok) {
       const payload = result.parsed || extractiveAnswer(question, evidence);
       const verified = verifyClaims(payload.claims, evidence.length);
-      const abstain = Boolean(payload.abstain) || verified.claims.length === 0;
+      // Flag keselamatan deterministik tidak boleh hilang; flag LLM hanya menambah.
+      const redFlags = mergeRedFlags(safetyFlags, payload.red_flags);
+      const abstain = resolveAbstain(payload.abstain, verified);
       return {
         status: 200,
         body: {
-          ...base,
+          ...base(redFlags),
           mode: "llm",
           model: result.model,
           answer: payload.answer || "",
@@ -261,7 +274,7 @@ export async function groundAnswer(env, question, options = {}) {
           unsupported: verified.unsupported,
           uncertainty: payload.uncertainty || "sedang",
           abstain,
-          red_flags: Array.isArray(payload.red_flags) ? payload.red_flags : redFlags,
+          red_flags: redFlags,
           usage: usageBreakdown(result.usage),
         },
       };
@@ -273,7 +286,7 @@ export async function groundAnswer(env, question, options = {}) {
   return {
     status: 200,
     body: {
-      ...base,
+      ...base(safetyFlags),
       mode: "extractive",
       model: null,
       answer: extractive.answer,
@@ -281,8 +294,8 @@ export async function groundAnswer(env, question, options = {}) {
       support_rate: verified.support_rate,
       unsupported: verified.unsupported,
       uncertainty: extractive.uncertainty,
-      abstain: Boolean(extractive.abstain),
-      red_flags: redFlags,
+      abstain: resolveAbstain(extractive.abstain, verified),
+      red_flags: safetyFlags,
       usage: null,
     },
   };

@@ -7,10 +7,11 @@ import {
   buildUserPrompt,
   extractiveAnswer,
   gatherEvidence,
+  resolveAbstain,
   verifyClaims,
   SYSTEM_PROMPT,
 } from "../../_grounded.js";
-import { classifyInput, redFlagNotice } from "../../_safety.js";
+import { classifyInput, mergeRedFlags, redFlagNotice } from "../../_safety.js";
 import { cacheGetJson, cacheKey, cachePutJson } from "../../_cache.js";
 import { answerCacheGet, answerCachePut, answerHash } from "../../_answercache.js";
 
@@ -19,7 +20,7 @@ const MAX_TOKENS_LIMIT = 2048;
 const ANSWER_CACHE_TTL = 7 * 24 * 3600;
 const ANSWER_CACHE_NAMESPACE = "answer:v2";
 // Naikkan bila prompt/skema berubah, agar jawaban lama tidak tersaji.
-const PROMPT_VERSION = "2026-09-11a";
+const PROMPT_VERSION = "2026-09-11b";
 
 function citationSnapshot(evidence) {
   return evidence.map((item) => ({
@@ -225,7 +226,8 @@ export async function onRequestPost(context) {
     );
   }
 
-  const redFlags = safety.red_flags || [];
+  const safetyRedFlags = safety.red_flags || [];
+  let redFlags = safetyRedFlags;
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -327,6 +329,7 @@ export async function onRequestPost(context) {
               answer = String(payload.answer || streamed.extracted || "");
               claims = payload.claims || [];
               abstain = Boolean(payload.abstain);
+              redFlags = mergeRedFlags(safetyRedFlags, payload.red_flags);
               mode = "llm";
               const cachePayload = { answer, claims, abstain, model, evidence: citationSnapshot(evidence), question };
               cacheSaved = await cachePutJson(cacheId, cachePayload, ANSWER_CACHE_TTL);
@@ -371,6 +374,7 @@ export async function onRequestPost(context) {
                 answer = String(payload.answer || "");
                 claims = payload.claims || [];
                 abstain = Boolean(payload.abstain);
+                redFlags = mergeRedFlags(safetyRedFlags, payload.red_flags);
                 mode = "llm";
                 const cachePayload = { answer, claims, abstain, model, evidence: citationSnapshot(evidence), question };
               cacheSaved = await cachePutJson(cacheId, cachePayload, ANSWER_CACHE_TTL);
@@ -422,7 +426,9 @@ export async function onRequestPost(context) {
 
         const verified = verifyClaims(claims, evidence.length);
         supportRate = verified.support_rate;
-        if (verified.claims.length === 0) abstain = true;
+        // Abstain hanya bila tak ada klaim bersitasi — permintaan abstain LLM tidak
+        // boleh menyembunyikan jawaban yang sudah didukung bukti.
+        abstain = resolveAbstain(abstain, verified);
 
         for (const item of evidence) {
           send("citation", { n: item.n, title: item.title, source: item.source, url: item.url });

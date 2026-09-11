@@ -30,6 +30,34 @@ const RED_FLAGS = [
   /nyeri perut hebat/i,
 ];
 
+// Flag dari LLM bebas-format: hanya terima frasa pendek dan buang prosa/penjelasan.
+export function normalizeRedFlags(flags) {
+  if (!Array.isArray(flags)) return [];
+  const out = [];
+  for (const raw of flags) {
+    if (typeof raw !== "string") continue;
+    const flag = raw.replace(/\s+/g, " ").trim();
+    if (!flag || flag.length > 60) continue;
+    if (/[.!?]\s/.test(flag)) continue;
+    if (!out.includes(flag)) out.push(flag);
+  }
+  return out;
+}
+
+// Flag keselamatan (deterministik) selalu dipakai; flag LLM hanya menambah, tidak menimpa.
+export function mergeRedFlags(safetyFlags, llmFlags) {
+  const merged = [];
+  for (const flag of safetyFlags || []) {
+    if (typeof flag !== "string") continue;
+    const clean = flag.replace(/\s+/g, " ").trim();
+    if (clean && !merged.includes(clean)) merged.push(clean);
+  }
+  for (const flag of normalizeRedFlags(llmFlags)) {
+    if (!merged.includes(flag)) merged.push(flag);
+  }
+  return merged;
+}
+
 export const SAFETY_CODES = {
   PATIENT_DATA: "patient_data",
   DIAGNOSIS_REQUEST: "diagnosis_request",

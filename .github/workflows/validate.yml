@@ -60,6 +60,9 @@ jobs:
       - name: Unit test streaming jawaban (ekstraksi inkremental)
         run: node tests/stream_unit.js
 
+      - name: Unit test grounded (abstain & red flag)
+        run: node tests/grounded_unit.js
+
       - name: Validasi auth klien (statis)
         run: node scripts/validate_auth.js
 
