@@ -95,6 +95,20 @@ Hasil:
 - Produksi: `/js/auth.js` (8.537 B), `config.js`, `masuk.js`, `app.js` ter-deploy; index memuat ketiganya; SW v5 aktif.
 
 > **Catatan keamanan:** alur yang dipakai sekarang adalah **implicit** (token muncul di URL hash lalu langsung dibersihkan). `auth.js` sudah siap menangani `?code=` (PKCE), tetapi penukaran kode belum diimplementasikan penuh; migrasi ke PKCE (agar token tidak pernah tampil di address bar) tetap masuk backlog Sprint 1B-lanjutan.
+## Aktivasi LLM nyata (DeepSeek) — SELESAI (2026-09-11)
+**Tujuan:** mengubah mode mock → LLM sungguhan di produksi.
+Hasil:
+- `DEEPSEEK_API_KEY` + `SUPABASE_SERVICE_ROLE` terpasang di Cloudflare Pages **Production** (diverifikasi `/api/health`: `ai.key_present=true`, `storage.service_role_present=true`).
+- **Endpoint baru `GET /api/health`** — melaporkan status konfigurasi (provider siap/tidak, panjang kunci, host, mode pembayaran, storage) **tanpa membocorkan nilai kunci**; berguna untuk memantau deployment.
+- **3 bug ditemukan & diperbaiki** saat aktivasi:
+  1. **Nama model salah** — `deepseek-v4.1-flash` ditolak provider; API hanya menerima `deepseek-flash` / `deepseek-v4-pro`. Default diganti ke `deepseek-flash`.
+  2. **Kegagalan parse JSON tersembunyi** — bila keluaran model tidak dapat diparsing, sistem diam-diam menyajikan jawaban ekstraktif tetapi tetap melabeli `mode: "llm"`. Kini: `extractJson` tangguh (fence/prefix/suffix, tolak array), retry otomatis tanpa `json_mode`, dan bila tetap gagal → `mode: "extractive"` + event **`provider_parse_error`**.
+  3. **Keluaran terpotong** (`finish_reason=length`) karena anggaran token terlalu kecil → ditambah **retry otomatis dengan token bertambah** (512 → 1024 → 2048 → 4096).
+- Guardrail input diperbaiki: pola "angka panjang" terlalu lebar (memblokir timestamp) → kini NIK 16 digit, nomor RM eksplisit, nomor HP, tanggal lahir.
+- Observability: event `done` kini memuat `model` dan `claims`; event `provider_error`/`provider_parse_error` dikirim ke klien.
+- Unit test baru `tests/provider_unit.js` (**20 cek**: parse JSON, retry mode JSON, retry token terpotong dengan cap, HTTP error tanpa retry, tanpa key) — masuk CI.
+- **Bukti produksi:** Q1 dengue → `mode=llm`, model `deepseek-flash`, 5 claims, support 0,8, 1.357 token keluar, biaya **Rp328**; Q2 metformin vs sulfonilurea → **abstain jujur** (0 claims) karena konteks tidak memuat perbandingan langsung.
+- Catatan: latensi jawaban pertama 5–22 dtk (model penalaran + keluaran panjang); jawaban berulang menjadi instan karena **cache 7 hari**. Streaming token real-time dari provider masuk backlog.
 ## Sprint 2 — PubMed E-utilities — SELESAI (2026-09-10)
 Terverifikasi di produksi: hasil memuat sumber **pubmed** + **europepmc**, **0 duplikat DOI/PMID** pada 4 query uji (tuberculosis, dengue, stunting, hypertension), NCBI E-utilities dapat diakses (total >300 rb untuk "tuberculosis").
 Tersisa opsional: NCBI API key (naikkan batas 3→10 req/detik), dan perbaikan peringkat (PubMed saat ini muncul setelah Europe PMC).
