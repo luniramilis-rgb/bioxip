@@ -175,6 +175,22 @@ if (/Authorization:\s*`Bearer \$\{env\.SUPABASE_SERVICE_ROLE\}`/.test(read("func
   problems.push("functions/_answercache.js: service key dikirim sebagai Authorization Bearer");
 }
 
+// 7. Harvester (Python) juga menulis via service_role → kunci hanya di header `apikey`.
+const harvesterFiles = [];
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (entry.name.endsWith(".py")) harvesterFiles.push(full);
+  }
+})(path.join(ROOT, "harvester"));
+for (const file of harvesterFiles) {
+  const source = fs.readFileSync(file, "utf8");
+  if (/Bearer/.test(source)) {
+    problems.push(`${path.relative(ROOT, file)}: kunci API dikirim sebagai Authorization Bearer (harus header apikey)`);
+  }
+}
+
 console.log(`Keamanan: ${migration.split("\n").length} baris migrasi · ${webFiles.length} berkas klien · ${edgeFiles.length} berkas edge diperiksa`);
 if (problems.length) {
   console.log("\nMASALAH:");

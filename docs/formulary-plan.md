@@ -4,7 +4,7 @@ Dokumen hidup. Rencana ini **turunan** dari `docs/blueprint.md` (arsitektur), `d
 
 Prinsip arsitektur: **Postgres = satu sumber kebenaran untuk data terstruktur; edge tipis; retrieval literatur live bercache; batch hanya untuk ingest & validasi.** Parquet/R2 **belum** dipakai (lihat §F).
 
-**Status (2026-09-11):** Fase 0 selesai (`docs/formulary.md`, `docs/literature.md`); Fase 1 selesai (migrasi `017_formulary.sql` diterapkan ke produksi + terverifikasi live). Fase 2+ belum dikerjakan.
+**Status (2026-09-11):** Fase 0 selesai (`docs/formulary.md`, `docs/literature.md`); Fase 1 selesai (migrasi `017_formulary.sql` diterapkan ke produksi + terverifikasi live); **Fase 2 selesai** (importer dua-fase `harvester/providers/formulary.py` + `harvester/runners/ingest_formulary.py`, seed 30 obat dipublikasikan, 15 interaksi + 175 monitoring tertahan di staging menunggu review; migrasi `018_formulary_monitoring_unique.sql`). Impor **Fornas penuh** menunggu berkas sumber resmi via `--source`. Fase 3+ belum dikerjakan.
 
 ---
 

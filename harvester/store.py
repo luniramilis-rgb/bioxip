@@ -16,9 +16,9 @@ class Store:
         if not url or not key:
             raise RuntimeError("SUPABASE_URL dan SUPABASE_SERVICE_ROLE wajib diisi")
         self.base = f"{url}/rest/v1"
+        # Kunci API Supabase (secret) BUKAN JWT → hanya header `apikey`.
         self.headers = {
             "apikey": key,
-            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
         self.client = httpx.Client(timeout=TIMEOUT, headers=self.headers)
@@ -113,3 +113,101 @@ class Store:
             json=data,
         )
         resp.raise_for_status()
+
+    # ------------------------------------------------------------------
+    # Formulary (Fase 2): staging dua-fase + publikasi.
+    # ------------------------------------------------------------------
+    def upsert_rows(
+        self,
+        table: str,
+        rows: list[dict],
+        on_conflict: Optional[str] = None,
+    ) -> list[dict]:
+        if not rows:
+            return []
+        # PostgREST bulk insert menuntut seluruh objek punya kunci yang sama (PGRST102).
+        keys: set[str] = set()
+        for row in rows:
+            keys.update(row.keys())
+        payload = [{key: row.get(key) for key in keys} for row in rows]
+        params = {"on_conflict": on_conflict} if on_conflict else None
+        resp = self.client.post(
+            f"{self.base}/{table}",
+            params=params,
+            headers={"Prefer": "resolution=merge-duplicates,return=representation"},
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def select_rows(self, table: str, params: dict) -> list[dict]:
+        resp = self.client.get(f"{self.base}/{table}", params=params)
+        resp.raise_for_status()
+        return resp.json()
+
+    def patch_rows(self, table: str, params: dict, data: dict) -> list[dict]:
+        resp = self.client.patch(
+            f"{self.base}/{table}",
+            params=params,
+            headers={"Prefer": "return=representation"},
+            json=data,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def staging_checksums(self, kind: str) -> dict[str, str]:
+        """Peta key->checksum dari staging (semua status) untuk diff idempoten."""
+        rows = self.select_rows(
+            "formulary_staging",
+            {"select": "slug,checksum", "kind": f"eq.{kind}"},
+        )
+        return {row["slug"]: row.get("checksum") for row in rows if row.get("slug")}
+
+    def insert_staging(self, rows: list[dict]) -> int:
+        if not rows:
+            return 0
+        created = self.upsert_rows("formulary_staging", rows)
+        return len(created)
+
+    def approve_staging(self, reviewer: str, only_source_reviewed: bool = True) -> int:
+        params = {"status": "eq.pending"}
+        if only_source_reviewed:
+            params["payload->>reviewed"] = "eq.true"
+        now = datetime.now(timezone.utc).isoformat()
+        updated = self.patch_rows(
+            "formulary_staging",
+            params,
+            {"status": "approved", "reviewed_by": reviewer, "reviewed_at": now},
+        )
+        return len(updated)
+
+    def list_staging(self, status: str = "approved", kind: Optional[str] = None) -> list[dict]:
+        params = {"select": "id,kind,slug,payload,checksum", "status": f"eq.{status}"}
+        if kind:
+            params["kind"] = f"eq.{kind}"
+        return self.select_rows("formulary_staging", params)
+
+    def publish_rows(self, table: str, rows: list[dict], on_conflict: str, reviewer: str) -> int:
+        if not rows:
+            return 0
+        now = datetime.now(timezone.utc).isoformat()
+        prepared = []
+        for row in rows:
+            item = dict(row)
+            item["reviewed"] = True
+            item["reviewed_by"] = reviewer or "system"
+            item["reviewed_at"] = now
+            prepared.append(item)
+        created = self.upsert_rows(table, prepared, on_conflict=on_conflict)
+        return len(created)
+
+    def get_meta(self, key: str) -> Optional[str]:
+        rows = self.select_rows("formulary_meta", {"select": "value", "key": f"eq.{key}"})
+        return rows[0]["value"] if rows else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        self.upsert_rows(
+            "formulary_meta",
+            [{"key": key, "value": value, "updated_at": datetime.now(timezone.utc).isoformat()}],
+            on_conflict="key",
+        )

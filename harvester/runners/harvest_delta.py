@@ -7,7 +7,7 @@ import typer
 from harvester.config import DELTA_LOOKBACK_DAYS, MAX_PAGES_DELTA, PAGE_SIZE
 from harvester.dedupe import to_rows_epmc, to_rows_trials
 from harvester.models import EpmcHit, TrialRecord
-from harvester.providers import clinicaltrials, europepmc, neliti_oai, openalex
+from harvester.providers import clinicaltrials, europepmc, openalex
 from harvester.store import Store
 
 app = typer.Typer(help="bioXip delta harian per watermark.")
