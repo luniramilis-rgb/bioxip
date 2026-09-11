@@ -1,5 +1,9 @@
 SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_ANON_KEY=eyJ...
+# Kunci baru (disarankan): publishable (sb_publishable_...) & secret (sb_secret_...).
+# Legacy JWT (eyJ...) masih jalan, tapi tidak bisa dirotasi lagi.
+# Kirim kunci hanya di header `apikey`; Authorization: Bearer khusus access token user.
+SUPABASE_ANON_KEY=sb_publishable_...
+SUPABASE_SERVICE_ROLE=sb_secret_...
 NCBI_EMAIL=you@example.com
 NCBI_API_KEY=
 DEEPSEEK_API_KEY=

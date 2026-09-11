@@ -13,8 +13,8 @@ async function adminRpc(env, name, args) {
   const resp = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: "POST",
     headers: {
+      // Kunci API baru (secret) BUKAN JWT → hanya header `apikey`.
       apikey: env.SUPABASE_SERVICE_ROLE,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(args),

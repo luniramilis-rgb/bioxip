@@ -18,7 +18,7 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
 async function anonRpc(name, args) {
   const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: "POST",
-    headers: { apikey: ANON, Authorization: `Bearer ${ANON}`, "Content-Type": "application/json" },
+    headers: { apikey: ANON, "Content-Type": "application/json" },
     body: JSON.stringify(args),
   });
   const text = await resp.text();
@@ -27,7 +27,7 @@ async function anonRpc(name, args) {
 
 async function anonSelect(table) {
   const resp = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&limit=1`, {
-    headers: { apikey: ANON, Authorization: `Bearer ${ANON}`, Accept: "application/json" },
+    headers: { apikey: ANON, Accept: "application/json" },
   });
   return { status: resp.status };
 }
@@ -37,6 +37,7 @@ const serviceOnly = [
   ["fn_credit_grant", { p_user_id: "00000000-0000-0000-0000-000000000000", p_amount_micro_idr: 1, p_reason: "topup", p_idempotency_key: null }],
   ["fn_topup_mark_paid", { p_external_id: "uji", p_status: "SUCCEEDED", p_paid_at: null, p_raw: {} }],
   ["fn_answer_cache_hit", { p_query_hash: "uji" }],
+  ["fn_housekeeping", { p_chat_delete_limit: 1, p_cache_delete_limit: 1 }],
 ];
 
 for (const [name, args] of serviceOnly) {

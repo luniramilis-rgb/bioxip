@@ -9,8 +9,9 @@ export async function rpc(env, name, args) {
   const resp = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: "POST",
     headers: {
+      // Kunci API (publishable/secret) BUKAN JWT → hanya header `apikey`.
+      // Header Authorization hanya untuk access token user (lihat _credits.js).
       apikey: env.SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(args),
@@ -26,7 +27,6 @@ export async function select(env, table, params) {
   const resp = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?${query}`, {
     headers: {
       apikey: env.SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
     },
   });
   if (!resp.ok) {

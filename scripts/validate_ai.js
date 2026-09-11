@@ -5,9 +5,7 @@ const ROOT = path.join(__dirname, "..");
 const BASE = (process.env.BIOXIP_BASE || "https://bioxip.pages.dev").replace(/\/$/, "");
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://nxlcosnksgbuvtiggjpw.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE || "";
-const ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54bGNvc25rc2didXZ0aWdnanB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzYwOTUsImV4cCI6MjEwNDU1MjA5NX0.mMkfEn6OvJM-W-ZgkSBTpTWlFPZ6eJELSzYeIf1kiX0";
+const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 async function userSelect(token, pathname) {
   const resp = await fetch(`${SUPABASE_URL}/rest/v1/${pathname}`, {
@@ -69,6 +67,10 @@ for (const marker of ["AnswerExtractor", "extractAnswerText", "this.emitted"]) {
 const aiUi = fs.readFileSync(path.join(ROOT, "web", "js", "ai.js"), "utf8");
 if (!aiUi.includes("onReplace")) fail("ai.js: harus menangani event replace (ganti teks saat parse gagal)");
 if (!aiUi.includes("caret")) fail("ai.js: indikator menulis (caret) tidak ditemukan");
+// Klaim tanpa sitasi wajib ditandai langsung di dalam teks jawaban.
+for (const marker of ["markUnsupported", 'class="unsupported"', "unsupported-list", "klaim tanpa sitasi ditandai"]) {
+  if (!aiUi.includes(marker)) fail(`ai.js: penandaan klaim tanpa sitasi "${marker}" tidak ditemukan`);
+}
 
 const pricing = fs.readFileSync(path.join(ROOT, "functions", "_pricing.js"), "utf8");
 if (!pricing.includes("safety")) fail("_pricing.js: estimate harus mendukung faktor keamanan (safety)");
@@ -111,7 +113,6 @@ async function admin(pathname, init = {}) {
     ...init,
     headers: {
       apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
       "Content-Type": "application/json",
       ...(init.headers || {}),
     },
@@ -126,7 +127,6 @@ async function grantCredits(userId, amountIdr) {
     method: "POST",
     headers: {
       apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -154,7 +154,6 @@ async function setUserRpm(userId, rpm) {
     method: "POST",
     headers: {
       apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
       "Content-Type": "application/json",
       Prefer: "resolution=merge-duplicates",
     },
@@ -183,8 +182,8 @@ async function readSse(response) {
 }
 
 async function liveTests() {
-  if (!SERVICE_KEY) {
-    console.log("INFO  SUPABASE_SERVICE_ROLE tidak diset → uji live dilewati.");
+  if (!SERVICE_KEY || !ANON_KEY) {
+    console.log("INFO  SUPABASE_SERVICE_ROLE + SUPABASE_ANON_KEY wajib → uji live dilewati.");
     return;
   }
 

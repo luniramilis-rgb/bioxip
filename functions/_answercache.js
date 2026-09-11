@@ -15,10 +15,11 @@ export function answerHash(text) {
 }
 
 function headers(env) {
+  // Kunci API baru (secret/publishable) BUKAN JWT → kirim hanya di `apikey`.
+  // Menaruhnya di Authorization: Bearer akan ditolak sebagai "Invalid JWT".
   const key = env.SUPABASE_SERVICE_ROLE;
   return {
     apikey: key,
-    Authorization: `Bearer ${key}`,
     "Content-Type": "application/json",
   };
 }

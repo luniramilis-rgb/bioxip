@@ -5,9 +5,7 @@ const ROOT = path.join(__dirname, "..");
 const BASE = (process.env.BIOXIP_BASE || "https://bioxip.pages.dev").replace(/\/$/, "");
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://nxlcosnksgbuvtiggjpw.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE || "";
-const ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54bGNvc25rc2didXZ0aWdnanB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzYwOTUsImV4cCI6MjEwNDU1MjA5NX0.mMkfEn6OvJM-W-ZgkSBTpTWlFPZ6eJELSzYeIf1kiX0";
+const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 const results = [];
 const problems = [];
@@ -56,7 +54,6 @@ async function admin(pathname, init = {}) {
     ...init,
     headers: {
       apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
       "Content-Type": "application/json",
     },
   });
@@ -82,8 +79,8 @@ async function userSelect(token, pathname) {
 }
 
 async function liveTests() {
-  if (!SERVICE_KEY) {
-    console.log("INFO  SUPABASE_SERVICE_ROLE tidak diset → uji live dilewati.");
+  if (!SERVICE_KEY || !ANON_KEY) {
+    console.log("INFO  SUPABASE_SERVICE_ROLE + SUPABASE_ANON_KEY wajib → uji live dilewati.");
     return;
   }
 
@@ -151,7 +148,6 @@ async function liveTests() {
       method: "POST",
       headers: {
         apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -169,7 +165,6 @@ async function liveTests() {
       method: "POST",
       headers: {
         apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

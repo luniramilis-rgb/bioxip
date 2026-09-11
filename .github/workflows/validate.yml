@@ -80,3 +80,5 @@ jobs:
       - name: Cek sintaks JS (functions + web)
         run: |
           for f in $(find functions web -name "*.js"); do node --check "$f" || exit 1; done
+          node --check scripts/housekeeping.mjs
+          node --check scripts/eval_golden.mjs

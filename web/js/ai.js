@@ -7,6 +7,83 @@
     return S ? S.escape(value) : String(value ?? "");
   }
 
+  // Normalisasi spasi + huruf kecil, sekaligus memetakan tiap karakter hasil
+  // normalisasi ke indeks aslinya agar klaim bisa dicari tanpa merusak escaping.
+  function indexedNormalize(value) {
+    const map = [];
+    let out = "";
+    let pendingSpace = false;
+    for (let index = 0; index < value.length; index += 1) {
+      const char = value[index];
+      if (/\s/.test(char)) {
+        if (out.length) pendingSpace = true;
+        continue;
+      }
+      if (pendingSpace) {
+        out += " ";
+        map.push(index);
+        pendingSpace = false;
+      }
+      // toLowerCase() bisa menghasilkan >1 unit UTF-16 (mis. "İ" → "i̇").
+      // Petakan setiap unit hasil agar `map` selalu sejajar dengan `out`.
+      const lowered = char.toLowerCase();
+      if (!lowered) continue;
+      out += lowered;
+      for (let unit = 0; unit < lowered.length; unit += 1) map.push(index);
+    }
+    return { norm: out, map };
+  }
+
+  // Cari rentang klaim di dalam teks (abaikan perbedaan spasi & penanda sitasi).
+  function claimRange(text, claim) {
+    const clean = String(claim || "")
+      .replace(/\[\d+(?:\s*,\s*\d+)*\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (clean.length < 12) return null;
+    const hay = indexedNormalize(text);
+    // Sabuk pengaman: bila pemetaan tidak sejajar, jangan menandai (fallback ke daftar).
+    if (hay.norm.length !== hay.map.length) return null;
+    const needle = indexedNormalize(clean).norm;
+    if (!needle) return null;
+    const index = hay.norm.indexOf(needle);
+    if (index < 0) return null;
+    const start = hay.map[index];
+    const end = hay.map[index + needle.length - 1] + 1;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || end <= start) return null;
+    return { start, end };
+  }
+
+  // Bungkus klaim tanpa sitasi di dalam teks agar pembaca melihat bagian mana
+  // yang tidak didukung sumber (bukan hanya persentase di footer).
+  function markUnsupported(text, unsupported) {
+    const candidates = [];
+    for (const claim of unsupported || []) {
+      const range = claimRange(text, claim);
+      if (range) candidates.push({ range, claim });
+    }
+    candidates.sort((a, b) => a.range.start - b.range.start);
+    let html = "";
+    let cursor = 0;
+    let marked = 0;
+    const matched = [];
+    for (const { range, claim } of candidates) {
+      if (range.start < cursor) continue;
+      html += esc(text.slice(cursor, range.start));
+      html += `<mark class="unsupported" title="Klaim tanpa sitasi">${esc(text.slice(range.start, range.end))}</mark>`;
+      cursor = range.end;
+      marked += 1;
+      matched.push(claim);
+    }
+    html += esc(text.slice(cursor));
+    return { html, marked, matched };
+  }
+
+  function uncitedList(unsupported) {
+    const items = (unsupported || []).map((claim) => `<li>${esc(claim)}</li>`).join("");
+    return items ? `<ul class="unsupported-list" aria-label="Klaim tanpa sitasi"><li><strong>Klaim tanpa sitasi:</strong></li>${items}</ul>` : "";
+  }
+
   function panelHTML() {
     return `
       <section id="ai-panel" class="ai-panel">
@@ -94,6 +171,8 @@
     answerHost.innerHTML = '<p class="muted" id="ai-stream">Menyusun jawaban…</p><div id="ai-text"></div><div id="ai-cites"></div><div id="ai-foot"></div>';
 
     let text = "";
+    let unsupported = [];
+    let markedClaims = new Set();
     const citations = new Map();
 
     // Render jawaban sebagai paragraf (LLM memakai \n\n) + kursor saat menulis.
@@ -104,12 +183,17 @@
         .map((part) => part.trim())
         .filter(Boolean);
       const caret = writing ? '<span class="caret" aria-hidden="true"></span>' : "";
+      markedClaims = new Set();
       if (!paragraphs.length) {
         host.innerHTML = writing ? `<p>${caret}</p>` : "";
         return;
       }
       host.innerHTML = paragraphs
-        .map((part, index) => `<p>${esc(part)}${index === paragraphs.length - 1 ? caret : ""}</p>`)
+        .map((part, index) => {
+          const { html, matched } = markUnsupported(part, unsupported);
+          for (const claim of matched) markedClaims.add(claim);
+          return `<p>${html}${index === paragraphs.length - 1 ? caret : ""}</p>`;
+        })
         .join("");
     }
 
@@ -138,6 +222,11 @@
           citations.set(data.n, data);
         },
         onCitations(data) {
+          // Hilangkan klaim duplikat agar hitungan "ditandai" konsisten.
+          unsupported = [...new Set(data.unsupported || [])];
+          // Teks sudah lengkap di titik ini → render ulang agar klaim tanpa sitasi
+          // benar-benar ditandai di dalam jawaban, bukan hanya dilaporkan persen.
+          renderAnswer(document.getElementById("ai-text"), text, false);
           const host = document.getElementById("ai-cites");
           if (!host) return;
           const list = [...citations.values()]
@@ -146,11 +235,22 @@
                 `<li value="${item.n}"><a href="${esc(item.url || "#")}" target="_blank" rel="noopener">${esc(item.title)}</a> <span class="muted">(${esc(item.source)})</span></li>`
             )
             .join("");
+          // Klaim yang tidak berhasil dipetakan ke teks (mis. terlalu pendek atau
+          // terpotong antar-paragraf) tetap didaftarkan agar tidak ada yang hilang.
+          const unmarked = unsupported.filter((claim) => !markedClaims.has(claim));
+          const distinctMarked = markedClaims.size;
+          let uncited = "";
+          if (unsupported.length) {
+            uncited =
+              distinctMarked > 0
+                ? ` · ${distinctMarked} dari ${unsupported.length} klaim tanpa sitasi ditandai`
+                : ` · ${unsupported.length} klaim tanpa sitasi`;
+          }
+          const fallback = unmarked.length ? uncitedList(unmarked) : "";
           host.innerHTML = `
             ${list ? `<h3>Sumber</h3><ol class="answer-list ai-cites">${list}</ol>` : ""}
-            <p class="muted">Dukungan sitasi: ${Math.round((data.support_rate || 0) * 100)}%${
-              (data.unsupported || []).length ? " · ada klaim tanpa sumber yang ditandai" : ""
-            }</p>`;
+            <p class="muted">Dukungan sitasi: ${Math.round((data.support_rate || 0) * 100)}%${uncited}</p>
+            ${fallback}`;
         },
         onRedFlag(data) {
           const host = document.getElementById("ai-foot");
@@ -202,5 +302,5 @@
     );
   }
 
-  window.BIOXIP_AI = { panelHTML, prepare };
+  window.BIOXIP_AI = { panelHTML, prepare, markUnsupported };
 })();

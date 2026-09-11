@@ -25,6 +25,7 @@ function makeElement(id) {
     querySelectorAll() { return []; },
     closest() { return null; },
     focus() {},
+    remove() { this.removed = true; },
     insertAdjacentHTML(_pos, html) { this.innerHTML += html; },
   };
 }
@@ -131,8 +132,62 @@ const INTER_PAYLOAD = {
   disclaimer: "informatif",
 };
 
-async function fetchStub(url) {
+function sseResponse(events) {
+  const body = events.map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join("");
+  let sent = false;
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({}),
+    text: async () => body,
+    body: {
+      getReader() {
+        return {
+          read: async () => {
+            if (sent) return { done: true, value: undefined };
+            sent = true;
+            return { done: false, value: new TextEncoder().encode(body) };
+          },
+        };
+      },
+    },
+  };
+}
+
+async function fetchStub(url, options) {
   const href = String(url);
+  if (href.includes("/api/ai/estimate")) {
+    return { ok: true, status: 200, json: async () => ({ estimate_idr: 200 }), text: async () => "{}" };
+  }
+  if (href.includes("/api/ai/chat")) {
+    let question = "";
+    try {
+      question = JSON.parse(options?.body || "{}").question || "";
+    } catch {
+      question = "";
+    }
+    // Fixture khusus: klaim yang sama muncul di DUA paragraf (uji dedup footer).
+    if (question.includes("duplikat")) {
+      return sseResponse([
+        ["meta", { estimate_idr: 200, evidence_count: 1 }],
+        ["delta", { text: "Kalimat sama tanpa sumber ini muncul lagi di sini.\n\n" }],
+        ["delta", { text: "Kalimat sama tanpa sumber ini muncul lagi di sini." }],
+        ["citation_summary", { support_rate: 0, unsupported: ["Kalimat sama tanpa sumber ini muncul lagi di sini"] }],
+        ["done", { charged_idr: 100, balance_idr: 49900, mode: "extractive", abstain: false }],
+      ]);
+    }
+    return sseResponse([
+      ["meta", { estimate_idr: 200, evidence_count: 2 }],
+      ["delta", { text: "Metformin menurunkan HbA1c pada diabetes tipe 2. " }],
+      ["delta", { text: "Klaim tambahan tanpa sumber ini perlu ditandai." }],
+      ["citation", { n: 1, title: "Study one", source: "europepmc", url: "https://example.org/1" }],
+      [
+        "citation_summary",
+        { support_rate: 0.5, unsupported: ["Klaim tambahan tanpa sumber ini perlu ditandai", "Singkat"] },
+      ],
+      ["done", { charged_idr: 100, balance_idr: 49900, mode: "llm", abstain: false }],
+    ]);
+  }
   if (href.includes("/api/credits/me") && creditBalance !== null) {
     return {
       ok: true,
@@ -179,6 +234,8 @@ const sandbox = {
   AbortSignal,
   URL,
   URLSearchParams,
+  TextEncoder,
+  TextDecoder,
   fetch: fetchStub,
   window: null,
   document: documentStub,
@@ -264,6 +321,75 @@ async function dispatchHash(hash) {
   results.push(
     ["mode AI: terkunci tanpa akun", aiAsk.includes("memerlukan akun") || aiAsk.includes("Masuk")],
   );
+
+  // Klaim tanpa sitasi harus ditandai langsung di dalam teks jawaban (bukan hanya %).
+  const markUnsupported = sandbox.BIOXIP_AI?.markUnsupported;
+  const marked = markUnsupported
+    ? markUnsupported("Metformin menurunkan HbA1c pada pasien diabetes tipe 2.", ["Metformin menurunkan HbA1c"])
+    : { html: "", marked: 0 };
+  results.push([
+    "ai: klaim tanpa sitasi ditandai inline",
+    marked.marked === 1 && marked.html.includes('<mark class="unsupported"'),
+    JSON.stringify(marked),
+  ]);
+  const clean = markUnsupported ? markUnsupported("Semua klaim di sini punya sitasi.", []) : { html: "", marked: 0 };
+  results.push(["ai: tanpa klaim unsupported tidak ada mark", clean.marked === 0 && !clean.html.includes("<mark")]);
+  const xss = markUnsupported
+    ? markUnsupported("Klaim <script>alert(1)</script> berbahaya.", ["Klaim <script>alert(1)</script>"])
+    : { html: "", marked: 0 };
+  results.push([
+    "ai: penandaan tetap meng-escape HTML",
+    xss.html.includes("&lt;script&gt;") && !xss.html.includes("<script>"),
+    xss.html,
+  ]);
+  // Unicode yang berubah panjang saat di-lowercase tidak boleh menggeser rentang penandaan.
+  const unicode = markUnsupported
+    ? markUnsupported("AAAİBBB klaim tanpa sumber yang panjang di sini.", ["klaim tanpa sumber yang panjang"])
+    : { html: "", marked: 0 };
+  results.push([
+    "ai: penandaan tetap akurat dengan karakter Unicode",
+    unicode.marked === 1 && unicode.html.includes('>klaim tanpa sumber yang panjang</mark>'),
+    unicode.html,
+  ]);
+
+  // Integrasi penuh: alur SSE nyata → klaim tanpa sitasi ditandai di teks jawaban.
+  storageMap.set("bioxip-access-token", "test-access-token");
+  sandbox.__setBalance(50000);
+  await dispatchHash("#/search?q=metformin&mode=ai");
+  const runBtn = registry.get("ai-run");
+  results.push([
+    "ai: tombol Tanya AI siap saat saldo cukup",
+    Boolean(runBtn) && (registry.get("ai-ask")?.innerHTML || "").includes("Tanya AI"),
+    registry.get("ai-ask")?.innerHTML || "",
+  ]);
+  runBtn?.trigger("click", {});
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const streamedText = registry.get("ai-text")?.innerHTML || "";
+  results.push([
+    "ai: klaim tanpa sitasi ditandai di jawaban ter-stream",
+    streamedText.includes('<mark class="unsupported"') && streamedText.includes("Klaim tambahan tanpa sumber"),
+    streamedText,
+  ]);
+  const streamedCites = registry.get("ai-cites")?.innerHTML || "";
+  results.push([
+    "ai: footer menghitung klaim ditandai secara akurat (parsial)",
+    streamedCites.includes("1 dari 2 klaim tanpa sitasi ditandai") && streamedCites.includes("Singkat"),
+    streamedCites.slice(0, 160),
+  ]);
+
+  // Klaim sama di dua paragraf tidak boleh menghasilkan hitungan mustahil ("2 dari 1").
+  await dispatchHash("#/search?q=duplikat&mode=ai");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  registry.get("ai-run")?.trigger("click", {});
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const dupCites = registry.get("ai-cites")?.innerHTML || "";
+  results.push([
+    "ai: klaim duplikat lintas-paragraf dihitung sekali",
+    dupCites.includes("1 dari 1 klaim tanpa sitasi ditandai") && !dupCites.includes("2 dari 1"),
+    dupCites.slice(0, 160),
+  ]);
+  storageMap.delete("bioxip-access-token");
+  sandbox.__setBalance(null);
 
   // Uji nyata: submit dari mode AI harus mempertahankan mode + filter.
   const formStub = registry.get("search-form");

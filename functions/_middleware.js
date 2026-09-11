@@ -30,10 +30,6 @@ export async function onRequest(context) {
     }
   }
 
-  if (env.TURNSTILE_SECRET_KEY && !response.headers.has("CF-Turnstile-Status")) {
-    headers.set("X-Turnstile-Required", "true");
-  }
-
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,

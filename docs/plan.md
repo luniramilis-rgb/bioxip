@@ -32,7 +32,7 @@ Deliverable:
 - **Middleware gating**: JWT wajib untuk `/api/*` kecuali `/api/auth/*`, webhook, dan prefiks publik.
 - **Halaman publik untuk SEO**: `/topik/*`, `/obat/{slug}` ringkas, `/sumber`, `/legal`, `/harga`.
 - **Preview 3 hasil** + CTA "Masuk untuk melihat semua" pada halaman hasil.
-- Rate limit magic link per email/IP + Turnstile pada form masuk.
+- Rate limit magic link per email/IP + Turnstile pada form masuk. **(Turnstile masih backlog prarilis: header `X-Turnstile-Required` palsu di `_middleware` dihapus 2026-09-11; yang tersisa hanya env `TURNSTILE_SECRET_KEY` opsional. Implementasi penuh = widget + `siteverify`.)**
 - **Layar "buka di browser"** untuk in-app browser (Instagram/FB/TikTok/Line) — sesuai `docs/principles.md` §5.
 - **Fondasi berbagi (murah, wajib sekarang)**: halaman publik sebagai tujuan tautan, **OG tags + gambar 1200×630**, dan tombol **Salin tautan**. (Integrasi kanal share ditunda ke backlog.)
 

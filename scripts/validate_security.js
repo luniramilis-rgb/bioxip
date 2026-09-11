@@ -36,6 +36,28 @@ if (!migration.includes("revoke all on table public.answer_cache from anon, auth
   problems.push("014_function_security.sql: answer_cache harus dicabut dari anon/authenticated");
 }
 
+// 1b. Housekeeping (016): fungsi pembersih hanya boleh dipanggil service_role dan
+//     pemangkasan harus dibatasi (batching) agar tidak mengunci tabel.
+const housekeeping = read("supabase/migrations/016_housekeeping.sql");
+for (const marker of [
+  "create or replace function fn_housekeeping",
+  "p_chat_delete_limit",
+  "p_cache_delete_limit",
+  "security definer",
+  "revoke execute on function public.fn_housekeeping(int, int) from public",
+  "revoke execute on function public.fn_housekeeping(int, int) from anon",
+  "revoke execute on function public.fn_housekeeping(int, int) from authenticated",
+  "grant execute on function public.fn_housekeeping(int, int) to service_role",
+]) {
+  if (!housekeeping.includes(marker)) problems.push(`016_housekeeping.sql: tidak ada "${marker}"`);
+}
+if (/grant execute on function public\.fn_housekeeping[^;]*to anon/i.test(housekeeping)) {
+  problems.push("016_housekeeping.sql: fn_housekeeping tidak boleh di-grant ke anon");
+}
+if (/delete\s+from\s+answer_cache\s+where\s+expires_at\s*<\s*now\(\)\s*;/i.test(housekeeping)) {
+  problems.push("016_housekeeping.sql: DELETE answer_cache tidak boleh tanpa batas (harus dibatch)");
+}
+
 // 2. Fungsi paling sensitif harus muncul di migrasi keamanan (agar tidak terlewat).
 for (const fn of ["fn_credit_grant", "fn_topup_mark_paid", "fn_answer_cache_hit"]) {
   if (!migration.includes(fn)) problems.push(`014_function_security.sql: tidak menyebut ${fn}`);
@@ -75,7 +97,50 @@ for (const marker of ["PATIENT_DATA", "\\b\\d{16}\\b", "pasien saya", "tanggal l
   if (!safety.includes(marker)) problems.push(`_safety.js: guardrail "${marker}" hilang`);
 }
 
-console.log(`Keamanan: ${migration.split("\n").length} baris migrasi · ${webFiles.length} berkas klien diperiksa`);
+// 6. Kunci API Supabase (publishable `sb_publishable_...` / secret `sb_secret_...`)
+//    BUKAN JWT, sehingga ditolak bila dikirim di header Authorization: Bearer.
+//    Kunci hanya boleh lewat `apikey`; Bearer khusus access token user.
+const edgeFiles = [];
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (entry.name.endsWith(".js")) edgeFiles.push(full);
+  }
+})(path.join(ROOT, "functions"));
+const apiKeyAsBearer = /Authorization:\s*`Bearer \$\{env\.SUPABASE_(?:ANON_KEY|SERVICE_ROLE)\}`/;
+for (const file of edgeFiles) {
+  const source = fs.readFileSync(file, "utf8");
+  if (apiKeyAsBearer.test(source)) {
+    problems.push(`${path.relative(ROOT, file)}: kunci API dikirim sebagai Authorization Bearer (harus lewat header apikey saja)`);
+  }
+}
+// Skrip operasional/validator juga tidak boleh mengirim kunci API sebagai Bearer.
+const scriptFiles = [];
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (/\.(?:js|mjs)$/.test(entry.name)) scriptFiles.push(full);
+  }
+})(path.join(ROOT, "scripts"));
+const scriptKeyAsBearer = /Authorization:\s*`Bearer \$\{(?:SERVICE|SERVICE_KEY|ANON|ANON_KEY)\}`/;
+for (const file of scriptFiles) {
+  const source = fs.readFileSync(file, "utf8");
+  // Kecualikan pola Bearer token user (variabel bernama token/accessToken).
+  if (scriptKeyAsBearer.test(source)) {
+    problems.push(`${path.relative(ROOT, file)}: kunci API dikirim sebagai Authorization Bearer (harus lewat header apikey saja)`);
+  }
+}
+const authClient = read("web/js/auth.js");
+if (/Bearer \$\{options\.token \|\| ANON\}/.test(authClient)) {
+  problems.push("web/js/auth.js: kunci anon dikirim sebagai Bearer saat tidak ada token user");
+}
+if (/Authorization:\s*`Bearer \$\{env\.SUPABASE_SERVICE_ROLE\}`/.test(read("functions/_answercache.js"))) {
+  problems.push("functions/_answercache.js: service key dikirim sebagai Authorization Bearer");
+}
+
+console.log(`Keamanan: ${migration.split("\n").length} baris migrasi · ${webFiles.length} berkas klien · ${edgeFiles.length} berkas edge diperiksa`);
 if (problems.length) {
   console.log("\nMASALAH:");
   for (const problem of problems) console.log(" - " + problem);

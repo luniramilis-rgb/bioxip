@@ -142,13 +142,17 @@
   }
 
   async function request(path, options = {}) {
+    const token = options.token || getAccessToken();
+    const headers = {
+      // Kunci API baru (publishable) BUKAN JWT → jangan pernah dikirim sebagai
+      // Bearer. Header Authorization hanya untuk access token user yang login.
+      apikey: ANON,
+      "Content-Type": "application/json",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
     const resp = await fetch(`${BASE}${path}`, {
       method: options.method || "GET",
-      headers: {
-        apikey: ANON,
-        Authorization: `Bearer ${options.token || ANON}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
     const text = await resp.text();

@@ -335,6 +335,19 @@ table.ledger td.neg { color: #9b2c1f; font-weight: 600; }
   .caret { animation: none; opacity: 0; }
 }
 
+/* Klaim AI tanpa sitasi: ditandai langsung di dalam teks jawaban. */
+mark.unsupported {
+  background: transparent;
+  color: inherit;
+  border-bottom: 1px dotted #c0392b;
+}
+.unsupported-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .chip.sev-high { background: #f7d9d5; color: #9b2c1f; }
 .chip.sev-moderate { background: #fbeccb; color: #8a5a00; }
 .chip.sev-low { background: var(--chip); color: var(--muted); }

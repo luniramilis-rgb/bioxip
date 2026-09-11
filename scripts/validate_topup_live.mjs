@@ -8,7 +8,7 @@ async function createUser() {
   const password = `Aa1!${Math.random().toString(36).slice(2)}xyz`;
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: "POST",
-    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
+    headers: { apikey: SERVICE, "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, email_confirm: true }),
   });
   const text = await resp.text();
@@ -77,7 +77,7 @@ async function balance(token) {
 
   await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`, {
     method: "DELETE",
-    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+    headers: { apikey: SERVICE },
   });
   process.exit(ok ? 0 : 2);
 })().catch((error) => {

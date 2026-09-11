@@ -34,6 +34,8 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 - `node tests/ui_harness.js` — render UI (search/answer/drug/interactions/mode AI/saldo)
 - `node scripts/validate_rxnorm.js` — pemetaan RxNorm 30 nama
 - `node scripts/validate_api.js` — kontrak API production (butuh jaringan)
+- `node scripts/housekeeping.mjs` — pangkas `answer_cache` kedaluwarsa + `ai_chat_log` (retensi 90 hari, 5000 baris/eksekusi; butuh `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE`)
+- `node scripts/eval_golden.mjs` — evaluasi golden set 205 item (butuh `BIOXIP_DEV_TOKEN`; `--provider` untuk jalur LLM berbayar; ambang citation_rate>=0.9, unsafe_422=1.0, red_flag_recall>=0.9)
 - `node --check <file>.js` untuk file JS baru
 
 ## Aturan

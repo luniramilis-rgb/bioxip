@@ -1,0 +1,48 @@
+name: Eval Golden Set
+
+on:
+  schedule:
+    # Mingguan, Senin 03:00 UTC (setelah housekeeping 03:00 bila kosong).
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Pakai jalur LLM (kena biaya token)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      limit:
+        description: "Batasi jumlah item (0 = semua 205)"
+        required: false
+        default: "0"
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Evaluasi golden set (semua item)
+        run: |
+          if [ "$PROVIDER" = "true" ]; then
+            node scripts/eval_golden.mjs --provider --limit "$LIMIT"
+          else
+            node scripts/eval_golden.mjs --limit "$LIMIT"
+          fi
+        env:
+          PROVIDER: ${{ github.event.inputs.provider || 'false' }}
+          LIMIT: ${{ github.event.inputs.limit || '0' }}
+          BIOXIP_BASE: https://bioxip.pages.dev
+          BIOXIP_DEV_TOKEN: ${{ secrets.BIOXIP_DEV_TOKEN }}
+      - name: Simpan laporan sebagai artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-report
+          path: tests/golden/last_report.json
+          if-no-files-found: ignore

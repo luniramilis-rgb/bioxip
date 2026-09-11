@@ -20,7 +20,7 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
 async function admin(pathname, init = {}) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/admin/${pathname}`, {
     ...init,
-    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
+    headers: { apikey: SERVICE, "Content-Type": "application/json" },
   });
   const text = await resp.text();
   return { ok: resp.ok, status: resp.status, body: text ? JSON.parse(text) : null };
@@ -38,7 +38,7 @@ async function signIn(email, password) {
 async function grant(userId, idr) {
   const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_credit_grant`, {
     method: "POST",
-    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
+    headers: { apikey: SERVICE, "Content-Type": "application/json" },
     body: JSON.stringify({
       p_user_id: userId,
       p_amount_micro_idr: idr * 1_000_000,

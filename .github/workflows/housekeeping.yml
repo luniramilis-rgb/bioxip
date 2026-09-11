@@ -1,0 +1,26 @@
+name: Housekeeping
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      chat_limit:
+        description: "Batas hapus ai_chat_log per eksekusi"
+        required: false
+        default: "5000"
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Pangkas cache & log (answer_cache + ai_chat_log)
+        run: node scripts/housekeeping.mjs "$CHAT_LIMIT"
+        env:
+          CHAT_LIMIT: ${{ github.event.inputs.chat_limit || '5000' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
