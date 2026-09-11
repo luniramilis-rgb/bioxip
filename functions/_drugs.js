@@ -40,6 +40,19 @@ export function findDrug(query) {
   );
 }
 
+/** Temukan obat yang namanya/alias-nya muncul di dalam teks bebas (mis. kalimat pertanyaan). */
+export function findDrugsInText(text, limit = 3) {
+  const q = normalize(text);
+  if (!q) return [];
+  const padded = ` ${q} `;
+  return DRUGS.filter((drug) => {
+    const candidates = [drug.name, drug.inn, drug.slug, ...(drug.aliases || [])]
+      .map((value) => normalize(value))
+      .filter((value) => value.length > 3);
+    return candidates.some((value) => padded.includes(` ${value} `) || padded.includes(` ${value}`));
+  }).slice(0, limit);
+}
+
 export function suggestDrugs(query, limit = 5) {
   const q = normalize(query);
   if (!q) return [];

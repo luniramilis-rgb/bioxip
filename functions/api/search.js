@@ -1,7 +1,7 @@
 import { expandQuery, expandQueryEnglish } from "../_dictionary.js";
 import { searchPubmed } from "../_pubmed.js";
 import { detectQuestionType, epmcFilterFor, expansionClause, expansionSearchText, pubmedCategoryFor } from "../_terminology.js";
-import { findDrug } from "../_drugs.js";
+import { findDrugsInText } from "../_drugs.js";
 import { rankResults } from "../_rank.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
@@ -33,10 +33,12 @@ export async function onRequestGet(context) {
 
     const query = expandQuery(raw);
     const extraClause = expansionClause(raw);
-    // Nama obat Indonesia (mis. "parasetamol") diperluas ke INN/nama Inggris.
-    const drug = findDrug(raw);
-    const drugTerm = drug?.inn ? String(drug.inn).split("/")[0].trim() : null;
-    const drugClause = drugTerm ? `(("${drugTerm}") OR MESH:"${drugTerm}")` : "";
+    // Nama obat Indonesia dalam kalimat (mis. "parasetamol dosis ginjal") → INN/nama Inggris.
+    const drugs = findDrugsInText(raw, 2);
+    const drugTerms = drugs.map((drug) => String(drug.inn).split("/")[0].trim()).filter(Boolean);
+    const drugClause = drugTerms.length
+      ? `(${drugTerms.map((term) => `("${term}" OR MESH:"${term}")`).join(" OR ")})`
+      : "";
     const conceptClause = [extraClause, drugClause].filter(Boolean).join(" AND ");
     // Bila istilah Indonesia dikenali, pakai HANYA ekspansi Inggris+MeSH agar token
     // Indonesia (mis. "diagnosis"/"akurasi") tidak mendominasi hasil.

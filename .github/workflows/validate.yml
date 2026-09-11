@@ -48,6 +48,9 @@ jobs:
       - name: Unit test ranking & klasifikasi pertanyaan
         run: node tests/rank_unit.js
 
+      - name: Unit test pencarian obat dalam teks
+        run: node tests/drugs_unit.js
+
       - name: Halaman topik tidak basi (build --check)
         run: node scripts/build_topics.js --check
 
