@@ -21,6 +21,8 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 - `node scripts/validate_auth.js` — klien auth (hash/code redirect, refresh, rute masuk, precache)
 - `node tests/auth_unit.js` — unit test auth (parse, sesi, refresh, sign out)
 - `node scripts/validate_topup.js` — top-up Xendit (statis; live mock bila ada kredensial)
+- `node scripts/validate_topup_live.mjs` — uji produksi: topup → webhook → saldo bertambah → idempotent
+- `node tests/provider_unit.js` — unit test provider LLM (parse JSON, retry, truncation)
 - `node scripts/validate_grounded.js` — grounded pipeline + golden set (>=150 item)
 - `node scripts/build_golden.js` — bangun golden set; `--check` untuk CI
 - `node tests/rank_unit.js` — unit test ranking, snippet, klasifikasi pertanyaan
