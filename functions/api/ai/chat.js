@@ -12,6 +12,7 @@ import {
 } from "../../_grounded.js";
 import { classifyInput, redFlagNotice } from "../../_safety.js";
 import { cacheGetJson, cacheKey, cachePutJson } from "../../_cache.js";
+import { answerCacheGet, answerCachePut, answerHash } from "../../_answercache.js";
 
 const MAX_TOKENS_LIMIT = 2048;
 // Cache jawaban AI: memotong biaya token berulang (pertanyaan populer) secara signifikan.
@@ -259,18 +260,25 @@ export async function onRequestPost(context) {
           v: PROMPT_VERSION,
         }, origin);
         if (providerIsReady) {
-          const cachedAnswer = await cacheGetJson(cacheId);
+          let cachedAnswer = await cacheGetJson(cacheId).catch(() => null);
+          let cacheLayer = cachedAnswer ? "l1" : null;
+          if (!cachedAnswer) {
+            // L1 (Cache API) meleset / per-colo → coba L2 (Postgres) yang andal.
+            cachedAnswer = await answerCacheGet(env, answerHash(cacheId));
+            cacheLayer = cachedAnswer ? "l2" : null;
+          }
           if (cachedAnswer?.answer) {
             answer = String(cachedAnswer.answer);
             claims = cachedAnswer.claims || [];
             abstain = Boolean(cachedAnswer.abstain);
             model = cachedAnswer.model || model;
             mode = "cache";
+            cacheSaved = cacheLayer;
             usage = { input_tokens: 0, output_tokens: 0, cache_hit_tokens: 0, cache_miss_tokens: 0 };
             if (Array.isArray(cachedAnswer.evidence) && cachedAnswer.evidence.length) {
               evidence = cachedAnswer.evidence;
             }
-            send("meta", { request_id: requestId, cached: true, evidence_count: evidence.length });
+            send("meta", { request_id: requestId, cached: true, cache_layer: cacheLayer, evidence_count: evidence.length });
           }
         }
 
@@ -320,7 +328,9 @@ export async function onRequestPost(context) {
               claims = payload.claims || [];
               abstain = Boolean(payload.abstain);
               mode = "llm";
-              cacheSaved = await cachePutJson(cacheId, { answer, claims, abstain, model, evidence: citationSnapshot(evidence) }, ANSWER_CACHE_TTL);
+              const cachePayload = { answer, claims, abstain, model, evidence: citationSnapshot(evidence), question };
+              cacheSaved = await cachePutJson(cacheId, cachePayload, ANSWER_CACHE_TTL);
+              await answerCachePut(env, answerHash(cacheId), cachePayload, ANSWER_CACHE_TTL);
             } else {
               // Teks sudah tampil sebagian, tetapi struktur klaim tidak dapat diparsing:
               // ganti dengan jawaban ekstraktif agar pengguna tidak melihat teks setengah jadi.
@@ -362,7 +372,9 @@ export async function onRequestPost(context) {
                 claims = payload.claims || [];
                 abstain = Boolean(payload.abstain);
                 mode = "llm";
-                cacheSaved = await cachePutJson(cacheId, { answer, claims, abstain, model, evidence: citationSnapshot(evidence) }, ANSWER_CACHE_TTL);
+                const cachePayload = { answer, claims, abstain, model, evidence: citationSnapshot(evidence), question };
+              cacheSaved = await cachePutJson(cacheId, cachePayload, ANSWER_CACHE_TTL);
+              await answerCachePut(env, answerHash(cacheId), cachePayload, ANSWER_CACHE_TTL);
               } else {
                 const extractive = extractiveAnswer(question, evidence);
                 answer = extractive.answer;
