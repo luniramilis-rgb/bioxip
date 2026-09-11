@@ -100,17 +100,33 @@ export async function callDeepseek(env, { system, user, maxTokens = 1024, temper
   const config = providerConfig(env);
   if (!config.apiKey) return { ok: false, error: "provider_not_configured" };
 
-  // Percobaan 1: mode JSON (paling patuh skema). Percobaan 2: tanpa mode JSON
-  // bila model tidak mendukungnya atau keluaran tidak dapat diparsing.
-  const attempts = [true, false];
+  const MAX_TOKENS_CAP = 4096;
+  // Rencana percobaan:
+  //  1) mode JSON (paling patuh skema)
+  //  2) tanpa mode JSON (model mungkin tidak mendukung)
+  //  3) token diperbesar bila keluaran sebelumnya terpotong (finish_reason=length)
+  const plan = [
+    { jsonMode: true, maxTokens },
+    { jsonMode: false, maxTokens },
+  ];
+  let index = 0;
   let last = null;
-  for (const jsonMode of attempts) {
-    const result = await requestCompletion(config, { system, user, maxTokens, temperature, jsonMode });
+
+  while (index < plan.length) {
+    const attempt = plan[index];
+    index += 1;
+
+    const result = await requestCompletion(config, {
+      system,
+      user,
+      maxTokens: attempt.maxTokens,
+      temperature,
+      jsonMode: attempt.jsonMode,
+    });
     if (!result.ok) return result;
 
     const parsed = extractJson(result.content);
-    last = { ...result, parsed, json_mode: jsonMode };
-
+    last = { ...result, parsed, json_mode: attempt.jsonMode, requested_max_tokens: attempt.maxTokens };
     if (parsed) {
       return {
         ok: true,
@@ -118,12 +134,19 @@ export async function callDeepseek(env, { system, user, maxTokens = 1024, temper
         parsed,
         model: result.model,
         finish_reason: result.finish_reason,
-        json_mode: jsonMode,
+        json_mode: attempt.jsonMode,
+        requested_max_tokens: attempt.maxTokens,
         usage: result.usage,
       };
     }
-    // Terpotong (finish_reason=length) tidak akan membaik dengan mengubah mode JSON.
-    if (result.finish_reason === "length") break;
+
+    // Keluaran terpotong: coba lagi dengan anggaran token lebih besar.
+    if (result.finish_reason === "length" && attempt.maxTokens < MAX_TOKENS_CAP) {
+      const bigger = Math.min(attempt.maxTokens * 2, MAX_TOKENS_CAP);
+      if (!plan.some((item) => item.maxTokens === bigger && item.jsonMode)) {
+        plan.push({ jsonMode: true, maxTokens: bigger });
+      }
+    }
   }
 
   return {
@@ -133,6 +156,7 @@ export async function callDeepseek(env, { system, user, maxTokens = 1024, temper
     model: last?.model || config.model,
     finish_reason: last?.finish_reason || null,
     json_mode: last?.json_mode ?? null,
+    requested_max_tokens: last?.requested_max_tokens ?? maxTokens,
     parse_failed: true,
     usage: last?.usage || { input_tokens: 0, output_tokens: 0, cache_hit_tokens: 0, cache_miss_tokens: 0 },
   };

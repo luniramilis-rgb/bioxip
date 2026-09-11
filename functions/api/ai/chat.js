@@ -222,7 +222,7 @@ export async function onRequestPost(context) {
                 error: "provider_parse_failed",
                 finish_reason: result.finish_reason || null,
                 output_tokens: result.usage.output_tokens,
-                max_tokens: maxTokens,
+                requested_max_tokens: result.requested_max_tokens || maxTokens,
               };
               console.warn("bioxip: keluaran provider tidak dapat diparsing", JSON.stringify(providerError));
               send("provider_parse_error", providerError);

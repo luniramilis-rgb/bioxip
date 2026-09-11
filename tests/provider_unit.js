@@ -92,16 +92,18 @@ async function main() {
     check("provider: mode json dicatat", out.json_mode === false, String(out.json_mode));
   }
 
-  // --- terpotong (finish_reason=length) → tidak retry, tandai parse_failed -
+  // --- terpotong (finish_reason=length) → retry dengan anggaran token lebih besar
   {
-    let calls = 0;
-    const p = loadProvider(async () => {
-      calls += 1;
+    const budgets = [];
+    const p = loadProvider(async (_url, init) => {
+      budgets.push(JSON.parse(init.body).max_tokens);
       return completion('{"answer":"terpotong', { finish: "length" });
     });
     const out = await p.callDeepseek({ DEEPSEEK_API_KEY: "k" }, { system: "s", user: "u", maxTokens: 512 });
-    check("provider: terpotong → tidak retry", calls === 1, String(calls));
-    check("provider: ditandai parse_failed", out.ok && out.parsed === null && out.parse_failed === true, JSON.stringify({ parsed: out.parsed, pf: out.parse_failed }));
+    check("provider: terpotong → retry token lebih besar", budgets.length > 1, budgets.join("→"));
+    check("provider: progres anggaran token", budgets[0] === 512 && budgets.includes(1024), budgets.join("→"));
+    check("provider: dibatasi cap 4096", Math.max(...budgets) === 4096, String(Math.max(...budgets)));
+    check("provider: ditandai parse_failed", out.ok && out.parsed === null && out.parse_failed === true, JSON.stringify({ pf: out.parse_failed }));
     check("provider: usage tetap tercatat saat parse gagal", out.usage.output_tokens === 300, String(out.usage.output_tokens));
   }
 
