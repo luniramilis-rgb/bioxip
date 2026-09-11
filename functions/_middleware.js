@@ -19,7 +19,13 @@ export async function onRequest(context) {
     for (const [key, value] of Object.entries(CORS)) {
       headers.set(key, value);
     }
-    headers.set("Cache-Control", "no-store");
+    // /api/search boleh di-cache di edge (TTL ditentukan fungsi); endpoint lain (termasuk SSE AI) tidak.
+    if (url.pathname === "/api/search") {
+      headers.set("Cache-Control", `public, max-age=${env.SEARCH_CACHE_TTL_SECONDS || 900}`);
+      headers.set("Vary", "Accept-Encoding");
+    } else {
+      headers.set("Cache-Control", "no-store");
+    }
   }
 
   if (env.TURNSTILE_SECRET_KEY && !response.headers.has("CF-Turnstile-Status")) {

@@ -1,6 +1,8 @@
 const EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
 const TIMEOUT_MS = 10000;
-const MIN_INTERVAL_MS = 150;
+// NCBI E-utilities: 3 req/detik tanpa API key, 10 req/detik dengan API key.
+const MIN_INTERVAL_NO_KEY_MS = 350;
+const MIN_INTERVAL_WITH_KEY_MS = 100;
 
 let lastCall = 0;
 
@@ -13,9 +15,13 @@ const CATEGORY_FILTERS = {
   etiology: '(etiology[sh] OR risk factors[MeSH Terms] OR causality[MeSH Terms])',
 };
 
-async function throttle() {
+function minInterval(env) {
+  return env?.NCBI_API_KEY ? MIN_INTERVAL_WITH_KEY_MS : MIN_INTERVAL_NO_KEY_MS;
+}
+
+async function throttle(env) {
   const now = Date.now();
-  const wait = Math.max(0, lastCall + MIN_INTERVAL_MS - now);
+  const wait = Math.max(0, lastCall + minInterval(env) - now);
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
   lastCall = Date.now();
 }
@@ -40,7 +46,7 @@ export async function searchPubmed(term, options = {}) {
   };
   if (env.NCBI_API_KEY) common.api_key = env.NCBI_API_KEY;
 
-  await throttle();
+  await throttle(env);
   const searchResp = await fetch(
     `${EUTILS}/esearch.fcgi?${new URLSearchParams({
       ...common,
@@ -56,7 +62,7 @@ export async function searchPubmed(term, options = {}) {
   const total = Number(searchData.esearchresult?.count || 0);
   if (!ids.length) return { total, results: [] };
 
-  await throttle();
+  await throttle(env);
   const summaryResp = await fetch(
     `${EUTILS}/esummary.fcgi?${new URLSearchParams({ ...common, id: ids.join(",") })}`,
     { signal: AbortSignal.timeout(TIMEOUT_MS) },

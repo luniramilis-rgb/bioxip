@@ -4,11 +4,26 @@ import { estimateInputTokens } from "../../_estimate.js";
 import { callDeepseek, providerReady } from "../../_provider.js";
 import { buildUserPrompt, gatherEvidence, extractiveAnswer, verifyClaims, SYSTEM_PROMPT } from "../../_grounded.js";
 import { classifyInput, redFlagNotice } from "../../_safety.js";
+import { cacheGetJson, cacheKey, cachePutJson } from "../../_cache.js";
 
 const MAX_TOKENS_LIMIT = 2048;
+// Cache jawaban AI: memotong biaya token berulang (pertanyaan populer) secara signifikan.
+const ANSWER_CACHE_TTL = 7 * 24 * 3600;
+const ANSWER_CACHE_NAMESPACE = "answer:v1";
 
 function sse(event, data) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+/** Hash FNV-1a sederhana (sinkron) untuk fingerprint konteks bukti. */
+function hashKey(text) {
+  let hash = 0x811c9dc5;
+  const value = String(text || "");
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16);
 }
 
 function chunkText(text, size = 90) {
@@ -149,7 +164,28 @@ export async function onRequestPost(context) {
         });
 
         const providerIsReady = useProvider && providerReady(env);
+
+        // Cache jawaban: pertanyaan + konteks bukti sama → tidak perlu memanggil LLM lagi.
+        const cacheId = cacheKey(ANSWER_CACHE_NAMESPACE, {
+          q: question.toLowerCase().replace(/\s+/g, " ").trim(),
+          max: maxTokens,
+          model: providerIsReady ? env.DEEPSEEK_MODEL || "deepseek-v4.1-flash" : "mock",
+          ev: hashKey(evidence.map((item) => item.id || item.title).join("|")),
+        });
         if (providerIsReady) {
+          const cachedAnswer = await cacheGetJson(cacheId);
+          if (cachedAnswer) {
+            answer = String(cachedAnswer.answer || "");
+            claims = cachedAnswer.claims || [];
+            abstain = Boolean(cachedAnswer.abstain);
+            model = cachedAnswer.model || model;
+            mode = "cache";
+            usage = { input_tokens: 0, output_tokens: 0, cache_hit_tokens: 0, cache_miss_tokens: 0 };
+            send("meta", { request_id: requestId, cached: true });
+          }
+        }
+
+        if (mode !== "cache" && providerIsReady) {
           const result = await callDeepseek(env, {
             system: SYSTEM_PROMPT,
             user: buildUserPrompt(question, evidence),
@@ -168,6 +204,7 @@ export async function onRequestPost(context) {
               cache_hit_tokens: result.usage.cache_hit_tokens,
               cache_miss_tokens: result.usage.cache_miss_tokens,
             };
+            await cachePutJson(cacheId, { answer, claims, abstain, model }, ANSWER_CACHE_TTL);
           }
         }
 

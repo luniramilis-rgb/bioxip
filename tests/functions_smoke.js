@@ -21,8 +21,10 @@ function loadModule(context, file, exports) {
 }
 
 // Fetch tiruan untuk Europe PMC, ClinicalTrials.gov, dan PubMed.
+let upstreamCalls = 0;
 const fetchStub = async (url) => {
   const href = String(url);
+  upstreamCalls += 1;
   const jsonResponse = (body) => ({
     ok: true,
     status: 200,
@@ -114,6 +116,7 @@ async function main() {
     "studyTypeWeight",
   ]);
   loadModule(sandbox, "_rank.js", ["rankResults", "rankScore", "relevanceScore", "sectionSnippet", "tokenize"]);
+  loadModule(sandbox, "_cache.js", ["cacheKey", "cacheGetJson", "cachePutJson", "resetMemoryCache"]);
   loadModule(sandbox, "_drugs.js", ["DRUGS", "FORNAS", "findDrug", "findDrugsInText", "suggestDrugs"]);
   loadModule(sandbox, "_pubmed.js", ["searchPubmed", "buildQuery"]);
   loadModule(sandbox, "api/search.js", ["onRequestGet"]);
@@ -150,6 +153,35 @@ async function main() {
     env: {},
   });
   check("search: q kosong ditolak 400", bad.status === 400, String(bad.status));
+
+  // Cache: permintaan identik kedua harus dilayani cache (tanpa memanggil upstream lagi).
+  sandbox.resetMemoryCache();
+  const before = upstreamCalls;
+  const first = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=cache-test&per_page=5" },
+    env: {},
+  });
+  const firstBody = await first.json();
+  const afterFirst = upstreamCalls;
+  const second = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=cache-test&per_page=5" },
+    env: {},
+  });
+  const secondBody = await second.json();
+  check("cache: permintaan pertama mengisi cache", firstBody.cache === "miss", String(firstBody.cache));
+  check("cache: permintaan kedua dilayani cache", secondBody.cache === "hit", String(secondBody.cache));
+  check(
+    "cache: upstream tidak dipanggil ulang saat cache hit",
+    upstreamCalls === afterFirst,
+    `before=${before} afterFirst=${afterFirst} afterSecond=${upstreamCalls}`,
+  );
+
+  const bypass = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=cache-test&per_page=5&no_cache=1" },
+    env: {},
+  });
+  const bypassBody = await bypass.json();
+  check("cache: no_cache=1 melewati cache", bypassBody.cache === "bypass", String(bypassBody.cache));
 
   let failed = 0;
   for (const item of results) {

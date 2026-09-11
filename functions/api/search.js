@@ -3,15 +3,71 @@ import { searchPubmed } from "../_pubmed.js";
 import { detectQuestionType, epmcFilterFor, expansionClause, expansionSearchText, pubmedCategoryFor } from "../_terminology.js";
 import { findDrugsInText } from "../_drugs.js";
 import { rankResults } from "../_rank.js";
+import { cacheGetJson, cacheKey, cachePutJson } from "../_cache.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 const CT = "https://clinicaltrials.gov/api/v2/studies";
 const TIMEOUT_MS = 10000;
 const MAX_WANT = 500;
+// Cache pencarian di edge: memotong latensi p95 dan melindungi rate limit sumber.
+const SEARCH_CACHE_DEFAULT_TTL = 900;
+const SEARCH_CACHE_NAMESPACE = "search:v2";
+
+function searchCacheTtl(env) {
+  const ttl = Number(env?.SEARCH_CACHE_TTL_SECONDS);
+  return Number.isFinite(ttl) && ttl > 0 ? Math.min(ttl, 86400) : SEARCH_CACHE_DEFAULT_TTL;
+}
 
 export async function onRequestGet(context) {
+  const { env, request } = context;
+  const url = new URL(request.url);
+  const useCache = url.searchParams.get("no_cache") !== "1";
+
+  const key = cacheKey(SEARCH_CACHE_NAMESPACE, {
+    q: url.searchParams.get("q") || "",
+    types: url.searchParams.get("types") || "",
+    oa: url.searchParams.get("oa") || "",
+    indonesia: url.searchParams.get("indonesia") || "",
+    page: url.searchParams.get("page") || "",
+    per_page: url.searchParams.get("per_page") || "",
+    sort: url.searchParams.get("sort") || "",
+    abstract: url.searchParams.get("abstract") || "",
+    clinical: url.searchParams.get("clinical") || "",
+  });
+
+  if (useCache) {
+    try {
+      const cached = await cacheGetJson(key);
+      if (cached) return json({ ...cached, cache: "hit" }, 200);
+    } catch {
+      /* lanjut tanpa cache */
+    }
+  }
+
+  const response = await produceSearch(env, request);
+  if (response.status !== 200) return response;
+
+  let body = null;
   try {
-    const url = new URL(context.request.url);
+    body = await response.clone().json();
+  } catch {
+    return response;
+  }
+
+  if (useCache) {
+    try {
+      await cachePutJson(key, { ...body, cache: "miss" }, searchCacheTtl(env));
+    } catch {
+      /* penyimpanan cache best-effort */
+    }
+  }
+
+  return json({ ...body, cache: useCache ? "miss" : "bypass" }, 200);
+}
+
+async function produceSearch(env, request) {
+  try {
+    const url = new URL(request.url);
     const raw = (url.searchParams.get("q") || "").trim();
     if (!raw) return json({ error: "param q wajib" }, 400);
 
@@ -47,7 +103,7 @@ export async function onRequestGet(context) {
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
     const needTrial = !types || types.includes("trial");
     const needPubmed = needLit && (!types || types.includes("paper"));
-    const env = context.env || {};
+
 
     const calls = [];
     if (needLit) {

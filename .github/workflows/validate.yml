@@ -54,6 +54,9 @@ jobs:
       - name: Smoke test fungsi edge (tanpa jaringan)
         run: node tests/functions_smoke.js
 
+      - name: Validasi cache edge & throttle NCBI
+        run: node scripts/validate_cache.js
+
       - name: Halaman topik tidak basi (build --check)
         run: node scripts/build_topics.js --check
 
