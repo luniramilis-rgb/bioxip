@@ -56,7 +56,10 @@ export async function onRequestGet(context) {
 
   // Jangan cache respons yang cacat/degraded: kegagalan sementara sumber (mis. PubMed
   // ter-throttle) tidak boleh membeku 15 menit bagi semua pengguna.
-  const degraded = (body.notes || []).length > 0 || (body.results || []).length < 3;
+  // Ukuran kesehatan = korpus utama (Europe PMC) punya cukup hasil; PubMed/ClinicalTrials
+  // bersifat pendamping sehingga variasi 0 hasil di sana tidak memblokir cache.
+  const primaryCount = Number(body.source_counts?.europepmc || 0);
+  const degraded = (body.notes || []).length > 0 || (body.results || []).length < 3 || primaryCount < 3;
   if (useCache && !degraded) {
     try {
       await cachePutJson(key, { ...body, cache: "miss" }, searchCacheTtl(env));
@@ -210,6 +213,7 @@ async function produceSearch(env, request) {
       limit: perPage,
       notes,
       pagination,
+      source_counts: countBySource(collected),
       facets: facetsOf(paged),
       results: paged,
     });
@@ -381,6 +385,12 @@ function resultKey(row) {
   const pmid = row.external_ids?.pmid;
   if (pmid) return `pmid:${pmid}`;
   return `id:${row.id}`;
+}
+
+function countBySource(rows) {
+  const counts = {};
+  for (const row of rows) counts[row.source] = (counts[row.source] || 0) + 1;
+  return counts;
 }
 
 function facetsOf(rows) {

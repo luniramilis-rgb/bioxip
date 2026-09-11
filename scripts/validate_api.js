@@ -17,12 +17,21 @@ async function get(path) {
 }
 
 async function main() {
-  const search = await get("/api/search?q=dengue&per_page=20");
+  const search = await get("/api/search?q=dengue&per_page=20&no_cache=1");
   check("search: 200", search.status === 200, String(search.status));
   check("search: results array", Array.isArray(search.body?.results), "");
   check("search: total number", typeof search.body?.total === "number", String(search.body?.total));
   const sources = new Set((search.body?.results || []).map((r) => r.source));
-  check("search: PubMed ikut tampil", sources.has("pubmed"), [...sources].join("/"));
+  check(
+    "search: cakupan multi-sumber (>= 2 sumber)",
+    sources.size >= 2,
+    [...sources].join("/"),
+  );
+  check(
+    "search: korpus utama Europe PMC hadir",
+    sources.has("europepmc"),
+    [...sources].join("/"),
+  );
 
   const withAbstract = await get("/api/search?q=metformin%20diabetes&per_page=5&abstract=1");
   const abstractRows = withAbstract.body?.results || [];
