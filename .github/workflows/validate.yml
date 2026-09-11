@@ -51,6 +51,12 @@ jobs:
       - name: Unit test pencarian obat dalam teks
         run: node tests/drugs_unit.js
 
+      - name: Unit test autentikasi (auth klien)
+        run: node tests/auth_unit.js
+
+      - name: Validasi auth klien (statis)
+        run: node scripts/validate_auth.js
+
       - name: Smoke test fungsi edge (tanpa jaringan)
         run: node tests/functions_smoke.js
 

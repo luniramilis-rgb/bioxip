@@ -3,6 +3,11 @@
   const TOKEN_KEY = "bioxip-access-token";
 
   function getToken() {
+    const auth = window.BIOXIP_AUTH;
+    if (auth?.getAccessToken) {
+      const token = auth.getAccessToken();
+      if (token) return token;
+    }
     try {
       return localStorage.getItem(TOKEN_KEY) || "";
     } catch {
@@ -11,6 +16,11 @@
   }
 
   function setToken(value) {
+    const auth = window.BIOXIP_AUTH;
+    if (auth?.saveSession && value) {
+      auth.saveSession({ accessToken: value, refreshToken: null, expiresAt: 0 });
+      return;
+    }
     try {
       if (value) localStorage.setItem(TOKEN_KEY, value);
       else localStorage.removeItem(TOKEN_KEY);

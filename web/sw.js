@@ -1,10 +1,12 @@
-const VERSION = "bioxip-v4";
+const VERSION = "bioxip-v5";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
   "/css/app.css",
   "/css/topik.css",
   "/js/brand.js",
+  "/js/config.js",
+  "/js/auth.js",
   "/js/topics.js",
   "/js/search.js",
   "/js/answer.js",
@@ -13,6 +15,7 @@ const STATIC_ASSETS = [
   "/js/credits.js",
   "/js/ai.js",
   "/js/saldo.js",
+  "/js/masuk.js",
   "/js/app.js",
   "/data/topics.json",
   "/manifest.json",

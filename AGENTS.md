@@ -18,6 +18,8 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 - `node scripts/validate_credits.js` — skema ledger + harga + rumus tagihan
 - `python scripts/validate_credits_live.py` — uji live hold/settle/refund (butuh kredensial DB; opsional)
 - `node scripts/validate_ai.js` — proxy AI + debit (statis; live mock bila ada kredensial)
+- `node scripts/validate_auth.js` — klien auth (hash/code redirect, refresh, rute masuk, precache)
+- `node tests/auth_unit.js` — unit test auth (parse, sesi, refresh, sign out)
 - `node scripts/validate_topup.js` — top-up Xendit (statis; live mock bila ada kredensial)
 - `node scripts/validate_grounded.js` — grounded pipeline + golden set (>=150 item)
 - `node scripts/build_golden.js` — bangun golden set; `--check` untuk CI

@@ -284,11 +284,14 @@
   }
 
   function route() {
+    const auth = window.BIOXIP_AUTH;
+    const redirect = auth?.handleRedirect?.();
     const raw = location.hash.slice(2) || "";
     const [pathPart, queryPart] = raw.split("?");
     const path = pathPart.split("/").filter(Boolean);
     markNav(navNameFor(path));
     window.BIOXIP_CREDITS?.refreshBadge?.();
+    updateAuthNav(redirect);
 
     if (path.length === 0) {
       view.innerHTML = homeHTML();
@@ -304,6 +307,10 @@
       } else {
         runSearch();
       }
+    } else if (path[0] === "masuk") {
+      const message = redirect?.error ? `Masuk gagal: ${redirect.error}` : "";
+      view.innerHTML = window.BIOXIP_MASUK.pageHTML(message);
+      window.BIOXIP_MASUK.bind();
     } else if (path[0] === "saldo") {
       view.innerHTML = window.BIOXIP_SALDO.pageHTML();
       window.BIOXIP_SALDO.load();
@@ -412,8 +419,33 @@
     if (path[0] === "search" || path[0] === "topic") return "home";
     if (path[0] === "interactions") return "drug";
     if (path[0] === "harga") return "saldo";
-    if (["answer", "drug", "saldo", "sources", "legal"].includes(path[0])) return path[0];
+    if (["answer", "drug", "saldo", "sources", "legal", "masuk"].includes(path[0])) return path[0];
     return "home";
+  }
+
+  function updateAuthNav(redirect) {
+    const link = document.getElementById("auth-link");
+    if (link) {
+      const user = window.BIOXIP_AUTH?.getUser?.();
+      link.textContent = user ? user.name.split(" ")[0] : "Masuk";
+      link.setAttribute("href", user ? "#/masuk" : "#/masuk");
+      link.dataset.state = user ? "in" : "out";
+    }
+    const banner = document.getElementById("auth-banner");
+    if (banner) {
+      if (redirect?.signedIn) {
+        banner.hidden = false;
+        banner.textContent = "Berhasil masuk. Selamat menggunakan bioXip.";
+        setTimeout(() => {
+          banner.hidden = true;
+        }, 4000);
+      } else if (redirect?.error) {
+        banner.hidden = false;
+        banner.textContent = `Gagal masuk: ${redirect.error}`;
+      } else {
+        banner.hidden = true;
+      }
+    }
   }
 
   function hargaHTML() {
@@ -496,6 +528,10 @@
   registerServiceWorker();
   globalEvents();
   window.addEventListener("hashchange", route);
+  window.BIOXIP_AUTH?.onAuthChange?.(() => {
+    window.BIOXIP_CREDITS?.refreshBadge?.(true);
+    updateAuthNav();
+  });
   loadTopics().finally(() => {
     route();
     window.BIOXIP_CREDITS?.refreshBadge?.();

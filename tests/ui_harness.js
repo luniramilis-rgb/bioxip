@@ -44,7 +44,27 @@ const documentStub = {
   querySelector() { return null; },
 };
 
-const locationStub = { hash: "#/", replace(value) { this.hash = value; } };
+const locationStub = { hash: "#/", search: "", pathname: "/", origin: "https://bioxip.pages.dev", replace(value) { this.hash = value; }, assign() {} };
+
+const storageMap = new Map();
+const localStorageStub = {
+  getItem: (key) => (storageMap.has(key) ? storageMap.get(key) : null),
+  setItem: (key, value) => storageMap.set(key, String(value)),
+  removeItem: (key) => storageMap.delete(key),
+  clear: () => storageMap.clear(),
+};
+
+const AUTH_PAYLOAD = {
+  access_token: "test-access-token",
+  refresh_token: "test-refresh-token",
+  expires_in: 3600,
+  user: {
+    id: "39d51ab2-2ddc-4fb3-9e2c-fac6b69b2296",
+    email: "lunira.milis@gmail.com",
+    user_metadata: { full_name: "arinulhaq d", avatar_url: "" },
+    identities: [{ provider: "email" }, { provider: "google" }],
+  },
+};
 
 const ANSWER_PAYLOAD = {
   question: "metformin vs insulin diabetes",
@@ -109,6 +129,16 @@ const INTER_PAYLOAD = {
 };
 
 async function fetchStub(url) {
+  const href = String(url);
+  if (href.includes("/auth/v1/token") || href.includes("/auth/v1/verify")) {
+    return { ok: true, status: 200, json: async () => AUTH_PAYLOAD, text: async () => JSON.stringify(AUTH_PAYLOAD) };
+  }
+  if (href.includes("/auth/v1/otp")) {
+    return { ok: true, status: 200, json: async () => ({}), text: async () => "{}" };
+  }
+  if (href.includes("/auth/v1/user")) {
+    return { ok: true, status: 200, json: async () => AUTH_PAYLOAD.user, text: async () => JSON.stringify(AUTH_PAYLOAD.user) };
+  }
   if (url.includes("/api/credits/") || url.includes("/api/ai/")) {
     return {
       ok: false,
@@ -142,7 +172,9 @@ const sandbox = {
   window: null,
   document: documentStub,
   location: locationStub,
-  localStorage: { getItem() { return null; }, setItem() {} },
+  history: { replaceState(_state, _title, url) { if (url) locationStub.hash = ""; } },
+  localStorage: localStorageStub,
+  sessionStorage: localStorageStub,
   navigator: { serviceWorker: { register: () => ({ catch() {} }) }, clipboard: { writeText: () => Promise.resolve() } },
 };
 sandbox.window = sandbox;
@@ -151,7 +183,7 @@ sandbox.globalThis = sandbox;
 
 vm.createContext(sandbox);
 
-const files = ["js/brand.js", "js/topics.js", "js/search.js", "js/answer.js", "js/drug.js", "js/interactions.js", "js/credits.js", "js/ai.js", "js/saldo.js", "js/app.js"];
+const files = ["js/brand.js", "js/config.js", "js/auth.js", "js/topics.js", "js/search.js", "js/answer.js", "js/drug.js", "js/interactions.js", "js/credits.js", "js/ai.js", "js/saldo.js", "js/masuk.js", "js/app.js"];
 for (const file of files) {
   const code = fs.readFileSync(path.join(ROOT, file), "utf8");
   vm.runInContext(code, sandbox, { filename: file });
@@ -236,6 +268,41 @@ async function dispatchHash(hash) {
   await dispatchHash("#/harga");
   const harga = registry.get("view").innerHTML;
   results.push(["harga: paket tampil", harga.includes("50.000") && harga.includes("500.000")]);
+
+  // Halaman masuk (belum login) menampilkan tombol Google + form email/OTP.
+  localStorageStub.clear();
+  await dispatchHash("#/masuk");
+  const masuk = registry.get("view").innerHTML;
+  results.push(["masuk: tombol Google", masuk.includes("auth-google") && masuk.includes("Google")]);
+  results.push(["masuk: form email & OTP", masuk.includes("auth-email-form") && masuk.includes("auth-otp-form")]);
+  results.push(["masuk: catatan data pasien", masuk.includes("data pasien")]);
+
+  // Auth: token di URL (implicit flow) harus diserap → kembali ke beranda, bukan 404.
+  const tokenHash =
+    "#access_token=test-access-token&refresh_token=test-refresh-token&expires_in=3600&token_type=bearer";
+  await dispatchHash(tokenHash);
+  const afterAuth = registry.get("view").innerHTML;
+  results.push([
+    "auth: token di hash diserap (bukan 404)",
+    !afterAuth.includes("Halaman tidak ditemukan"),
+    afterAuth.slice(0, 60),
+  ]);
+  results.push([
+    "auth: sesi tersimpan",
+    storageMap.get("bioxip-access-token") === "test-access-token",
+    String(storageMap.get("bioxip-access-token") || "-"),
+  ]);
+  results.push(["auth: URL dibersihkan", !locationStub.hash.includes("access_token"), locationStub.hash]);
+
+  // Setelah sesi tersimpan, halaman masuk berubah menjadi kartu akun.
+  await dispatchHash("#/masuk");
+  const account = registry.get("view").innerHTML;
+  results.push([
+    "masuk: kartu akun setelah login",
+    account.includes("arinulhaq") || account.includes("lunira.milis"),
+    account.slice(0, 60),
+  ]);
+  results.push(["masuk: tombol keluar", account.includes("auth-signout") || account.includes("Keluar")]);
 
   let failed = 0;
   for (const [name, ok] of results) {

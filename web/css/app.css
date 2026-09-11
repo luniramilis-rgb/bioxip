@@ -295,6 +295,20 @@ table.ledger td.neg { color: #9b2c1f; font-weight: 600; }
   margin-top: 0.8rem;
 }
 
+.auth-banner {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.auth-error { color: #9b2c1f; font-size: 0.9rem; }
+.rule { border: 0; border-top: 1px solid var(--line); margin: 1rem 0; }
+.avatar { border-radius: 999px; border: 1px solid var(--line); }
+#auth-link[data-state="in"] { font-weight: 700; color: var(--accent); }
+
 .chip.sev-high { background: #f7d9d5; color: #9b2c1f; }
 .chip.sev-moderate { background: #fbeccb; color: #8a5a00; }
 .chip.sev-low { background: var(--chip); color: var(--muted); }
