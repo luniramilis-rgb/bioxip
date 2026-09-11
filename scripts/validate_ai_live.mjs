@@ -108,25 +108,53 @@ async function readStream(resp) {
 
     const deltas = events.filter((e) => e.event === "delta");
     const done = events.find((e) => e.event === "done");
+    const citations = events.filter((e) => e.event === "citation");
     const providerError = events.find((e) => e.event === "provider_error" || e.event === "provider_parse_error");
     const firstDelta = deltas[0]?.at ?? null;
     const text = deltas.map((e) => e.data.text).join("");
 
-    check("live: HTTP 200", resp.status === 200, String(resp.status));
-    check("live: mode llm", done?.data?.mode === "llm", String(done?.data?.mode));
-    check("live: ada potongan delta", deltas.length >= 2, String(deltas.length));
+    check("run1: HTTP 200", resp.status === 200, String(resp.status));
+    check("run1: mode llm (pertanyaan baru)", done?.data?.mode === "llm", String(done?.data?.mode));
+    check("run1: ada potongan delta", deltas.length >= 2, String(deltas.length));
     check(
-      "live: token pertama datang jauh sebelum selesai (streaming nyata)",
+      "run1: token pertama jauh sebelum selesai (streaming nyata)",
       firstDelta !== null && firstDelta < total * 0.7,
       `pertama=${firstDelta}ms total=${total}ms`,
     );
-    check("live: teks jawaban terbaca", text.length > 40, String(text.length));
-    check("live: biaya > 0", Number(done?.data?.charged_idr) > 0, String(done?.data?.charged_idr));
-    check("live: tidak ada error provider", !providerError, JSON.stringify(providerError?.data || {}));
+    check("run1: teks jawaban terbaca", text.length > 40, String(text.length));
+    check("run1: biaya > 0", Number(done?.data?.charged_idr) > 0, String(done?.data?.charged_idr));
+    check("run1: sitasi terkirim", citations.length >= 1, String(citations.length));
+    check("run1: tidak ada error provider", !providerError, JSON.stringify(providerError?.data || {}));
 
     console.log(`\npertanyaan : ${QUESTION}`);
     console.log(`jawaban    : ${text.slice(0, 200).replace(/\n/g, " ")}…`);
-    console.log(`token      : ${deltas.length} potongan · pertama ${firstDelta}ms · total ${total}ms`);
+    console.log(`run1       : ${deltas.length} potongan · pertama ${firstDelta}ms · total ${total}ms · Rp${done?.data?.charged_idr}`);
+
+    // --- run 2: pertanyaan sama harus dilayani dari cache -------------------
+    const startedCache = Date.now();
+    const respCache = await fetch(`${BASE}/api/ai/chat`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: QUESTION, max_tokens: 1024 }),
+    });
+    const cacheEvents = await readStream(respCache);
+    const cacheTotal = Date.now() - startedCache;
+    const cacheDone = cacheEvents.find((e) => e.event === "done");
+    const cacheMeta = cacheEvents.find((e) => e.event === "meta");
+    const cacheCitations = cacheEvents.filter((e) => e.event === "citation");
+    const cacheText = cacheEvents.filter((e) => e.event === "delta").map((e) => e.data.text).join("");
+
+    check("run2: mode cache", cacheDone?.data?.mode === "cache", String(cacheDone?.data?.mode));
+    check("run2: meta menandai cached", cacheMeta?.data?.cached === true, JSON.stringify(cacheMeta?.data || {}));
+    check("run2: jawaban sama dengan run1", cacheText === text, `len ${cacheText.length} vs ${text.length}`);
+    check("run2: sitasi tetap terkirim dari snapshot", cacheCitations.length >= 1, String(cacheCitations.length));
+    check(
+      "run2: tagihan minimum (Rp100) karena 0 token",
+      Number(cacheDone?.data?.charged_idr) === 100,
+      String(cacheDone?.data?.charged_idr),
+    );
+    check("run2: jauh lebih cepat daripada run1", cacheTotal < total / 2, `cache=${cacheTotal}ms vs ${total}ms`);
+    console.log(`run2       : cache · ${cacheTotal}ms · Rp${cacheDone?.data?.charged_idr} · sitasi ${cacheCitations.length}`);
   } finally {
     await admin(`users/${userId}`, { method: "DELETE" });
   }

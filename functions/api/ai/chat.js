@@ -16,21 +16,24 @@ import { cacheGetJson, cacheKey, cachePutJson } from "../../_cache.js";
 const MAX_TOKENS_LIMIT = 2048;
 // Cache jawaban AI: memotong biaya token berulang (pertanyaan populer) secara signifikan.
 const ANSWER_CACHE_TTL = 7 * 24 * 3600;
-const ANSWER_CACHE_NAMESPACE = "answer:v1";
+const ANSWER_CACHE_NAMESPACE = "answer:v2";
+// Naikkan bila prompt/skema berubah, agar jawaban lama tidak tersaji.
+const PROMPT_VERSION = "2026-09-11a";
+
+function citationSnapshot(evidence) {
+  return evidence.map((item) => ({
+    n: item.n,
+    id: item.id,
+    title: item.title,
+    source: item.source,
+    url: item.url,
+    journal: item.journal,
+    year: item.year,
+  }));
+}
 
 function sse(event, data) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
-
-/** Hash FNV-1a sederhana (sinkron) untuk fingerprint konteks bukti. */
-function hashKey(text) {
-  let hash = 0x811c9dc5;
-  const value = String(text || "");
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16);
 }
 
 /**
@@ -187,7 +190,7 @@ export async function onRequestPost(context) {
   }
 
   const origin = new URL(request.url).origin;
-  const evidence = await gatherEvidence(origin, question, { limit: 8 });
+  let evidence = await gatherEvidence(origin, question, { limit: 8 });
   const providerOk = useProvider && providerReady(env);
   const estimate = estimateMicroIdr({
     inputTokens: estimateInputTokens(question, evidence),
@@ -246,23 +249,28 @@ export async function onRequestPost(context) {
 
         const providerIsReady = providerOk;
 
-        // Cache jawaban: pertanyaan + konteks bukti sama → tidak perlu memanggil LLM lagi.
+        // Cache jawaban: pertanyaan + model + versi prompt. Snapshot sitasi ikut disimpan
+        // agar nomor sitasi pada jawaban yang di-cache tetap konsisten walau hasil
+        // pencarian live berubah (penyebab cache selalu miss sebelumnya).
         const cacheId = cacheKey(ANSWER_CACHE_NAMESPACE, {
           q: question.toLowerCase().replace(/\s+/g, " ").trim(),
           max: maxTokens,
           model: providerIsReady ? env.DEEPSEEK_MODEL || "deepseek-flash" : "mock",
-          ev: hashKey(evidence.map((item) => item.id || item.title).join("|")),
+          v: PROMPT_VERSION,
         }, origin);
         if (providerIsReady) {
           const cachedAnswer = await cacheGetJson(cacheId);
-          if (cachedAnswer) {
-            answer = String(cachedAnswer.answer || "");
+          if (cachedAnswer?.answer) {
+            answer = String(cachedAnswer.answer);
             claims = cachedAnswer.claims || [];
             abstain = Boolean(cachedAnswer.abstain);
             model = cachedAnswer.model || model;
             mode = "cache";
             usage = { input_tokens: 0, output_tokens: 0, cache_hit_tokens: 0, cache_miss_tokens: 0 };
-            send("meta", { request_id: requestId, cached: true });
+            if (Array.isArray(cachedAnswer.evidence) && cachedAnswer.evidence.length) {
+              evidence = cachedAnswer.evidence;
+            }
+            send("meta", { request_id: requestId, cached: true, evidence_count: evidence.length });
           }
         }
 
@@ -299,7 +307,7 @@ export async function onRequestPost(context) {
               claims = payload.claims || [];
               abstain = Boolean(payload.abstain);
               mode = "llm";
-              await cachePutJson(cacheId, { answer, claims, abstain, model }, ANSWER_CACHE_TTL);
+              await cachePutJson(cacheId, { answer, claims, abstain, model, evidence: citationSnapshot(evidence) }, ANSWER_CACHE_TTL);
             } else {
               // Teks sudah tampil sebagian, tetapi struktur klaim tidak dapat diparsing:
               // ganti dengan jawaban ekstraktif agar pengguna tidak melihat teks setengah jadi.
@@ -341,7 +349,7 @@ export async function onRequestPost(context) {
                 claims = payload.claims || [];
                 abstain = Boolean(payload.abstain);
                 mode = "llm";
-                await cachePutJson(cacheId, { answer, claims, abstain, model }, ANSWER_CACHE_TTL);
+                await cachePutJson(cacheId, { answer, claims, abstain, model, evidence: citationSnapshot(evidence) }, ANSWER_CACHE_TTL);
               } else {
                 const extractive = extractiveAnswer(question, evidence);
                 answer = extractive.answer;
