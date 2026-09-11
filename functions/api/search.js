@@ -1,5 +1,7 @@
 import { expandQuery, expandQueryEnglish } from "../_dictionary.js";
 import { searchPubmed } from "../_pubmed.js";
+import { detectQuestionType, epmcFilterFor, pubmedCategoryFor } from "../_terminology.js";
+import { rankResults } from "../_rank.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 const CT = "https://clinicaltrials.gov/api/v2/studies";
@@ -23,6 +25,10 @@ export async function onRequestGet(context) {
     const epmcCursor = url.searchParams.get("epmc_cursor") || "*";
     const ctToken = url.searchParams.get("ct_token") || null;
     const withAbstract = url.searchParams.get("abstract") === "1" || url.searchParams.get("abstract") === "true";
+    const clinical = url.searchParams.get("clinical") === "1";
+    const questionType = detectQuestionType(raw);
+    const clinicalFilter = clinical ? epmcFilterFor(questionType) : null;
+    const pubmedCategory = clinical ? pubmedCategoryFor(questionType) : null;
 
     const query = expandQuery(raw);
     const needLit = !types || types.some((t) => t === "paper" || t === "preprint");
@@ -32,14 +38,25 @@ export async function onRequestGet(context) {
 
     const calls = [];
     if (needLit) {
-      calls.push(fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }));
+      calls.push(
+        fetchEpmc(query, {
+          oa,
+          indonesia,
+          types,
+          sort,
+          limit: perPage,
+          cursor: epmcCursor,
+          withAbstract,
+          filter: clinicalFilter,
+        }),
+      );
     }
     if (needTrial) {
       calls.push(fetchTrials(query, { oa, indonesia, types, sort, limit: perPage, token: ctToken, withAbstract }));
     }
     if (needPubmed) {
       calls.push(
-        searchPubmed(expandQueryEnglish(raw), { retmax: perPage, env }).then((data) => ({
+        searchPubmed(expandQueryEnglish(raw), { retmax: perPage, category: pubmedCategory, env }).then((data) => ({
           total: data.total,
           results: data.results,
           pagination: { pubmedHasMore: false },
@@ -64,8 +81,21 @@ export async function onRequestGet(context) {
       }
     }
 
-    const results = dedupeResults(collected);
-    results.sort(rankBy(sort));
+    let results = dedupeResults(collected);
+
+    // Bila filter klinis terlalu sempit, ulangi tanpa filter agar bukti tetap ada.
+    if (clinical && results.length < 5) {
+      const relaxed = await Promise.allSettled([
+        fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }),
+      ]);
+      for (const item of relaxed) {
+        if (item.status === "fulfilled") collected.push(...item.value.results);
+      }
+      results = dedupeResults(collected);
+      notes.push("filter klinis dilonggarkan karena hasil sedikit");
+    }
+
+    results = rankResults(results, raw, sort);
     const paged = results.slice(0, perPage);
 
     return json({
@@ -85,8 +115,10 @@ export async function onRequestGet(context) {
 }
 
 async function fetchEpmc(query, filters) {
+  const base = epmcQuery(query, filters);
+  const effectiveQuery = filters.filter ? `(${base}) AND ${filters.filter}` : base;
   const params = new URLSearchParams({
-    query: epmcQuery(query, filters),
+    query: effectiveQuery,
     format: "json",
     resultType: "core",
     pageSize: String(filters.limit),
@@ -243,21 +275,6 @@ function resultKey(row) {
   const pmid = row.external_ids?.pmid;
   if (pmid) return `pmid:${pmid}`;
   return `id:${row.id}`;
-}
-
-function rankBy(sort) {
-  if (sort === "date") {
-    return (a, b) => String(b.published_on || "").localeCompare(String(a.published_on || ""));
-  }
-  if (sort === "citations") {
-    return (a, b) => (b.citation_count || 0) - (a.citation_count || 0);
-  }
-  const order = { paper: 0, trial: 1, preprint: 2 };
-  return (a, b) => {
-    const ta = order[a.doc_type] ?? 3;
-    const tb = order[b.doc_type] ?? 3;
-    return ta - tb;
-  };
 }
 
 function facetsOf(rows) {

@@ -17,8 +17,13 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 - `node scripts/validate_topics.js` — data topik + halaman statis (meta/JSON-LD/disclaimer)
 - `node scripts/validate_credits.js` — skema ledger + harga + rumus tagihan
 - `python scripts/validate_credits_live.py` — uji live hold/settle/refund (butuh kredensial DB; opsional)
+- `node scripts/validate_ai.js` — proxy AI + debit (statis; live mock bila ada kredensial)
+- `node scripts/validate_topup.js` — top-up Xendit (statis; live mock bila ada kredensial)
+- `node scripts/validate_grounded.js` — grounded pipeline + golden set (>=150 item)
+- `node scripts/build_golden.js` — bangun golden set; `--check` untuk CI
+- `node tests/rank_unit.js` — unit test ranking, snippet, klasifikasi pertanyaan
 - `node scripts/build_topics.js` — bangun halaman topik; `--check` untuk CI (deteksi file basi)
-- `node tests/ui_harness.js` — render UI (search/answer/drug/interactions)
+- `node tests/ui_harness.js` — render UI (search/answer/drug/interactions/mode AI/saldo)
 - `node scripts/validate_rxnorm.js` — pemetaan RxNorm 30 nama
 - `node scripts/validate_api.js` — kontrak API production (butuh jaringan)
 - `node --check <file>.js` untuk file JS baru

@@ -41,10 +41,18 @@ for (const item of items) {
 }
 
 const answered = [...byRole("klinis"), ...byRole("farmasi"), ...byRole("akademik")];
-check("golden: >= 25 pertanyaan berjawab", answered.length >= 25, String(answered.length));
-check("golden: 5 kasus abstain", byRole("abstain").length === 5, String(byRole("abstain").length));
-check("golden: 5 input tidak aman", byRole("tidak_aman").length === 5, String(byRole("tidak_aman").length));
-check("golden: 5 kasus red flag", byRole("red_flag").length === 5, String(byRole("red_flag").length));
+const curatedItems = items.filter((item) => item.curated === true);
+check("golden: total >= 150", items.length >= 150, String(items.length));
+check("golden: kurasi manual >= 40", curatedItems.length >= 40, String(curatedItems.length));
+check("golden: pertanyaan berjawab >= 100", answered.length >= 100, String(answered.length));
+check("golden: >= 5 kasus abstain", byRole("abstain").length >= 5, String(byRole("abstain").length));
+check("golden: >= 5 input tidak aman", byRole("tidak_aman").length >= 5, String(byRole("tidak_aman").length));
+check("golden: >= 5 kasus red flag", byRole("red_flag").length >= 5, String(byRole("red_flag").length));
+check(
+  "golden: item draft ditandai jelas (belum direview)",
+  items.filter((item) => item.draft).every((item) => item.curated === false),
+  String(items.filter((item) => item.draft).length),
+);
 
 // --- 2. Penanda sumber wajib -----------------------------------------------
 const grounded = fs.readFileSync(path.join(ROOT, "functions", "_grounded.js"), "utf8");
@@ -81,7 +89,7 @@ async function liveTests() {
     console.log("INFO  BIOXIP_DEV_TOKEN tidak diset → uji live dilewati (hanya struktur & sumber).");
     return;
   }
-  for (const item of [...byRole("klinis").slice(0, 3), ...byRole("farmasi").slice(0, 2)]) {
+  for (const item of [...byRole("klinis").filter((i) => i.curated).slice(0, 3), ...byRole("farmasi").filter((i) => i.curated).slice(0, 2)]) {
     const { status, body } = await askDev(item.question, { useProvider: false });
     const claims = body?.claims || [];
     const cited = claims.filter((claim) => (claim.citations || []).length > 0).length;

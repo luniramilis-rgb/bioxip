@@ -2,6 +2,7 @@ import { chargedMicroIdr, costMicroIdr } from "./_pricing.js";
 import { callDeepseek, providerReady } from "./_provider.js";
 import { classifyInput, redFlagNotice } from "./_safety.js";
 import { findDrug } from "./_drugs.js";
+import { sectionSnippet } from "./_rank.js";
 
 const MAX_EVIDENCE = 8;
 
@@ -40,6 +41,7 @@ export async function gatherEvidence(origin, question, options = {}) {
     url.searchParams.set("q", question);
     url.searchParams.set("per_page", String(limit));
     url.searchParams.set("abstract", "1");
+    url.searchParams.set("clinical", "1");
     const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(20000) });
     if (resp.ok) {
       const data = await resp.json();
@@ -53,7 +55,7 @@ export async function gatherEvidence(origin, question, options = {}) {
           journal: row.journal || null,
           year: row.year || null,
           url: row.url || null,
-          snippet: normalizeSnippet(row.abstract || row.meta?.briefSummary || ""),
+          snippet: sectionSnippet(row.abstract || row.meta?.briefSummary || "", question, 2),
         });
       }
     }
@@ -76,14 +78,6 @@ export async function gatherEvidence(origin, question, options = {}) {
   }
 
   return evidence.slice(0, MAX_EVIDENCE + 1);
-}
-
-function normalizeSnippet(value) {
-  const text = String(value || "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return text.length > 700 ? text.slice(0, 700) + "…" : text;
 }
 
 export function extractiveAnswer(question, evidence) {
