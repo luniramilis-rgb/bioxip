@@ -1,10 +1,13 @@
 const TIMEOUT_MS = 60000;
+// Model yang didukung Provider API DeepSeek (lihat pesan error provider):
+// deepseek-flash (murah/cepat) dan deepseek-v4-pro (lebih kuat).
+const DEFAULT_MODEL = "deepseek-flash";
 
 export function providerConfig(env) {
   return {
     apiKey: env.DEEPSEEK_API_KEY || "",
     baseUrl: (env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, ""),
-    model: env.DEEPSEEK_MODEL || "deepseek-v4.1-flash",
+    model: env.DEEPSEEK_MODEL || DEFAULT_MODEL,
   };
 }
 
