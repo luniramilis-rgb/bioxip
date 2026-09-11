@@ -84,6 +84,9 @@ jobs:
       - name: Validasi keamanan (fungsi & akses klien)
         run: node scripts/validate_security.js
 
+      - name: Validasi integrasi formulary & literatur
+        run: node scripts/validate_formulary.js
+
       - name: Halaman topik tidak basi (build --check)
         run: node scripts/build_topics.js --check
 

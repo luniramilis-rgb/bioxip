@@ -26,6 +26,8 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 - `node tests/provider_unit.js` — unit test provider LLM (parse JSON, retry, truncation)
 - `node tests/stream_unit.js` — unit test streaming (ekstraksi jawaban inkremental, parser SSE)
 - `node scripts/validate_security.js` — statis: fungsi sensitif tertutup dari PUBLIC/anon, service_role tidak di klien
+- `node scripts/validate_formulary.js` — statis: migrasi formulary, flag OFF, adapter literatur, pencarian aman
+- `node scripts/validate_formulary_live.mjs` — produksi: anon baca view & RPC, tolak tabel dasar, hardening wildcard, coverage (butuh `SUPABASE_URL` + `SUPABASE_ANON_KEY`)
 - `node scripts/validate_security_live.mjs` — produksi: anon ditolak pada fungsi & tabel sensitif (butuh anon key)
 - `node scripts/validate_ai_live.mjs` — uji produksi: streaming token bertahap (butuh kredensial)
 - `node scripts/validate_grounded.js` — grounded pipeline + golden set (>=150 item)
