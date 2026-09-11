@@ -82,6 +82,19 @@ Setelah Sprint 1A selesai dan kredensial tersedia: Google OAuth client, SMTP + d
 >
 > **Audit Google OAuth (2026-09-11):** Bagian A & B **selesai** oleh pemilik (`external_google_enabled=true`, client ID + secret terisi; uji `/auth/v1/authorize` mengembalikan 302 ke accounts.google.com dengan `redirect_uri` = `https://nxlcosnksgbuvtiggjpw.supabase.co/auth/v1/callback`). Bagian C diperbaiki: `site_url` semula `http://localhost:3000` → **`https://bioxip.pages.dev`**; `uri_allow_list` dibersihkan (`bioxip.id` **dihapus** karena domain belum dibeli — mencegah pihak lain yang membelinya masuk daftar redirect sah).
 
+## Sprint 1B — Halaman masuk + gating klien — SELESAI (2026-09-11)
+**Tujuan:** menutup bug "Halaman tidak ditemukan" setelah login dan menyediakan alur masuk Google + OTP.
+Hasil:
+- `web/js/config.js` — URL + **anon key** (kunci publik; tidak ada service role di klien).
+- `web/js/auth.js` — sesi klien: `parseAuthParams` (dari hash **implicit** maupun query **code** PKCE), `sessionFromParams`, `isExpired` (skew 120 dtk), `getAccessToken`/`getUser`, `refreshSession` (grant_type=refresh_token), `ensureFresh`, `handleRedirect` (menyerap token lalu **membersihkan URL** via `history.replaceState`), `signInWithGoogle`, `signInWithEmail`, `verifyOtp`, `signOut`, `onAuthChange`.
+- `web/js/masuk.js` — halaman `#/masuk`: tombol Google, form email → kirim kode, form OTP 6 digit, pesan status, peringatan "jangan masukkan data pasien", dan **kartu akun** (nama/email/avatar/providers + Keluar) setelah masuk.
+- `web/js/app.js` — `route()` memanggil `handleRedirect()` **sebelum** menghitung rute → token di URL tidak lagi dianggap rute asing (penyebab 404). Ditambah rute `#/masuk`, `updateAuthNav` (tautan Masuk ⇄ nama pengguna), dan banner sukses/gagal.
+- `web/js/credits.js` — token diambil dari `auth.getAccessToken()` (satu sumber kebenaran, plus refresh otomatis).
+- `web/index.html` — memuat `config.js`/`auth.js`/`masuk.js` sebelum `app.js`; nav "Masuk"; banner auth. `sw.js` **v5** mem-precache modul baru.
+- Validasi: `tests/auth_unit.js` (**27 cek** — parse hash/query/error, sesi, expiry, redirect, refresh sukses/gagal, signOut) dan `scripts/validate_auth.js` (statis) + langkah CI baru. `ui_harness` ditambah 10 cek auth (token di hash tidak 404, sesi tersimpan, URL bersih, halaman masuk, kartu akun, keluar).
+- Produksi: `/js/auth.js` (8.537 B), `config.js`, `masuk.js`, `app.js` ter-deploy; index memuat ketiganya; SW v5 aktif.
+
+> **Catatan keamanan:** alur yang dipakai sekarang adalah **implicit** (token muncul di URL hash lalu langsung dibersihkan). `auth.js` sudah siap menangani `?code=` (PKCE), tetapi penukaran kode belum diimplementasikan penuh; migrasi ke PKCE (agar token tidak pernah tampil di address bar) tetap masuk backlog Sprint 1B-lanjutan.
 ## Sprint 2 — PubMed E-utilities — SELESAI (2026-09-10)
 Terverifikasi di produksi: hasil memuat sumber **pubmed** + **europepmc**, **0 duplikat DOI/PMID** pada 4 query uji (tuberculosis, dengue, stunting, hypertension), NCBI E-utilities dapat diakses (total >300 rb untuk "tuberculosis").
 Tersisa opsional: NCBI API key (naikkan batas 3→10 req/detik), dan perbaikan peringkat (PubMed saat ini muncul setelah Europe PMC).
