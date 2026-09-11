@@ -29,6 +29,8 @@ check("term: 'mdr' cocok utuh", term.containsTerm("terapi MDR-TB", "mdr") === tr
 check("term: 'mdr' tidak cocok di tengah kata", term.containsTerm("kamdrx", "mdr") === false);
 check("term: 'asi' cocok sebagai kata", term.containsTerm("pemberian ASI eksklusif", "asi") === true);
 check("term: 'asi' tidak cocok di dalam kata lain", term.containsTerm("diagnosis banding", "asi") === false);
+check("term: 'hati' tidak cocok di dalam 'diperhatikan'", term.containsTerm("perlu diperhatikan", "hati") === false);
+check("term: 'hati' cocok sebagai kata", term.containsTerm("gangguan ginjal atau hati", "hati") === true);
 check("term: istilah panjang cocok sebagai substring", term.containsTerm("pengobatan hipertensi", "hipertensi") === true);
 
 // --- konsep generik tidak boleh jadi klausa tunggal ------------------------
@@ -74,6 +76,17 @@ check("term: 'dimulai' → initiation", /initiation|when to start/i.test(mulai),
 check("term: uji klinis bukan diagnosis", term.detectQuestionType("Bagaimana cara menghitung sampel untuk uji klinis?") !== "diagnosis", term.detectQuestionType("Bagaimana cara menghitung sampel untuk uji klinis?"));
 check("term: uji diagnostik tetap diagnosis", term.detectQuestionType("Apa hasil uji diagnostik tuberkulosis?") === "diagnosis");
 check("term: akurasi tetap diagnosis", term.detectQuestionType("Apa akurasi USG untuk kolesistitis?") === "diagnosis");
+
+// --- aspek farmakologi/akademik -------------------------------------------
+check("term: interaksi obat terpetakan", /drug interactions/i.test(term.expansionClause("Apa interaksi obat penting pada Ibuprofen?")), term.expansionClause("Apa interaksi obat penting pada Ibuprofen?"));
+check("term: 'diperhatikan' tidak memicu konsep hati", !/MESH:"Liver"|"liver" OR "hepatic"/i.test(term.expansionClause("Apa interaksi obat penting yang perlu diperhatikan pada Ibuprofen?")), term.expansionClause("Apa interaksi obat penting yang perlu diperhatikan pada Ibuprofen?"));
+check("term: pemantauan terpetakan", /drug monitoring|"monitoring"/i.test(term.expansionClause("Apa parameter pemantauan selama terapi Ampisilin?")), term.expansionClause("Apa parameter pemantauan selama terapi Ampisilin?"));
+check("term: efek samping terpetakan", /adverse effects|side effects/i.test(term.expansionClause("Apa pertimbangan keamanan dan efek samping pada kesehatan mental?")), term.expansionClause("Apa pertimbangan keamanan dan efek samping pada kesehatan mental?"));
+check("term: prognosis terpetakan", /prognosis/i.test(term.expansionClause("Bagaimana prognosis tuberkulosis?")), term.expansionClause("Bagaimana prognosis tuberkulosis?"));
+check("term: faktor risiko terpetakan", /risk factors/i.test(term.expansionClause("Apa faktor risiko hipertensi?")), term.expansionClause("Apa faktor risiko hipertensi?"));
+check("term: meta-analisis terpetakan", /meta-analysis/i.test(term.expansionClause("Bagaimana menilai heterogenitas pada meta-analisis?")), term.expansionClause("Bagaimana menilai heterogenitas pada meta-analisis?"));
+check("term: number needed to treat terpetakan", /numbers needed to treat/i.test(term.expansionClause("Apa itu number needed to treat?")), term.expansionClause("Apa itu number needed to treat?"));
+check("term: klausa duplikat di-dedup", (() => { const c = term.expansionClause("Apa faktor risiko dan etiologi hipertensi?"); const groups = c.split(" AND "); return new Set(groups).size === groups.length; })(), term.expansionClause("Apa faktor risiko dan etiologi hipertensi?"));
 
 // --- batas maksimum konsep (AND tidak berlebihan) --------------------------
 const many = term.expandTerms("efektivitas metformin pada diabetes dengan hipertensi dan anemia pada lansia");

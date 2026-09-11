@@ -83,6 +83,20 @@ const EXTRA = [
   { id_term: "sampel", en_terms: '"sample size" OR "sampling studies"', mesh: ["Sample Size"] },
   { id_term: "dimulai", en_terms: '"initiation" OR "initiated" OR "when to start"', mesh: [] },
   { id_term: "inisiasi", en_terms: '"initiation" OR "when to start"', mesh: [] },
+  // Aspek farmakologi/akademik (dipakai item golden yang gagal: d0xx, m1xx, t0xx).
+  { id_term: "pemantauan", en_terms: '"drug monitoring" OR "monitoring"', mesh: ["Drug Monitoring"] },
+  { id_term: "interaksi obat", en_terms: '"drug interactions"', mesh: ["Drug Interactions"] },
+  { id_term: "efek samping", en_terms: '"drug-related side effects and adverse reactions" OR "adverse effects"', mesh: ["Drug-Related Side Effects and Adverse Reactions"] },
+  { id_term: "keamanan", en_terms: '"safety" OR "adverse effects"', mesh: [] },
+  { id_term: "prognosis", en_terms: '"prognosis"', mesh: ["Prognosis"] },
+  { id_term: "luaran", en_terms: '"treatment outcome" OR "prognosis"', mesh: ["Treatment Outcome"] },
+  { id_term: "faktor risiko", en_terms: '"risk factors"', mesh: ["Risk Factors"] },
+  { id_term: "etiologi", en_terms: '"risk factors" OR "etiology"', mesh: ["Risk Factors"] },
+  { id_term: "meta-analisis", en_terms: '"meta-analysis as topic" OR "meta-analysis"', mesh: ["Meta-Analysis as Topic"] },
+  { id_term: "heterogenitas", en_terms: '"heterogeneity"', mesh: [] },
+  { id_term: "number needed to treat", en_terms: '"numbers needed to treat"', mesh: ["Numbers Needed To Treat"] },
+  { id_term: "dosis", en_terms: '"dose" OR "dosage" OR "dose adjustment"', mesh: [] },
+  { id_term: "pemeriksaan penunjang", en_terms: '"diagnostic techniques and procedures" OR "diagnostic tests"', mesh: ["Diagnostic Techniques and Procedures"] },
 ];
 
 export const TERMINOLOGY = [...DICTIONARY, ...EXTRA];
@@ -118,17 +132,16 @@ function escapeRegExp(value) {
 }
 
 /**
- * Pencocokan istilah: istilah pendek (<=3 huruf, mis. "mdr"/"hiv"/"asi") harus
- * cocok sebagai kata utuh agar tidak salah tangkap di dalam kata lain.
+ * Pencocokan istilah: istilah tanpa spasi harus cocok sebagai kata utuh, agar
+ * tidak salah tangkap di dalam kata lain (mis. "hati" di "diperhatikan",
+ * "mdr" di "kamdrx"). Frasa multi-kata tetap dicocokkan sebagai substring.
  */
 export function containsTerm(text, term) {
   const value = String(text || "").toLowerCase();
   const needle = String(term || "").toLowerCase();
   if (!needle) return false;
-  if (needle.length <= 3) {
-    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}([^a-z0-9]|$)`, "i").test(value);
-  }
-  return value.includes(needle);
+  if (needle.includes(" ")) return value.includes(needle);
+  return new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}([^a-z0-9]|$)`, "i").test(value);
 }
 
 export function expandTerms(text) {
@@ -155,11 +168,18 @@ export function expandTerms(text) {
 export function expansionClause(text) {
   const { entries } = expandTerms(text);
   if (!entries.length) return "";
-  const groups = entries.map((entry) => {
+  const seen = new Set();
+  const groups = [];
+  for (const entry of entries) {
     const parts = [entry.en_terms];
     if (entry.mesh?.length) parts.push(entry.mesh.map((term) => `MESH:"${term}"`).join(" OR "));
-    return `(${parts.join(" OR ")})`;
-  });
+    const group = `(${parts.join(" OR ")})`;
+    // Konsep yang menghasilkan klausa identik (mis. "faktor risiko" + "etiologi")
+    // cukup sekali agar AND tidak kontradiktif/menyempit sia-sia.
+    if (seen.has(group)) continue;
+    seen.add(group);
+    groups.push(group);
+  }
   return groups.join(" AND ");
 }
 

@@ -12,7 +12,7 @@ const MAX_WANT = 500;
 // Cache pencarian di edge: memotong latensi p95 dan melindungi rate limit sumber.
 const SEARCH_CACHE_DEFAULT_TTL = 900;
 // Naikkan versi bila konstruksi query/ekspansi berubah agar hasil lama tidak tersaji.
-const SEARCH_CACHE_NAMESPACE = "search:v6";
+const SEARCH_CACHE_NAMESPACE = "search:v7";
 
 function searchCacheTtl(env) {
   const ttl = Number(env?.SEARCH_CACHE_TTL_SECONDS);
@@ -176,14 +176,17 @@ async function produceSearch(env, request) {
     }
 
     if (results.length < 3 && conceptClause) {
+      // Bila klausa konsep terlalu sempit (mis. banyak konsep AND + obat), longgarkan
+      // bertahap: dahulukan nama obat saja (paling terarah), lalu query penuh.
+      const relaxQuery = drugClause || query;
       const fallback = await Promise.allSettled([
-        fetchEpmc(query, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }),
+        fetchEpmc(relaxQuery, { oa, indonesia, types, sort, limit: perPage, cursor: epmcCursor, withAbstract }),
       ]);
       for (const item of fallback) {
         if (item.status === "fulfilled") collected.push(...item.value.results);
       }
       results = dedupeResults(collected);
-      notes.push("pencarian dilonggarkan (istilah Inggris terlalu spesifik)");
+      notes.push(drugClause ? "pencarian dilonggarkan ke nama obat" : "pencarian dilonggarkan (istilah Inggris terlalu spesifik)");
     }
 
     results = rankResults(results, rankText, sort);
