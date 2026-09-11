@@ -249,6 +249,12 @@ export async function onRequestPost(context) {
         });
 
         const providerIsReady = providerOk;
+        let providerError = null;
+        let cacheSaved = null;
+        let providerAnswered = false;
+        // Bila provider sudah mengalirkan potongan jawaban, jangan kirim ulang di bawah.
+        let deltasSent = false;
+        let providerDebug = null;
 
         // Cache jawaban: pertanyaan + model + versi prompt. Snapshot sitasi ikut disimpan
         // agar nomor sitasi pada jawaban yang di-cache tetap konsisten walau hasil
@@ -282,12 +288,6 @@ export async function onRequestPost(context) {
           }
         }
 
-        let providerError = null;
-        let cacheSaved = null;
-        let providerAnswered = false;
-        // Bila provider sudah mengalirkan potongan jawaban, jangan kirim ulang di bawah.
-        let deltasSent = false;
-        let providerDebug = null;
         if (mode !== "cache" && providerIsReady) {
           const streamed = await runProviderStream(env, {
             system: SYSTEM_PROMPT,
