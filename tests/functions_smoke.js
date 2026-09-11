@@ -22,6 +22,7 @@ function loadModule(context, file, exports) {
 
 // Fetch tiruan untuk Europe PMC, ClinicalTrials.gov, dan PubMed.
 let upstreamCalls = 0;
+let degradedMode = false;
 const fetchStub = async (url) => {
   const href = String(url);
   upstreamCalls += 1;
@@ -32,29 +33,32 @@ const fetchStub = async (url) => {
     text: async () => JSON.stringify(body),
   });
 
+  if (degradedMode) {
+    if (href.includes("clinicaltrials.gov")) return jsonResponse({ studies: [], totalCount: 0, nextPageToken: null });
+    if (href.includes("eutils.ncbi.nlm.nih.gov")) return jsonResponse({ esearchresult: { idlist: [], count: 0 } });
+    return jsonResponse({ hitCount: 0, nextCursorMark: null, resultList: { result: [] } });
+  }
+
   if (href.includes("europepmc.org") || href.includes("/europepmc/")) {
+    const makeHit = (index) => ({
+      id: String(12345 + index),
+      source: "MED",
+      pmid: String(31234567 + index),
+      doi: `10.1000/xyz-${index}`,
+      title: `<b>Dengue</b> vaccine efficacy in children (part ${index + 1})`,
+      abstractText: "Results: The vaccine significantly reduced hospitalization by 40%.",
+      authorList: { author: [{ fullName: "Li Zhang" }] },
+      journalInfo: { journal: { title: "Test Journal" }, issn: "1111-2222" },
+      pubYear: "2024",
+      firstPublicationDate: "2024-05-01",
+      isOpenAccess: "Y",
+      citedByCount: 12,
+      pubTypeList: { pubType: ["journal article"] },
+    });
     return jsonResponse({
-      hitCount: 1,
+      hitCount: 3,
       nextCursorMark: null,
-      resultList: {
-        result: [
-          {
-            id: "12345",
-            source: "MED",
-            pmid: "31234567",
-            doi: "10.1000/xyz",
-            title: "<b>Dengue</b> vaccine efficacy in children",
-            abstractText: "Results: The vaccine significantly reduced hospitalization by 40%.",
-            authorList: { author: [{ fullName: "Li Zhang" }] },
-            journalInfo: { journal: { title: "Test Journal" }, issn: "1111-2222" },
-            pubYear: "2024",
-            firstPublicationDate: "2024-05-01",
-            isOpenAccess: "Y",
-            citedByCount: 12,
-            pubTypeList: { pubType: ["journal article"] },
-          },
-        ],
-      },
+      resultList: { result: [makeHit(0), makeHit(1), makeHit(2)] },
     });
   }
   if (href.includes("clinicaltrials.gov")) {
@@ -102,6 +106,9 @@ async function main() {
     FORNAS: { edition: catalogue.edition, source_url: catalogue.source_url },
   };
   sandbox.globalThis = sandbox;
+  sandbox.__setDegraded = (value) => {
+    degradedMode = Boolean(value);
+  };
   vm.createContext(sandbox);
 
   loadModule(sandbox, "_dictionary.js", ["DICTIONARY", "expandQuery", "expandQueryEnglish", "suggest"]);
@@ -182,6 +189,26 @@ async function main() {
   });
   const bypassBody = await bypass.json();
   check("cache: no_cache=1 melewati cache", bypassBody.cache === "bypass", String(bypassBody.cache));
+
+  // Respons cacat (hasil < 3 / ada notes) tidak boleh disimpan ke cache.
+  sandbox.resetMemoryCache();
+  sandbox.__setDegraded(true);
+  const degraded = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=degraded-test&per_page=5" },
+    env: {},
+  });
+  const degradedBody = await degraded.json();
+  const degradedAgain = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=degraded-test&per_page=5" },
+    env: {},
+  });
+  const degradedAgainBody = await degradedAgain.json();
+  sandbox.__setDegraded(false);
+  check(
+    "cache: respons degraded tidak disimpan",
+    (degradedBody.results || []).length < 3 && degradedAgainBody.cache === "miss",
+    `hasil=${(degradedBody.results || []).length} kedua=${degradedAgainBody.cache}`,
+  );
 
   let failed = 0;
   for (const item of results) {

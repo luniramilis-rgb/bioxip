@@ -11,7 +11,7 @@ const TIMEOUT_MS = 10000;
 const MAX_WANT = 500;
 // Cache pencarian di edge: memotong latensi p95 dan melindungi rate limit sumber.
 const SEARCH_CACHE_DEFAULT_TTL = 900;
-const SEARCH_CACHE_NAMESPACE = "search:v2";
+const SEARCH_CACHE_NAMESPACE = "search:v3";
 
 function searchCacheTtl(env) {
   const ttl = Number(env?.SEARCH_CACHE_TTL_SECONDS);
@@ -54,7 +54,10 @@ export async function onRequestGet(context) {
     return response;
   }
 
-  if (useCache) {
+  // Jangan cache respons yang cacat/degraded: kegagalan sementara sumber (mis. PubMed
+  // ter-throttle) tidak boleh membeku 15 menit bagi semua pengguna.
+  const degraded = (body.notes || []).length > 0 || (body.results || []).length < 3;
+  if (useCache && !degraded) {
     try {
       await cachePutJson(key, { ...body, cache: "miss" }, searchCacheTtl(env));
     } catch {
