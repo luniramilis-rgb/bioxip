@@ -229,13 +229,12 @@ async function produceSearch(env, request) {
       }
     }
 
-    // Link-out ke sumber lokal (tanpa scraping) dimasukkan SEBELUM pemotongan halaman
-    // agar `results.length <= per_page` dan facet tetap konsisten; hanya untuk literatur.
-    if (needLit && litSources.includes("linkout")) {
-      results.push(...linkoutEntries(raw, env));
-    }
-
-    const paged = results.slice(0, perPage);
+    // Link-out sumber lokal (tanpa scraping) DIPASTIKAN tampil dengan mereservasi slot,
+    // sehingga tidak terpotong saat hasil inti sudah memenuhi `per_page`.
+    const linkouts = needLit && litSources.includes("linkout") ? linkoutEntries(raw, env) : [];
+    const room = Math.max(0, perPage - linkouts.length);
+    const paged = results.slice(0, room);
+    paged.push(...linkouts);
 
     // Sembunyikan abstrak dari respons kecuali diminta eksplisit (abstrak hanya untuk skoring/grounded).
     if (!withAbstract) {

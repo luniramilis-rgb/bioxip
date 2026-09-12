@@ -174,12 +174,12 @@ async function main() {
   check("lit: linkout tidak muncul saat flag OFF", !(noLitBody.results || []).some((row) => row.source === "onesearch"));
 
   const lit = await sandbox.onRequestGet({
-    request: { url: "https://bioxip.pages.dev/api/search?q=tuberkulosis%20indonesia&per_page=5&no_cache=1" },
+    request: { url: "https://bioxip.pages.dev/api/search?q=tuberkulosis%20indonesia&per_page=3&no_cache=1" },
     env: { LIT_SOURCES: "linkout" },
   });
   const litBody = await lit.json();
   check(
-    "lit: linkout OneSearch muncul saat flag ON",
+    "lit: linkout OneSearch muncul saat flag ON (walau halaman penuh)",
     (litBody.results || []).some((row) => row.source === "onesearch" && row.linkout === true),
     JSON.stringify((litBody.results || []).map((row) => row.source)),
   );
