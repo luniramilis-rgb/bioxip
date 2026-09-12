@@ -34,6 +34,17 @@ export function relevanceScore(row, tokens) {
   return Math.min(1, coverage);
 }
 
+// Local-first: dahulukan sumber resmi/Indonesia. `source_tier` (guideline/fakta
+// terstruktur) lebih kuat daripada sekadar asal jurnal.
+const LOCAL_SOURCE_BONUS = { neliti: 1, garuda: 1, onesearch: 0.8, doaj: 0.5, crossref: 0.4 };
+
+export function localityScore(row) {
+  const tier = String(row.source_tier || "").toLowerCase();
+  if (tier === "official") return 1;
+  if (tier === "curated") return 0.7;
+  return LOCAL_SOURCE_BONUS[String(row.source || "").toLowerCase()] || 0;
+}
+
 export function rankScore(row, tokens, now = Date.now()) {
   const relevance = relevanceScore(row, tokens);
   const published = row.published_on ? Date.parse(row.published_on) : null;
@@ -42,7 +53,8 @@ export function rankScore(row, tokens, now = Date.now()) {
   const quality = studyTypeWeight(row.doc_type);
   const authority = Math.min(1, Math.log10((Number(row.citation_count) || 0) + 1) / 3);
   const oa = row.oa?.is_oa ? 1 : 0;
-  return 0.42 * relevance + 0.2 * recency + 0.18 * quality + 0.14 * authority + 0.06 * oa;
+  const locality = localityScore(row);
+  return 0.34 * relevance + 0.18 * recency + 0.16 * quality + 0.12 * authority + 0.05 * oa + 0.15 * locality;
 }
 
 export function rankResults(rows, query, sort = "relevance") {

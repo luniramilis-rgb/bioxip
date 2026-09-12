@@ -71,6 +71,27 @@ const recency = rank.rankResults(
 );
 check("rank: paper baru berbukti mengalahkan preprint lama", recency[0].doc_type === "paper", recency[0].doc_type);
 
+// --- rank: local-first -------------------------------------------------------
+const localFirst = rank.rankResults(
+  [
+    { title: "dengue study", abstract: "dengue", doc_type: "paper", year: 2024, published_on: "2024-01-01", citation_count: 10, source: "europepmc" },
+    { title: "dengue study", abstract: "dengue", doc_type: "paper", year: 2024, published_on: "2024-01-01", citation_count: 10, source: "neliti" },
+  ],
+  "dengue study",
+  "relevance"
+);
+check("rank: sumber lokal (neliti) diprioritaskan saat setara", localFirst[0].source === "neliti", localFirst[0].source);
+
+const officialFirst = rank.rankResults(
+  [
+    { title: "hipertensi", abstract: "hipertensi", doc_type: "paper", year: 2024, published_on: "2024-01-01", citation_count: 10, source: "europepmc" },
+    { title: "hipertensi", abstract: "hipertensi", doc_type: "paper", year: 2024, published_on: "2024-01-01", citation_count: 10, source: "guideline", source_tier: "official" },
+  ],
+  "hipertensi",
+  "relevance"
+);
+check("rank: source_tier official paling diprioritaskan", officialFirst[0].source_tier === "official", String(officialFirst[0].source_tier));
+
 // --- rank: sort --------------------------------------------------------------
 const byDate = rank.rankResults(
   [
