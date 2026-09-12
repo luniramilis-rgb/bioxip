@@ -92,6 +92,14 @@
           return;
         }
         aiMode = !aiMode;
+        if (location.hash.startsWith("#/search")) {
+          const current = new URLSearchParams(location.hash.split("?")[1] || "");
+          if (aiMode) current.set("mode", "ai");
+          else current.delete("mode");
+          current.delete("page");
+          location.hash = `#/search?${current.toString()}`;
+          return;
+        }
         const submit = document.getElementById("search-submit");
         const input = document.getElementById("q");
         if (submit) submit.textContent = aiMode ? "Tanya AI" : "Cari";
@@ -352,14 +360,16 @@
     const section = (title, rows) =>
       rows.length ? `<h2 class="muted">${title} (${rows.length})</h2>${rows.map((doc) => S.renderResult(doc)).join("")}` : "";
     const aiCta = `<p class="actions"><a class="btn small ghost" href="${aiHash(q)}">Buat jawaban AI →</a></p>`;
-    const blocks = [
-      aiCta,
+    const body = [
       drug,
       section("Pedoman lokal", guidelines),
       section("Bukti ilmiah", papers),
       section("Tautan sumber", links),
     ].join("");
-    host.insertAdjacentHTML("beforeend", blocks || '<p class="muted">Tidak ada hasil. Coba kata lain atau filter lebih sedikit.</p>');
+    host.insertAdjacentHTML(
+      "beforeend",
+      `${aiCta}${body || '<p class="muted">Tidak ada hasil. Coba kata lain atau filter lebih sedikit.</p>'}`,
+    );
     host.insertAdjacentHTML("beforeend", S.renderNote(current));
     renderPager(q, filters, page);
   }
@@ -629,7 +639,7 @@
       </section>
       <section class="answer-card">
         <h3>Cara biaya dihitung</h3>
-        <p class="muted">Biaya per permintaan AI dihitung dari tarif DeepSeek (input cache hit/miss + output) dikali markup 12×, dibulatkan ke atas ke Rp1 dengan minimum Rp100. Estimasi selalu tampil sebelum Anda menekan tombol Tanya AI.</p>
+        <p class="muted">Biaya per permintaan AI dihitung dari tarif DeepSeek (input cache hit/miss + output) dikali markup 12×, dibulatkan ke atas ke Rp1 dengan minimum Rp100. Info biaya cukup dari sisa saldo; Anda melihat "Terpakai" setelah jawaban selesai.</p>
       </section>`;
   }
 

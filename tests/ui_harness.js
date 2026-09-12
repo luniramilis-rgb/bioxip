@@ -178,7 +178,7 @@ async function fetchStub(url, options) {
     }
     return sseResponse([
       ["meta", { estimate_idr: 200, evidence_count: 2 }],
-      ["delta", { text: "Metformin menurunkan HbA1c pada diabetes tipe 2. " }],
+      ["delta", { text: "Metformin menurunkan HbA1c pada diabetes tipe 2 [1]. " }],
       ["delta", { text: "Klaim tambahan tanpa sumber ini perlu ditandai." }],
       ["citation", { n: 1, title: "Study one", source: "europepmc", url: "https://example.org/1" }],
       ["citation", { n: 2, title: "PNPK TB: paduan berbasis resistensi", source: "guideline", url: "https://kemkes.go.id/pnpk-tb", guideline: { tier: "pnk", label: "PNPK", edisi: "2024", locator: "hal. 12" } }],
@@ -419,6 +419,28 @@ async function dispatchHash(hash) {
     streamedCites.slice(0, 200),
   ]);
   results.push(["ai: indikator kekuatan bukti tampil", streamedCites.includes("Kekuatan bukti")]);
+  results.push([
+    "ai: status tanpa estimasi rupiah (cukup jumlah bukti)",
+    (registry.get("ai-status")?.innerHTML || "").includes("sumber bukti") &&
+      !(registry.get("ai-status")?.innerHTML || "").includes("Estimasi"),
+    registry.get("ai-status")?.innerHTML || "",
+  ]);
+  results.push([
+    "ai: penanda [1] di badan jawaban menjadi tautan sitasi",
+    streamedText.includes('data-ai-cite="1"') && streamedText.includes("cite-link"),
+    streamedText.slice(0, 200),
+  ]);
+  results.push([
+    "ai: sumber menaut balik ke klaim (dua arah)",
+    streamedCites.includes("dirujuk klaim") && streamedCites.includes('data-ai-claim="1"'),
+    streamedCites.slice(0, 220),
+  ]);
+  results.push([
+    "ai: sitasi tidak memakai href hash / data-cite polos",
+    !streamedCites.includes('href="#cite-') &&
+      !streamedText.includes('href="#cite-') &&
+      !streamedText.includes('data-cite="'),
+  ]);
 
   // Klaim sama di dua paragraf tidak boleh menghasilkan hitungan mustahil ("2 dari 1").
   await dispatchHash("#/search?q=duplikat&mode=ai");

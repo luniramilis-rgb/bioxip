@@ -224,6 +224,14 @@ export async function callDeepseek(env, { system, user, maxTokens = 1024, temper
   };
 }
 
+/**
+ * Keputusan mengulang saat streaming tidak menghasilkan JSON valid: ulangi bila
+ * provider berhenti tidak wajar (mis. `length`/truncation) dan anggaran masih bisa naik.
+ */
+export function shouldRetryStream(finishReason, maxTokens, retryMaxTokens = 4096) {
+  return finishReason !== "stop" && Number(maxTokens) < Number(retryMaxTokens);
+}
+
 /** Baca SSE OpenAI-compatible (DeepSeek) menjadi potongan JSON bertahap. */
 export async function* parseOpenAiSse(body) {
   const reader = body.getReader();

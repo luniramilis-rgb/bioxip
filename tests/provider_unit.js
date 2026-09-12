@@ -10,7 +10,7 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
 
 function loadProvider(fetchImpl) {
   let source = SRC.replace(/^import\s+.*?;\s*$/gm, "").replace(/export /g, "");
-  source += "\nglobalThis.__p = { extractJson, callDeepseek, providerConfig, providerReady };\n";
+  source += "\nglobalThis.__p = { extractJson, callDeepseek, shouldRetryStream, providerConfig, providerReady };\n";
   const sandbox = {
     console,
     fetch: fetchImpl,
@@ -105,6 +105,15 @@ async function main() {
     check("provider: dibatasi cap 4096", Math.max(...budgets) === 4096, String(Math.max(...budgets)));
     check("provider: ditandai parse_failed", out.ok && out.parsed === null && out.parse_failed === true, JSON.stringify({ pf: out.parse_failed }));
     check("provider: usage tetap tercatat saat parse gagal", out.usage.output_tokens === 300, String(out.usage.output_tokens));
+  }
+
+  // --- keputusan retry streaming (anti-fallback ekstraktif) ---------------
+  {
+    const p = loadProvider(noFetch);
+    check("retry: finish_reason=length + anggaran < cap → ulangi", p.shouldRetryStream("length", 2048, 4096) === true);
+    check("retry: finish_reason null → ulangi", p.shouldRetryStream(null, 2048, 4096) === true);
+    check("retry: finish_reason=stop → jangan ulangi", p.shouldRetryStream("stop", 2048, 4096) === false);
+    check("retry: anggaran sudah cap → jangan ulangi", p.shouldRetryStream("length", 4096, 4096) === false);
   }
 
   // --- HTTP error tidak di-retry ----------------------------------------

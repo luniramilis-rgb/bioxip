@@ -56,6 +56,19 @@ if (!chat.includes("refundCredits")) fail("api/ai/chat.js: harus refund saat gag
 for (const marker of ["runProviderStream", "streamDeepseek", 'send("replace"', "AnswerExtractor", "provider_empty_stream"]) {
   if (!chat.includes(marker)) fail(`api/ai/chat.js: tidak ada penanda streaming "${marker}"`);
 }
+// Anti-fallback ekstraktif: JSON terpotong di jalur streaming harus diulang dengan token lebih besar.
+for (const marker of ["RETRY_MAX_TOKENS", "applyLlmPayload", "fallbackExtractive", "shouldRetryStream"]) {
+  if (!chat.includes(marker)) fail(`api/ai/chat.js: eskalasi token/retry tidak ada "${marker}"`);
+}
+if (!/body\.max_tokens\) \|\| 2048/.test(chat)) fail("api/ai/chat.js: default max_tokens harus 2048");
+// Setiap penggantian teks (replace) harus menandai teks sudah terkirim agar tak dobel.
+{
+  const replaceCount = (chat.match(/send\("replace"/g) || []).length;
+  const guardCount = (chat.match(/deltasSent = true/g) || []).length;
+  if (replaceCount === 0 || guardCount < replaceCount) {
+    fail("api/ai/chat.js: setiap send(\"replace\") harus mencegah pengiriman ganda (deltasSent = true)");
+  }
+}
 const providerSrc = fs.readFileSync(path.join(ROOT, "functions", "_provider.js"), "utf8");
 for (const marker of ["stream: true", "parseOpenAiSse", "stream_options", "STREAM_TIMEOUT_MS"]) {
   if (!providerSrc.includes(marker)) fail(`_provider.js: tidak ada penanda streaming "${marker}"`);
@@ -67,6 +80,7 @@ for (const marker of ["AnswerExtractor", "extractAnswerText", "this.emitted"]) {
 const aiUi = fs.readFileSync(path.join(ROOT, "web", "js", "ai.js"), "utf8");
 if (!aiUi.includes("onReplace")) fail("ai.js: harus menangani event replace (ganti teks saat parse gagal)");
 if (!aiUi.includes("caret")) fail("ai.js: indikator menulis (caret) tidak ditemukan");
+if (!aiUi.includes("max_tokens: 2048")) fail("ai.js: permintaan chat harus memakai max_tokens 2048");
 // Klaim tanpa sitasi wajib ditandai langsung di dalam teks jawaban.
 for (const marker of ["markUnsupported", 'class="unsupported"', "unsupported-list", "klaim tanpa sitasi ditandai"]) {
   if (!aiUi.includes(marker)) fail(`ai.js: penandaan klaim tanpa sitasi "${marker}" tidak ditemukan`);
@@ -110,6 +124,17 @@ for (const marker of ["Tanya AI terkunci", "Sisa saldo"]) {
 if (ai.includes("Perkiraan biaya") || ai.includes("Tanya AI ≈")) {
   fail("ai.js: estimasi di muka harus dihapus (info biaya cukup sisa saldo)");
 }
+if (app.includes("Estimasi selalu tampil")) fail("app.js: copy #/harga masih menjanjikan estimasi di muka");
+if (!app.includes("Tidak ada hasil. Coba kata lain")) fail("app.js: empty-state hasil pencarian hilang");
+// Meta streaming tidak boleh menampilkan angka rupiah di muka; cukup jumlah bukti.
+if (ai.includes("Estimasi") || ai.includes("estimate_idr")) {
+  fail("ai.js: harga estimasi masih tampil di UI (info biaya cukup sisa saldo)");
+}
+// Sitasi memakai data-ai-cite (bukan hash) agar tidak bentrok dengan router.
+if (ai.includes('href="#cite-')) fail("ai.js: sitasi memakai href hash dan akan menabrak router");
+if (!ai.includes("data-ai-cite")) fail("ai.js: sitasi harus memakai data-ai-cite (namespace AI)");
+if (ai.includes('data-cite="')) fail("ai.js: data-cite polos bentrok dengan handler answer.js");
+if (!ai.includes("safeHref")) fail("ai.js: tautan sumber harus lewat safeHref (allowlist http/https)");
 
 // --- 2. Uji live mock (butuh service role) ---------------------------------
 async function admin(pathname, init = {}) {

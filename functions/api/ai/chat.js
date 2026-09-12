@@ -2,7 +2,7 @@ import { bearerToken, fetchAccount, fetchUserEmail, holdCredits, isAdminEmail, r
 
 import { chargedMicroIdr, costMicroIdr, estimateMicroIdr, microToIdr } from "../../_pricing.js";
 import { estimateInputTokens } from "../../_estimate.js";
-import { callDeepseek, extractJson, providerReady, streamDeepseek } from "../../_provider.js";
+import { callDeepseek, extractJson, providerReady, shouldRetryStream, streamDeepseek } from "../../_provider.js";
 import {
   AnswerExtractor,
   buildUserPrompt,
@@ -18,6 +18,8 @@ import { answerCacheGet, answerCachePut, answerHash } from "../../_answercache.j
 import { detectGuidelineTopic, guidelineEnabled, searchGuidelines, toEvidence } from "../../_guideline.js";
 
 const MAX_TOKENS_LIMIT = 2048;
+// Anggaran ulang saat JSON terpotong (bukan permintaan normal pengguna).
+const RETRY_MAX_TOKENS = 4096;
 // Cache jawaban AI: memotong biaya token berulang (pertanyaan populer) secara signifikan.
 const ANSWER_CACHE_TTL = 7 * 24 * 3600;
 const ANSWER_CACHE_NAMESPACE = "answer:v2";
@@ -177,7 +179,7 @@ export async function onRequestPost(context) {
   if (!question) return json({ error: "question_wajib" }, 400);
 
   const feature = String(body.feature || "chat");
-  const maxTokens = Math.min(Math.max(Number(body.max_tokens) || 1024, 128), MAX_TOKENS_LIMIT);
+  const maxTokens = Math.min(Math.max(Number(body.max_tokens) || 2048, 128), MAX_TOKENS_LIMIT);
   const useProvider = body.use_provider !== false;
 
   const safety = classifyInput(question);
@@ -295,6 +297,32 @@ export async function onRequestPost(context) {
           model: providerIsReady ? env.DEEPSEEK_MODEL || "deepseek-flash" : "mock",
           v: PROMPT_VERSION,
         }, origin);
+
+        // Terapkan payload JSON provider sebagai jawaban LLM + simpan cache.
+        const applyLlmPayload = async (payload, fallbackText = "") => {
+          answer = String(payload.answer || fallbackText || "");
+          claims = payload.claims || [];
+          abstain = Boolean(payload.abstain);
+          redFlags = mergeRedFlags(safetyRedFlags, payload.red_flags);
+          mode = "llm";
+          const cachePayload = { answer, claims, abstain, model, evidence: citationSnapshot(evidence), question };
+          cacheSaved = await cachePutJson(cacheId, cachePayload, ANSWER_CACHE_TTL);
+          await answerCachePut(env, answerHash(cacheId), cachePayload, ANSWER_CACHE_TTL);
+        };
+        // Provider tidak menghasilkan JSON valid → tampilkan jawaban ekstraktif.
+        const fallbackExtractive = (extra) => {
+          const extractive = extractiveAnswer(question, evidence);
+          answer = extractive.answer;
+          claims = extractive.claims;
+          abstain = Boolean(extractive.abstain);
+          mode = "extractive";
+          deltasSent = true; // teks sudah dikirim lewat replace → jangan kirim ulang di loop akhir
+          send("replace", { text: answer });
+          providerError = { error: "provider_parse_failed", ...extra };
+          console.warn("bioxip: keluaran provider tidak dapat diparsing", JSON.stringify(providerError));
+          send("provider_parse_error", providerError);
+        };
+
         if (providerIsReady) {
           let cachedAnswer = await cacheGetJson(cacheId).catch(() => null);
           let cacheLayer = cachedAnswer ? "l1" : null;
@@ -353,32 +381,43 @@ export async function onRequestPost(context) {
             }
 
             if (streamed.parsed) {
-              const payload = streamed.parsed;
-              answer = String(payload.answer || streamed.extracted || "");
-              claims = payload.claims || [];
-              abstain = Boolean(payload.abstain);
-              redFlags = mergeRedFlags(safetyRedFlags, payload.red_flags);
-              mode = "llm";
-              const cachePayload = { answer, claims, abstain, model, evidence: citationSnapshot(evidence), question };
-              cacheSaved = await cachePutJson(cacheId, cachePayload, ANSWER_CACHE_TTL);
-              await answerCachePut(env, answerHash(cacheId), cachePayload, ANSWER_CACHE_TTL);
+              await applyLlmPayload(streamed.parsed, streamed.extracted);
             } else {
-              // Teks sudah tampil sebagian, tetapi struktur klaim tidak dapat diparsing:
-              // ganti dengan jawaban ekstraktif agar pengguna tidak melihat teks setengah jadi.
-              const extractive = extractiveAnswer(question, evidence);
-              answer = extractive.answer;
-              claims = extractive.claims;
-              abstain = Boolean(extractive.abstain);
-              mode = "extractive";
-              send("replace", { text: answer });
-              providerError = {
-                error: "provider_parse_failed",
-                finish_reason: streamed.finish_reason || null,
-                output_tokens: usage.output_tokens,
-                streamed: true,
-              };
-              console.warn("bioxip: keluaran stream tidak dapat diparsing", JSON.stringify(providerError));
-              send("provider_parse_error", providerError);
+              // Teks sudah tampil sebagian, tetapi struktur klaim tidak dapat diparsing.
+              // Bila bukan karena berhenti wajar, ulangi sekali tanpa stream dengan
+              // anggaran token lebih besar (callDeepseek ikut menaikkan sampai cap).
+              const retryable = shouldRetryStream(streamed.finish_reason, maxTokens, RETRY_MAX_TOKENS);
+              const retry = retryable
+                ? await callDeepseek(env, {
+                    system: SYSTEM_PROMPT,
+                    user: buildUserPrompt(question, evidence),
+                    maxTokens: RETRY_MAX_TOKENS,
+                  })
+                : null;
+              if (retry?.ok && retry.parsed) {
+                await applyLlmPayload(retry.parsed, retry.raw);
+                model = retry.model || model;
+                usage = {
+                  input_tokens: retry.usage.input_tokens,
+                  output_tokens: retry.usage.output_tokens,
+                  cache_hit_tokens: retry.usage.cache_hit_tokens,
+                  cache_miss_tokens: retry.usage.cache_miss_tokens,
+                };
+                providerDebug = {
+                  ...providerDebug,
+                  retried: true,
+                  retry_max_tokens: retry.requested_max_tokens || RETRY_MAX_TOKENS,
+                };
+                deltasSent = true; // teks lengkap dikirim lewat replace
+                send("replace", { text: answer });
+              } else {
+                fallbackExtractive({
+                  finish_reason: streamed.finish_reason || null,
+                  output_tokens: usage.output_tokens,
+                  streamed: true,
+                  retried: Boolean(retry),
+                });
+              }
             }
           } else {
             // Streaming gagal total → fallback ke panggilan non-streaming yang sudah terbukti.
@@ -398,29 +437,13 @@ export async function onRequestPost(context) {
                 cache_miss_tokens: result.usage.cache_miss_tokens,
               };
               if (result.parsed) {
-                const payload = result.parsed;
-                answer = String(payload.answer || "");
-                claims = payload.claims || [];
-                abstain = Boolean(payload.abstain);
-                redFlags = mergeRedFlags(safetyRedFlags, payload.red_flags);
-                mode = "llm";
-                const cachePayload = { answer, claims, abstain, model, evidence: citationSnapshot(evidence), question };
-              cacheSaved = await cachePutJson(cacheId, cachePayload, ANSWER_CACHE_TTL);
-              await answerCachePut(env, answerHash(cacheId), cachePayload, ANSWER_CACHE_TTL);
+                await applyLlmPayload(result.parsed, result.raw);
               } else {
-                const extractive = extractiveAnswer(question, evidence);
-                answer = extractive.answer;
-                claims = extractive.claims;
-                abstain = Boolean(extractive.abstain);
-                mode = "extractive";
-                providerError = {
-                  error: "provider_parse_failed",
+                fallbackExtractive({
                   finish_reason: result.finish_reason || null,
                   output_tokens: result.usage.output_tokens,
                   requested_max_tokens: result.requested_max_tokens || maxTokens,
-                };
-                console.warn("bioxip: keluaran provider tidak dapat diparsing", JSON.stringify(providerError));
-                send("provider_parse_error", providerError);
+                });
               }
             } else {
               providerError = { error: result.error, detail: result.detail || null };

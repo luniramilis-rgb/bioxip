@@ -7,6 +7,134 @@
     return S ? S.escape(value) : String(value ?? "");
   }
 
+  // Sitasi aktif untuk run terakhir; dipakai delegasi tooltip di tingkat dokumen.
+  let activeCites = new Map();
+  let tipEl = null;
+  let tipHideTimer = null;
+
+  function cancelTipHide() {
+    if (tipHideTimer) clearTimeout(tipHideTimer);
+    tipHideTimer = null;
+  }
+
+  function scheduleTipHide() {
+    cancelTipHide();
+    tipHideTimer = setTimeout(hideTip, 180);
+  }
+
+  function citeMeta(item) {
+    if (!item) return "";
+    return item.guideline
+      ? [item.guideline.label || item.guideline.tier, item.guideline.edisi, item.guideline.locator].filter(Boolean).join(" · ")
+      : item.source || "";
+  }
+
+  function safeHref(url) {
+    const raw = String(url || "").trim();
+    if (!raw) return "";
+    const base = (typeof window !== "undefined" && window.location?.origin) || "https://localhost";
+    try {
+      const parsed = new URL(raw, base);
+      return parsed.protocol === "http:" || parsed.protocol === "https:" ? esc(parsed.href) : "";
+    } catch {
+      return "";
+    }
+  }
+
+  // Penanda [n] dibuat sebagai tombol (bukan tautan anchor berbasis hash)
+  // agar tidak bentrok dengan router yang akan merender "Halaman tidak ditemukan".
+  // Atribut di-namespace (data-ai-*) supaya tidak bertabrakan dengan handler
+  // data-cite milik answer.js.
+  function citeLink(n, cites) {
+    const item = cites ? cites.get(n) : null;
+    const aria = item ? `[${n}] ${item.title}${citeMeta(item) ? ` — ${citeMeta(item)}` : ""}` : `[${n}]`;
+    return `<button type="button" class="cite-link" data-ai-cite="${n}" aria-label="${esc(aria)}">[${n}]</button>`;
+  }
+
+  function linkifyCites(html, cites) {
+    if (!cites || !cites.size) return html;
+    return html.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (whole, group) => {
+      const nums = group.split(",").map((part) => Number(part.trim()));
+      if (!nums.every((n) => cites.has(n))) return whole;
+      return nums.map((n) => citeLink(n, cites)).join(" ");
+    });
+  }
+
+  function ensureTip() {
+    if (tipEl) return tipEl;
+    tipEl = document.createElement("div");
+    tipEl.className = "cite-tip";
+    tipEl.setAttribute("role", "tooltip");
+    tipEl.hidden = true;
+    tipEl.addEventListener("mouseover", cancelTipHide);
+    tipEl.addEventListener("mouseout", scheduleTipHide);
+    document.body.appendChild(tipEl);
+    return tipEl;
+  }
+
+  function showTip(target) {
+    const item = activeCites.get(Number(target.dataset.aiCite));
+    if (!item) return;
+    cancelTipHide();
+    const tip = ensureTip();
+    const meta = citeMeta(item);
+    const href = safeHref(item.url);
+    tip.innerHTML = `<strong>[${esc(target.dataset.aiCite)}] ${esc(item.title)}</strong>${
+      meta ? `<span>${esc(meta)}</span>` : ""
+    }${href ? `<a href="${href}" target="_blank" rel="noopener">Buka sumber</a>` : ""}`;
+    tip.hidden = false;
+    const rect = target.getBoundingClientRect();
+    const top = window.scrollY + rect.top - tip.offsetHeight - 8;
+    tip.style.top = `${Math.max(8, top)}px`;
+    tip.style.left = `${Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, window.scrollX + rect.left))}px`;
+  }
+
+  function hideTip() {
+    if (tipEl) tipEl.hidden = true;
+  }
+
+  function flashAndScroll(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("cite-flash");
+    setTimeout(() => el.classList.remove("cite-flash"), 1200);
+  }
+
+  function targetEl(event) {
+    const target = event.target;
+    return target && typeof target.closest === "function" ? target : null;
+  }
+
+  document.addEventListener("click", (event) => {
+    const el = targetEl(event);
+    const cite = el?.closest("[data-ai-cite]");
+    if (cite) {
+      event.preventDefault();
+      flashAndScroll(`cite-${cite.dataset.aiCite}`);
+      return;
+    }
+    const claim = el?.closest("[data-ai-claim]");
+    if (claim) {
+      event.preventDefault();
+      flashAndScroll(`claim-${claim.dataset.aiClaim}`);
+    }
+  });
+  document.addEventListener("mouseover", (event) => {
+    const cite = targetEl(event)?.closest("[data-ai-cite]");
+    if (cite) showTip(cite);
+  });
+  document.addEventListener("mouseout", (event) => {
+    if (targetEl(event)?.closest("[data-ai-cite]")) scheduleTipHide();
+  });
+  document.addEventListener("focusin", (event) => {
+    const cite = targetEl(event)?.closest("[data-ai-cite]");
+    if (cite) showTip(cite);
+  });
+  document.addEventListener("focusout", (event) => {
+    if (targetEl(event)?.closest("[data-ai-cite]")) scheduleTipHide();
+  });
+
   // Normalisasi spasi + huruf kecil, sekaligus memetakan tiap karakter hasil
   // normalisasi ke indeks aslinya agar klaim bisa dicari tanpa merusak escaping.
   function indexedNormalize(value) {
@@ -87,7 +215,7 @@
   function panelHTML() {
     return `
       <section id="ai-panel" class="ai-panel">
-        <div id="ai-status" class="muted">Menyiapkan estimasi…</div>
+        <div id="ai-status" class="muted">Menyiapkan jawaban…</div>
         <div id="ai-ask"></div>
         <div id="ai-answer" hidden></div>
       </section>`;
@@ -165,6 +293,7 @@
     let keyClaims = [];
     let markedClaims = new Set();
     const citations = new Map();
+    activeCites = citations;
 
     // Render jawaban sebagai paragraf (LLM memakai \n\n) + kursor saat menulis.
     function renderAnswer(host, value, writing) {
@@ -183,19 +312,17 @@
         .map((part, index) => {
           const { html, matched } = markUnsupported(part, unsupported);
           for (const claim of matched) markedClaims.add(claim);
-          return `<p>${html}${index === paragraphs.length - 1 ? caret : ""}</p>`;
+          return `<p>${linkifyCites(html, citations)}${index === paragraphs.length - 1 ? caret : ""}</p>`;
         })
         .join("");
     }
 
     C.streamChat(
-      { question, feature: "chat", max_tokens: 1024, grounding: { search: true, drug: true } },
+      { question, feature: "chat", max_tokens: 2048, grounding: { search: true, drug: true } },
       {
         onMeta(data) {
           if (status) {
-            status.innerHTML = `<span class="muted">Estimasi ${esc(C.formatIdr(data.estimate_idr))} · ${data.evidence_count} sumber bukti${
-              data.cached ? " · dari cache" : ""
-            }</span>`;
+            status.innerHTML = `<span class="muted">${data.evidence_count} sumber bukti${data.cached ? " · dari cache" : ""}</span>`;
           }
         },
         onDelta(data) {
@@ -221,12 +348,24 @@
           renderAnswer(document.getElementById("ai-text"), text, false);
           const host = document.getElementById("ai-cites");
           if (!host) return;
+          // Peta dua arah: sumber → nomor klaim yang merujuknya.
+          const claimRefs = new Map();
+          keyClaims.forEach((claim, index) => {
+            for (const n of claim.citations || []) {
+              if (!claimRefs.has(n)) claimRefs.set(n, []);
+              claimRefs.get(n).push(index + 1);
+            }
+          });
           const list = [...citations.values()]
             .map((item) => {
-              const meta = item.guideline
-                ? [item.guideline.label || item.guideline.tier, item.guideline.edisi, item.guideline.locator].filter(Boolean).join(" · ")
-                : item.source;
-              return `<li id="cite-${item.n}" value="${item.n}"><a href="${esc(item.url || "#")}" target="_blank" rel="noopener">${esc(item.title)}</a> <span class="muted">(${esc(meta)})</span></li>`;
+              const meta = citeMeta(item);
+              const refs = claimRefs.get(item.n) || [];
+              const refHtml = refs.length
+                ? ` <span class="cite-refs">· dirujuk klaim ${refs
+                    .map((i) => `<button type="button" class="claim-ref" data-ai-claim="${i}" aria-label="Ke klaim ${i}">${i}</button>`)
+                    .join(", ")}</span>`
+                : "";
+              return `<li id="cite-${item.n}" value="${item.n}"><a href="${safeHref(item.url) || "#"}" target="_blank" rel="noopener">${esc(item.title)}</a> <span class="muted">(${esc(meta)})</span>${refHtml}</li>`;
             })
             .join("");
           // Klaim yang tidak berhasil dipetakan ke teks (mis. terlalu pendek atau
@@ -242,15 +381,15 @@
           }
           const fallback = unmarked.length ? uncitedList(unmarked) : "";
           const bullets = keyClaims.length
-            ? `<h3>Klaim kunci</h3><ul class="answer-list ai-claims">${keyClaims
-                .map((claim) => {
-                  const cites = (claim.citations || []).map((n) => `<a class="cite-link" href="#cite-${n}">[${n}]</a>`).join(" ");
-                  return `<li class="${claim.supported ? "" : "unsupported-item"}">${esc(claim.text)} ${cites}</li>`;
+            ? `<h3>Klaim kunci</h3><ol class="answer-list ai-claims">${keyClaims
+                .map((claim, index) => {
+                  const cites = (claim.citations || []).map((n) => citeLink(n, citations)).join(" ");
+                  return `<li id="claim-${index + 1}" class="${claim.supported ? "" : "unsupported-item"}">${esc(claim.text)} ${cites}</li>`;
                 })
-                .join("")}</ul>`
+                .join("")}</ol>`
             : "";
           const exportText = [...citations.values()]
-            .map((item) => `[${item.n}] ${item.title} (${item.source}) ${item.url || ""}`.trim())
+            .map((item) => `[${item.n}] ${item.title} (${citeMeta(item) || item.source || ""}) ${item.url || ""}`.trim())
             .join("\n");
           const exportBtn = exportText
             ? `<p class="actions"><button class="btn small ghost" data-copy="${esc(exportText)}">Salin daftar sumber</button></p>`
