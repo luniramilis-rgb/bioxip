@@ -220,6 +220,13 @@ class Store:
         rows = self.select_rows("formulary_meta", {"select": "value", "key": f"eq.{key}"})
         return rows[0]["value"] if rows else None
 
+    def publish_guideline(self, rows: list[dict]) -> int:
+        """Upsert `guideline_recs` (tanpa kolom review; payload sudah sesuai kolom)."""
+        if not rows:
+            return 0
+        created = self.upsert_rows("guideline_recs", rows, on_conflict="source_id,topik,locator")
+        return len(created)
+
     def set_meta(self, key: str, value: str) -> None:
         self.upsert_rows(
             "formulary_meta",

@@ -6,7 +6,7 @@ Prinsip arsitektur: **pakai ulang pola formulary** (`sources → staging → val
 
 **Keputusan kebijakan (2026-09-12):** **fetch-first** — fokus pada data yang **bisa di-fetch** dari endpoint publik. **Gate lisensi/MoU/kesepakatan DIHAPUS** sebagai penghambat; kebijakan penggantinya: ambil dari endpoint publik, simpan pointer + snippet + **atribusi sumber**, jangan menyalin dokumen penuh, dan sediakan kanal koreksi/takedown.
 
-**Status (2026-09-12):** **L0 selesai** — kontrak `docs/guideline.md`, migrasi **`023_guideline.sql`** (1 tabel `guideline_recs` + view `guideline_recs_public` + RPC `fn_guideline_search`; RLS anon read-only via view) dan **`024_guideline_search_default.sql`** (`p_query` default agar pencarian bisa hanya `p_topik`), plus validator statis `scripts/validate_guideline.js` (masuk CI). Skema memakai ulang `fact_sources` (sumber/edisi) dan `formulary_staging` (two-phase); tanpa PDF/full-text. **L1–L5 belum** (belum ada adapter/ingest). Direvisi fetch-first; gate lisensi/MoU dihapus pada 2026-09-12.
+**Status (2026-09-12):** **L0 selesai** (kontrak `docs/guideline.md`; migrasi `023`/`024`; validator `validate_guideline.js` + CI). **L1 selesai** — adapter `harvester/providers/{farmalkes,whogho,regulasi}.py` + provider `guideline.py` + runner `ingest_guideline.py` (staging→publish ke `guideline_recs`, reuse `fact_sources`/`formulary_staging`); ingest live TB/DBD/HIV → **13 record** dipublikasikan (farmalkes 12 `regulator`, WHO GHO 1 `epidemiologi`; topik tb 11, hiv 2, **dbd 0** karena tak ada sumber ter-fetch untuk dengue). Regulasi/PNPK disuplai operator via `--regulasi-file` (tanpa menebak URL). **L2–L5 belum** (belum ada routing pencarian/AI memakai guideline). Kebijakan fetch-first; gate lisensi/MoU dihapus.
 
 ---
 
