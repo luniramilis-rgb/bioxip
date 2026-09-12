@@ -1,4 +1,5 @@
-import { bearerToken, fetchAccount, holdCredits, refundCredits, settleCredits, json } from "../../_credits.js";
+import { bearerToken, fetchAccount, fetchUserEmail, holdCredits, isAdminEmail, refundCredits, settleCredits, json } from "../../_credits.js";
+
 import { chargedMicroIdr, costMicroIdr, estimateMicroIdr, microToIdr } from "../../_pricing.js";
 import { estimateInputTokens } from "../../_estimate.js";
 import { callDeepseek, extractJson, providerReady, streamDeepseek } from "../../_provider.js";
@@ -187,6 +188,10 @@ export async function onRequestPost(context) {
   const account = await fetchAccount(env, token);
   if (!account) return json({ error: "unauthorized" }, 401);
 
+  // Akses admin (unlimited, tanpa saldo) — hanya bila allowlist env `ADMIN_EMAILS` cocok.
+  const adminAllowlist = String(env.ADMIN_EMAILS || "").trim();
+  const isAdmin = adminAllowlist ? isAdminEmail(await fetchUserEmail(env, token), adminAllowlist) : false;
+
   const rpm = await effectiveRpm(env, token);
   const recent = await recentRequestCount(env, token);
   if (recent >= rpm) {
@@ -222,29 +227,31 @@ export async function onRequestPost(context) {
   });
 
   const balanceMicro = Number(account.balance_micro_idr || 0);
-  if (balanceMicro < estimate) {
-    return json(
-      {
-        error: "insufficient_balance",
-        balance_idr: microToIdr(balanceMicro),
-        estimate_idr: microToIdr(estimate),
-      },
-      402,
-    );
-  }
-
   const requestId = crypto.randomUUID();
-  const hold = await holdCredits(env, token, requestId, estimate);
-  if (!hold.ok) {
-    const insufficient = String(hold.body?.message || hold.body || "").includes("insufficient_balance");
-    return json(
-      {
-        error: insufficient ? "insufficient_balance" : "hold_failed",
-        balance_idr: microToIdr(balanceMicro),
-        estimate_idr: microToIdr(estimate),
-      },
-      insufficient ? 402 : 502,
-    );
+  if (!isAdmin) {
+    if (balanceMicro < estimate) {
+      return json(
+        {
+          error: "insufficient_balance",
+          balance_idr: microToIdr(balanceMicro),
+          estimate_idr: microToIdr(estimate),
+        },
+        402,
+      );
+    }
+
+    const hold = await holdCredits(env, token, requestId, estimate);
+    if (!hold.ok) {
+      const insufficient = String(hold.body?.message || hold.body || "").includes("insufficient_balance");
+      return json(
+        {
+          error: insufficient ? "insufficient_balance" : "hold_failed",
+          balance_idr: microToIdr(balanceMicro),
+          estimate_idr: microToIdr(estimate),
+        },
+        insufficient ? 402 : 502,
+      );
+    }
   }
 
   const safetyRedFlags = safety.red_flags || [];
@@ -462,9 +469,12 @@ export async function onRequestPost(context) {
         });
         chargedMicro = chargedMicroIdr(cost);
         if (chargedMicro > estimate) chargedMicro = estimate;
+        if (isAdmin) chargedMicro = 0; // akses admin: tanpa biaya
 
-        const settled = await settleCredits(env, token, requestId, chargedMicro);
-        if (!settled.ok) throw new Error("settle_failed");
+        if (!isAdmin) {
+          const settled = await settleCredits(env, token, requestId, chargedMicro);
+          if (!settled.ok) throw new Error("settle_failed");
+        }
 
         await logUsage(env, token, {
           requestId,
@@ -511,7 +521,7 @@ export async function onRequestPost(context) {
         });
       } catch (error) {
         try {
-          await refundCredits(env, token, requestId);
+          if (!isAdmin) await refundCredits(env, token, requestId); // admin: tidak ada hold untuk dikembalikan
           await logUsage(env, token, {
             requestId,
             feature,

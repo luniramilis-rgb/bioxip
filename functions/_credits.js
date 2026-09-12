@@ -84,3 +84,27 @@ export function json(data, status = 200) {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+/** Cek email admin terhadap allowlist (env). Murni & mudah diuji. */
+export function isAdminEmail(email, allowlist) {
+  const list = String(allowlist || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const value = String(email || "").trim().toLowerCase();
+  return Boolean(value) && list.includes(value);
+}
+
+/** Ambil email user dari access token (Supabase Auth). */
+export async function fetchUserEmail(env, token) {
+  try {
+    const resp = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data?.email || null;
+  } catch {
+    return null;
+  }
+}

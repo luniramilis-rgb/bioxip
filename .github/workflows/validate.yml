@@ -81,6 +81,9 @@ jobs:
       - name: Unit test intent classifier (R2)
         run: node tests/intent_unit.js
 
+      - name: Unit test akses admin (env-guarded)
+        run: node tests/admin_unit.js
+
       - name: Unit test format sitasi (Vancouver/APA)
         run: node tests/format_unit.js
 

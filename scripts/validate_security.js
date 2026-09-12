@@ -157,6 +157,16 @@ for (const file of webFiles) {
   if (/SERVICE_ROLE|service_role/i.test(source)) {
     problems.push(`${path.relative(ROOT, file)}: memuat service_role di kode klien`);
   }
+  // Akses admin hanya boleh dari env server, tidak boleh dirujuk di klien.
+  if (/\bADMIN_EMAILS\b/.test(source)) {
+    problems.push(`${path.relative(ROOT, file)}: ADMIN_EMAILS tidak boleh ada di kode klien (server-only)`);
+  }
+}
+
+// 3b. Bypass admin hanya di chat.js dan wajib env-guarded (default OFF).
+const chatAdmin = read("functions/api/ai/chat.js");
+if (!chatAdmin.includes("env.ADMIN_EMAILS") || !chatAdmin.includes("isAdminEmail")) {
+  problems.push("api/ai/chat.js: bypass admin harus memakai env.ADMIN_EMAILS + isAdminEmail");
 }
 
 // 4. Service role hanya dipakai di edge (webhook) — bukan di endpoint publik lain.
