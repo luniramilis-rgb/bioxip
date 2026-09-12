@@ -1,0 +1,2 @@
+# Golden set dibandingkan byte-per-byte oleh `build_golden.js --check` → wajib LF.
+tests/golden/grounded_set.json text eol=lf

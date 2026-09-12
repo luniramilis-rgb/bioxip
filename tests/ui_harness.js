@@ -390,6 +390,7 @@ async function dispatchHash(hash) {
     streamedCites.slice(0, 200),
   ]);
   results.push(["ai: tombol salin daftar sumber tampil", streamedCites.includes("Salin daftar sumber")]);
+  results.push(["ai: indikator kekuatan bukti tampil", streamedCites.includes("Kekuatan bukti")]);
 
   // Klaim sama di dua paragraf tidak boleh menghasilkan hitungan mustahil ("2 dari 1").
   await dispatchHash("#/search?q=duplikat&mode=ai");

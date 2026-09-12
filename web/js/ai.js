@@ -263,10 +263,17 @@
           const exportBtn = exportText
             ? `<p class="actions"><button class="btn small ghost" data-copy="${esc(exportText)}">Salin daftar sumber</button></p>`
             : "";
+          // Indikator kekuatan bukti (bukan "dukungan sitasi" mentah): jawaban tanpa
+          // klaim tidak boleh tampil 100%.
+          const sourceCount = citations.size;
+          const strength =
+            keyClaims.length === 0
+              ? "Bukti belum cukup untuk diringkas"
+              : `Kekuatan bukti: ${sourceCount} sumber · ${Math.round((data.support_rate || 0) * 100)}% klaim bersitasi`;
           host.innerHTML = `
             ${bullets}
             ${list ? `<h3>Sumber</h3><ol class="answer-list ai-cites">${list}</ol>${exportBtn}` : ""}
-            <p class="muted">Dukungan sitasi: ${Math.round((data.support_rate || 0) * 100)}%${uncited}</p>
+            <p class="muted">${esc(strength)}${uncited}</p>
             ${fallback}`;
         },
         onRedFlag(data) {

@@ -4,7 +4,7 @@ Dokumen hidup. Turunan dari `docs/blueprint.md` (arsitektur) dan rekonsiliasi te
 
 Tujuan: memisahkan **yang sudah selesai**, **yang parsial**, dan **roadmap** dalam materi strategi (prompt patterns, local-first, daftar upgrade, unifikasi medis–farmasi), lalu menetapkan **rencana eksekusi tervalidasi** berikutnya.
 
-**Progres (2026-09-12):** N0 selesai. **N1 sebagian** (`minInterval` diekspor + `tests/pubmed_unit.js`; `NCBI_EMAIL` diset; `NCBI_API_KEY` menunggu kunci NCBI). **N2 selesai** (patterns.js 5 pola + chips + precache v6). **N3 selesai** (chip Bukti klinis, ekspor Vancouver/APA, bullet klaim kunci + salin daftar sumber). **N4 selesai** — reranking local-first via `source_tier`/sumber (`_rank.js`), 2 uji baru. N5 belum.
+**Progres (2026-09-12):** N0 selesai. **N1 sebagian** (`minInterval` diekspor + `tests/pubmed_unit.js`; `NCBI_EMAIL` diset; `NCBI_API_KEY` menunggu kunci NCBI). **N2 selesai** (patterns.js 5 pola + chips + precache v6). **N3 selesai** (chip Bukti klinis, ekspor Vancouver/APA, bullet klaim kunci + salin daftar sumber). **N4 selesai** (reranking local-first via `source_tier`). **N5 selesai** — 5 topik baru (Fornas, AMR, Interaksi Obat, Herbal, Metodologi) sebagai **konten-saja** (`golden:false` → tidak mengubah golden set), OG generik, halaman statis tervalidasi; indikator **"Kekuatan bukti"** menggantikan persentase `support_rate` mentah (jawaban tanpa klaim tidak lagi tampil 100%).
 
 ---
 

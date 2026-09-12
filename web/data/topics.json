@@ -220,6 +220,121 @@
         "Bagaimana efektivitas intervensi psikologis jangka pendek untuk ansietas?",
         "Apa strategi mengurangi stigma layanan kesehatan mental?"
       ]
+    },
+    {
+      "slug": "fornas",
+      "golden": false,
+      "label": "Formularium Nasional (Fornas)",
+      "query": "formularium nasional ketersediaan obat Indonesia",
+      "desc": "Ketersediaan obat, batasan peresepan, dan kesetaraan generik.",
+      "intro": "Fornas menjadi acuan ketersediaan dan pembiayaan obat di fasilitas kesehatan Indonesia. Halaman ini merangkum tema bukti seputar ketersediaan, substitusi generik, dan batasan peresepan.",
+      "points": [
+        "Ketersediaan obat di fasilitas kesehatan mengikuti daftar Fornas dan ketentuan pembiayaan.",
+        "Substitusi ke generik atau padanan terapeutik perlu mempertimbangkan bioekivalensi dan ketersediaan.",
+        "Batasan peresepan (restriksi) dan obat program menentukan pilihan terapi pada layanan primer.",
+        "Edisi Fornas diperbarui berkala; selalu verifikasi ke sumber resmi terbaru."
+      ],
+      "sources": [
+        { "name": "Fornas (e-Fornas Kemenkes)", "url": "https://e-fornas.kemkes.go.id/guest/daftar-obat" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Bagaimana ketentuan ketersediaan dan batasan peresepan obat dalam Fornas?",
+        "Apa pertimbangan substitusi generik dan bioekivalensi?",
+        "Bagaimana edisi Fornas memengaruhi pilihan terapi di layanan primer?"
+      ]
+    },
+    {
+      "slug": "amr",
+      "golden": false,
+      "label": "Resistensi Antimikroba (AMR)",
+      "query": "antimicrobial resistance stewardship",
+      "desc": "Stewardship antibiotik dan pola resistensi.",
+      "intro": "Resistensi antimikroba menurunkan efektivitas terapi infeksi dan meningkatkan mortalitas. Penggunaan antibiotik secara bijak menjadi intervensi utama.",
+      "points": [
+        "Pemberian antibiotik hanya bila ada indikasi dan sesuai pedoman setempat.",
+        "Pemantauan pola resistensi lokal membantu memilih terapi empiris.",
+        "Kepatuhan dosis, durasi, dan de-eskalasi menekan munculnya resistensi.",
+        "Edukasi pasien dan tenaga kesehatan mendukung program stewardship."
+      ],
+      "sources": [
+        { "name": "WHO Indonesia", "url": "https://www.who.int/indonesia" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Bagaimana prinsip antimicrobial stewardship di fasilitas kesehatan?",
+        "Apa bukti efektivitas pemantauan pola resistensi terhadap pemilihan terapi?",
+        "Bagaimana strategi menurunkan penggunaan antibiotik yang tidak perlu?"
+      ]
+    },
+    {
+      "slug": "interaksi-obat",
+      "golden": false,
+      "label": "Interaksi Obat",
+      "query": "drug interactions mechanism management",
+      "desc": "Mekanisme interaksi dan pemantauan klinis.",
+      "intro": "Interaksi obat dapat menurunkan efektivitas atau meningkatkan toksisitas. Pemahaman mekanisme dan pemantauan membantu mencegah kejadian tidak diinginkan, terutama pada polifarmasi.",
+      "points": [
+        "Interaksi farmakokinetik (mis. enzim CYP) dan farmakodinamik memiliki implikasi pemantauan berbeda.",
+        "Polifarmasi dan pasien lansia meningkatkan risiko interaksi bermakna.",
+        "Beberapa interaksi dapat dikelola dengan penyesuaian dosis atau pemantauan, bukan selalu dihentikan.",
+        "Verifikasi interaksi ke sumber resmi/label tetap diperlukan untuk keputusan klinis."
+      ],
+      "sources": [
+        { "name": "Fornas (e-Fornas Kemenkes)", "url": "https://e-fornas.kemkes.go.id/guest/daftar-obat" },
+        { "name": "Farmalkes Kemenkes", "url": "https://farmalkes.kemkes.go.id/" }
+      ],
+      "questions": [
+        "Bagaimana mekanisme interaksi obat dan cara pemantauannya?",
+        "Apa interaksi bermakna yang perlu diwaspadai pada polifarmasi lansia?",
+        "Bagaimana mengelola interaksi obat tanpa menghentikan terapi yang diperlukan?"
+      ]
+    },
+    {
+      "slug": "herbal",
+      "golden": false,
+      "label": "Obat Herbal & Fitofarmaka",
+      "query": "herbal medicine Indonesia efficacy safety",
+      "desc": "Bukti efikasi dan keamanan produk herbal.",
+      "intro": "Penggunaan herbal dan fitofarmaka luas di Indonesia, sering bersama obat konvensional. Bukti efikasi dan keamanannya bervariasi, sehingga penilaian kritis dan pemantauan tetap penting.",
+      "points": [
+        "Tingkat bukti produk herbal bervariasi dari tradisional hingga fitofarmaka teruji klinis.",
+        "Potensi interaksi herbal–obat dan kualitas produk perlu diperhatikan.",
+        "Pelaporan efek samping membantu pemantauan keamanan.",
+        "Verifikasi status produk ke sumber resmi dianjurkan."
+      ],
+      "sources": [
+        { "name": "BPOM RI", "url": "https://pom.go.id/" },
+        { "name": "Kementerian Kesehatan RI", "url": "https://kemkes.go.id/" }
+      ],
+      "questions": [
+        "Apa bukti efikasi dan keamanan fitofarmaka untuk penyakit kronis?",
+        "Apa potensi interaksi antara herbal dan obat konvensional?",
+        "Bagaimana menilai mutu dan status registrasi produk herbal?"
+      ]
+    },
+    {
+      "slug": "metodologi",
+      "golden": false,
+      "label": "Metodologi & Systematic Review",
+      "query": "systematic review methodology risk of bias",
+      "desc": "Panduan metodologi dan penilaian risiko bias.",
+      "intro": "Kualitas kesimpulan bergantung pada metodologi. Halaman ini merangkum tema bukti tentang penyusunan pertanyaan, penilaian risiko bias, dan sintesis bukti.",
+      "points": [
+        "Kerangka PICO membantu merumuskan pertanyaan dan strategi pencarian.",
+        "Penilaian risiko bias menentukan keyakinan pada hasil studi.",
+        "Heterogenitas memengaruhi pilihan model sintesis (fixed vs random effects).",
+        "Pelaporan mengikuti panduan (mis. PRISMA) agar dapat direplikasi."
+      ],
+      "sources": [
+        { "name": "DOAJ (jurnal akses terbuka)", "url": "https://doaj.org/" },
+        { "name": "Indonesia OneSearch", "url": "https://onesearch.id/" }
+      ],
+      "questions": [
+        "Bagaimana menyusun pertanyaan dan strategi pencarian yang sistematis?",
+        "Bagaimana menilai risiko bias pada studi primer?",
+        "Kapan memakai model fixed-effect vs random-effects?"
+      ]
     }
   ]
 }

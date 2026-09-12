@@ -25,6 +25,8 @@ const topicTemplates = [
   { role: "farmasi", suffix: "Apa pertimbangan keamanan dan efek samping terapi pada", type: "keamanan" },
 ];
 for (const topic of topics) {
+  // Topik konten-saja (golden:false) tidak menambah item eval → menjaga golden set stabil.
+  if (topic.golden === false) continue;
   for (const template of topicTemplates) {
     generated.push({
       id: nextId("t"),

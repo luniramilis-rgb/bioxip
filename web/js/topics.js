@@ -58,5 +58,35 @@ window.BIOXIP_TOPICS = [
     "label": "Kesehatan Mental",
     "query": "mental health intervention OR depression OR anxiety",
     "desc": "Intervensi kesehatan mental remaja dan dewasa."
+  },
+  {
+    "slug": "fornas",
+    "label": "Formularium Nasional (Fornas)",
+    "query": "formularium nasional ketersediaan obat Indonesia",
+    "desc": "Ketersediaan obat, batasan peresepan, dan kesetaraan generik."
+  },
+  {
+    "slug": "amr",
+    "label": "Resistensi Antimikroba (AMR)",
+    "query": "antimicrobial resistance stewardship",
+    "desc": "Stewardship antibiotik dan pola resistensi."
+  },
+  {
+    "slug": "interaksi-obat",
+    "label": "Interaksi Obat",
+    "query": "drug interactions mechanism management",
+    "desc": "Mekanisme interaksi dan pemantauan klinis."
+  },
+  {
+    "slug": "herbal",
+    "label": "Obat Herbal & Fitofarmaka",
+    "query": "herbal medicine Indonesia efficacy safety",
+    "desc": "Bukti efikasi dan keamanan produk herbal."
+  },
+  {
+    "slug": "metodologi",
+    "label": "Metodologi & Systematic Review",
+    "query": "systematic review methodology risk of bias",
+    "desc": "Panduan metodologi dan penilaian risiko bias."
   }
 ];
