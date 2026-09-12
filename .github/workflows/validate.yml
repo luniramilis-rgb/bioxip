@@ -96,6 +96,9 @@ jobs:
       - name: Validasi integrasi formulary & literatur
         run: node scripts/validate_formulary.js
 
+      - name: Validasi skema guideline (pedoman lokal)
+        run: node scripts/validate_guideline.js
+
       - name: Halaman topik tidak basi (build --check)
         run: node scripts/build_topics.js --check
 
