@@ -28,12 +28,14 @@ export async function onRequestGet(context) {
     const q = (url.searchParams.get("q") || "").trim();
     if (!q) return json({ error: "param q wajib" }, 400);
 
-    // Sumber utama = Postgres (view publik) bila flag aktif; fallback = katalog JSON.
+    // Katalog JSON (30 kurasi) diutamakan: ia punya ATC + catatan keselamatan (watchouts/lasa).
+    // Postgres (Fornas penuh) menjadi sumber untuk obat di luar katalog, bila flag aktif.
+    const jsonDrug = findDrug(q);
     let dbDrug = null;
-    if (formularyEnabled(context.env)) {
+    if (!jsonDrug && formularyEnabled(context.env)) {
       dbDrug = await findFormularyDrug(context.env, q, url.origin).catch(() => null);
     }
-    let drug = dbDrug || findDrug(q);
+    let drug = jsonDrug || dbDrug;
     let outsideCatalogue = false;
 
     const rxnorm = await resolveRxNorm(...rxCandidates(drug, q)).catch(() => null);

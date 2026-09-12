@@ -46,7 +46,7 @@ export async function searchCrossref(query, { limit = 10, indonesia = false, mai
   if (mailto) params.set("mailto", mailto);
   const resp = await fetch(`${ENDPOINT}?${params}`, {
     signal: AbortSignal.timeout(8000),
-    headers: { accept: "application/json", "user-agent": `bioXip/0.1 (mailto:${mailto || "admin@bioxip.id"})` },
+    headers: { accept: "application/json", "user-agent": mailto ? `bioXip/0.1 (mailto:${mailto})` : "bioXip/0.1" },
   });
   if (!resp.ok) throw new Error(`crossref ${resp.status}`);
   const data = await resp.json();
