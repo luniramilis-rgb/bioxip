@@ -67,6 +67,24 @@ const fetchStub = async (url) => {
   if (href.includes("eutils.ncbi.nlm.nih.gov")) {
     return jsonResponse({ esearchresult: { idlist: [], count: 0 } });
   }
+  // Pedoman lokal (L2): RPC fn_guideline_search.
+  if (href.includes("/rest/v1/rpc/fn_guideline_search")) {
+    return jsonResponse([
+      {
+        id: 1,
+        tier: "pnk",
+        topik: "tb",
+        ringkasan: "Terapi TB mengikuti paduan berbasis resistensi.",
+        kelas: null,
+        locator: "hal. 12",
+        url: "https://kemkes.go.id/pnpk-tb",
+        sumber: "PNPK Tuberkulosis",
+        edisi: "2024",
+        berlaku_dari: "2024-01-01",
+        score: 0.9,
+      },
+    ]);
+  }
   return jsonResponse({});
 };
 
@@ -104,6 +122,10 @@ async function main() {
     catalogue,
     DRUGS: catalogue.drugs,
     FORNAS: { edition: catalogue.edition, source_url: catalogue.source_url },
+    rpc: async (env, name, args) => {
+      const resp = await fetchStub(`https://bioxip.pages.dev/rest/v1/rpc/${name}?args=${encodeURIComponent(JSON.stringify(args))}`);
+      return resp.json();
+    },
   };
   sandbox.globalThis = sandbox;
   sandbox.__setDegraded = (value) => {
@@ -129,6 +151,7 @@ async function main() {
   loadModule(sandbox, "_literature/crossref.js", ["searchCrossref", "mapCrossrefItem"]);
   loadModule(sandbox, "_literature/doaj.js", ["searchDoaj", "mapDoajItem"]);
   loadModule(sandbox, "_literature/linkout.js", ["linkoutEntries"]);
+  loadModule(sandbox, "_guideline.js", ["guidelineEnabled", "detectGuidelineTopic", "mapGuidelineRow", "searchGuidelines"]);
   loadModule(sandbox, "_middleware.js", ["onRequest"]);
   loadModule(sandbox, "api/search.js", ["onRequestGet"]);
 
@@ -185,6 +208,24 @@ async function main() {
   );
   check("lit: hasil tidak melebihi per_page", (litBody.results || []).length <= litBody.limit, `${litBody.results?.length}/${litBody.limit}`);
   check("lit: kegagalan sumber opsional tidak menandai degraded", (litBody.notes || []).length === 0, JSON.stringify(litBody.notes || []));
+
+  // L2: pedoman lokal (GUIDELINE_DB) — opt-in, diprioritaskan di depan.
+  const gOff = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=terapi%20tuberkulosis&per_page=5&no_cache=1" },
+    env: {},
+  });
+  const gOffBody = await gOff.json();
+  check("guideline: OFF tidak muncul", !(gOffBody.results || []).some((row) => row.source === "guideline"));
+
+  const gOn = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=terapi%20tuberkulosis&per_page=5&no_cache=1" },
+    env: { GUIDELINE_DB: "on" },
+  });
+  const gOnBody = await gOn.json();
+  const gFirst = (gOnBody.results || [])[0] || {};
+  check("guideline: ON muncul di depan", gFirst.source === "guideline", JSON.stringify((gOnBody.results || []).map((row) => row.source)));
+  check("guideline: badge tier/edisi/locator", gFirst.guideline?.label === "PNPK" && gFirst.guideline?.edisi === "2024" && gFirst.guideline?.locator === "hal. 12");
+  check("guideline: source_counts memuat guideline", Number(gOnBody.source_counts?.guideline || 0) >= 1, JSON.stringify(gOnBody.source_counts || {}));
 
   // Cache: permintaan identik kedua harus dilayani cache (tanpa memanggil upstream lagi).
   sandbox.resetMemoryCache();

@@ -46,6 +46,20 @@ if (!exists(MIGRATION)) {
 
 if (!exists("docs/guideline.md")) problems.push("dokumen kontrak hilang: docs/guideline.md");
 
+// L2: pembacaan guideline di edge (flag GUIDELINE_DB) + integrasi di /api/search.
+if (!exists("functions/_guideline.js")) {
+  problems.push("modul hilang: functions/_guideline.js");
+} else {
+  const mod = read("functions/_guideline.js");
+  for (const marker of ["guidelineEnabled", "detectGuidelineTopic", "searchGuidelines", "GUIDELINE_DB", "fn_guideline_search"]) {
+    if (!mod.includes(marker)) problems.push(`_guideline.js: tidak ada "${marker}"`);
+  }
+}
+const search = read("functions/api/search.js");
+for (const marker of ["guidelineEnabled(env)", "searchGuidelines(env", "guidelineRows"]) {
+  if (!search.includes(marker)) problems.push(`api/search.js: integrasi guideline "${marker}" tidak ditemukan`);
+}
+
 // 024: p_query diberi default agar pencarian bisa dipanggil hanya dengan p_topik.
 const MIGRATION_DEFAULT = "supabase/migrations/024_guideline_search_default.sql";
 if (!exists(MIGRATION_DEFAULT)) {

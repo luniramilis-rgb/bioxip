@@ -7,6 +7,7 @@ import { cacheGetJson, cacheKey, cachePutJson } from "../_cache.js";
 import { searchCrossref } from "../_literature/crossref.js";
 import { searchDoaj } from "../_literature/doaj.js";
 import { linkoutEntries } from "../_literature/linkout.js";
+import { detectGuidelineTopic, guidelineEnabled, searchGuidelines } from "../_guideline.js";
 
 const EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search";
 const CT = "https://clinicaltrials.gov/api/v2/studies";
@@ -15,7 +16,7 @@ const MAX_WANT = 500;
 // Cache pencarian di edge: memotong latensi p95 dan melindungi rate limit sumber.
 const SEARCH_CACHE_DEFAULT_TTL = 900;
 // Naikkan versi bila konstruksi query/ekspansi berubah agar hasil lama tidak tersaji.
-const SEARCH_CACHE_NAMESPACE = "search:v8";
+const SEARCH_CACHE_NAMESPACE = "search:v9";
 
 function searchCacheTtl(env) {
   const ttl = Number(env?.SEARCH_CACHE_TTL_SECONDS);
@@ -118,6 +119,11 @@ async function produceSearch(env, request) {
     const needPubmed = needLit && (!types || types.includes("paper"));
     // Sumber literatur tambahan bersifat opt-in (default kosong → perilaku tak berubah).
     const litSources = parseLitSources(env?.LIT_SOURCES);
+    // Pedoman lokal (opt-in `GUIDELINE_DB=on`) — diambil lebih dulu untuk diprioritaskan.
+    const guidelineRows =
+      needLit && guidelineEnabled(env)
+        ? await searchGuidelines(env, raw, url.origin, { topik: detectGuidelineTopic(raw), limit: 5 }).catch(() => [])
+        : [];
 
 
     const calls = [];
@@ -184,6 +190,7 @@ async function produceSearch(env, request) {
         else notes.push(message);
       }
     }
+    if (guidelineRows.length) collected.push(...guidelineRows);
 
     let results = dedupeResults(collected);
 
@@ -214,6 +221,12 @@ async function produceSearch(env, request) {
     }
 
     results = rankResults(results, rankText, sort);
+
+    // Local-first: pedoman lokal tampil di depan untuk pertanyaan terkait.
+    if (guidelineRows.length) {
+      const gids = new Set(guidelineRows.map((row) => row.id));
+      results = [...results.filter((row) => gids.has(row.id)), ...results.filter((row) => !gids.has(row.id))];
+    }
 
     // Jaga keberagaman sumber: bila PubMed diminta tetapi tergusur dari halaman,
     // sisipkan hasil PubMed terbaik agar pengguna tetap melihat cakupan sumber.
@@ -398,7 +411,7 @@ function mapTrial(study, withAbstract = false) {
   return row;
 }
 
-const SOURCE_PRIORITY = { europepmc: 0, pubmed: 1, clinicaltrials: 2, crossref: 3, doaj: 4, neliti: 5, onesearch: 9, garuda: 9 };
+const SOURCE_PRIORITY = { guideline: -1, europepmc: 0, pubmed: 1, clinicaltrials: 2, crossref: 3, doaj: 4, neliti: 5, onesearch: 9, garuda: 9 };
 
 function parseLitSources(value) {
   if (!value) return [];

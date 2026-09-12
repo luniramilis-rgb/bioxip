@@ -6,7 +6,7 @@ Prinsip arsitektur: **pakai ulang pola formulary** (`sources → staging → val
 
 **Keputusan kebijakan (2026-09-12):** **fetch-first** — fokus pada data yang **bisa di-fetch** dari endpoint publik. **Gate lisensi/MoU/kesepakatan DIHAPUS** sebagai penghambat; kebijakan penggantinya: ambil dari endpoint publik, simpan pointer + snippet + **atribusi sumber**, jangan menyalin dokumen penuh, dan sediakan kanal koreksi/takedown.
 
-**Status (2026-09-12):** **L0 selesai** (kontrak `docs/guideline.md`; migrasi `023`/`024`; validator `validate_guideline.js` + CI). **L1 selesai** — adapter `harvester/providers/{farmalkes,whogho,regulasi}.py` + provider `guideline.py` + runner `ingest_guideline.py` (staging→publish ke `guideline_recs`, reuse `fact_sources`/`formulary_staging`); ingest live TB/DBD/HIV → **13 record** dipublikasikan (farmalkes 12 `regulator`, WHO GHO 1 `epidemiologi`; topik tb 11, hiv 2, **dbd 0** karena tak ada sumber ter-fetch untuk dengue). Regulasi/PNPK disuplai operator via `--regulasi-file` (tanpa menebak URL). **L2–L5 belum** (belum ada routing pencarian/AI memakai guideline). Kebijakan fetch-first; gate lisensi/MoU dihapus.
+**Status (2026-09-12):** **L0 selesai**; **L1 selesai**; **L2 selesai** — `functions/_guideline.js` (`guidelineEnabled` `GUIDELINE_DB`, `detectGuidelineTopic`, `searchGuidelines` via RPC + cache) diintegrasikan ke `/api/search` (pedoman **diprioritaskan di depan** untuk pertanyaan terkait; `source_tier=official`; badge tier/edisi/locator di UI), cache `search:v9`; unit test `tests/guideline_unit.js` + smoke (flag OFF/ON) masuk CI. **L3–L5 belum** (BPOM/PIONAS/epidemiologi, pedoman profesi, buku link-out). Kebijakan fetch-first; gate lisensi/MoU dihapus.
 
 ---
 

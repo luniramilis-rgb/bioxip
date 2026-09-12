@@ -24,6 +24,11 @@ window.BIOXIP_SEARCH = {
     const metaBits = [];
     metaBits.push(`<span class="chip">${this.escape(this.sourceLabel(doc.source))}</span>`);
     metaBits.push(`<span class="chip">${this.escape(doc.doc_type)}</span>`);
+    if (doc.guideline) {
+      if (doc.guideline.tier) metaBits.push(`<span class="chip">${this.escape(doc.guideline.label || doc.guideline.tier)}</span>`);
+      if (doc.guideline.edisi) metaBits.push(this.escape(doc.guideline.edisi));
+      if (doc.guideline.locator) metaBits.push(this.escape(doc.guideline.locator));
+    }
     if (doc.oa && doc.oa.is_oa) metaBits.push('<span class="chip oa">OA</span>');
     if (doc.journal) metaBits.push(this.escape(doc.journal));
     if (doc.year) metaBits.push(String(doc.year));
@@ -84,6 +89,7 @@ window.BIOXIP_SEARCH = {
         crossref: "Crossref",
         doaj: "DOAJ",
         neliti: "Neliti",
+        guideline: "Pedoman",
         onesearch: "Indonesia OneSearch",
         garuda: "Garuda",
       }[source] || source

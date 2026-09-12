@@ -69,6 +69,9 @@ jobs:
       - name: Unit test formulary (baca DB + fallback)
         run: node tests/formulary_unit.js
 
+      - name: Unit test guideline lokal (baca RPC + prioritas)
+        run: node tests/guideline_unit.js
+
       - name: Unit test throttle & query PubMed
         run: node tests/pubmed_unit.js
 
