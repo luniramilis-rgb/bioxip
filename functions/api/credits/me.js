@@ -1,4 +1,4 @@
-import { accountPayload, bearerToken, ensureAccount, fetchAccount, json } from "../../_credits.js";
+import { accountPayload, bearerToken, ensureAccount, fetchAccount, fetchUserEmail, isAdminEmail, json } from "../../_credits.js";
 
 export async function onRequestGet(context) {
   try {
@@ -11,7 +11,9 @@ export async function onRequestGet(context) {
     }
     const row = await fetchAccount(context.env, token);
     if (!row) return json({ error: "account_unavailable" }, 502);
-    return json(accountPayload(row));
+    const allowlist = String(context.env.ADMIN_EMAILS || "").trim();
+    const isAdmin = allowlist ? isAdminEmail(await fetchUserEmail(context.env, token), allowlist) : false;
+    return json({ ...accountPayload(row), is_admin: isAdmin, ai_locked: !isAdmin && accountPayload(row).ai_locked });
   } catch (error) {
     return json({ error: error.message }, 500);
   }

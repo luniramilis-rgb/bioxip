@@ -79,12 +79,15 @@
           return;
         }
         let balance = 0;
+        let isAdmin = false;
         try {
-          balance = (await C.me()).body?.balance_idr ?? 0;
+          const me = await C.me();
+          balance = me.body?.balance_idr ?? 0;
+          isAdmin = Boolean(me.body?.is_admin);
         } catch {
           balance = 0;
         }
-        if (balance <= 0) {
+        if (balance <= 0 && !isAdmin) {
           location.hash = "#/saldo";
           return;
         }
@@ -123,10 +126,17 @@
       return;
     }
     let balance = 0;
+    let isAdmin = false;
     try {
-      balance = (await C.me()).body?.balance_idr ?? 0;
+      const me = await C.me();
+      balance = me.body?.balance_idr ?? 0;
+      isAdmin = Boolean(me.body?.is_admin);
     } catch {
       balance = 0;
+    }
+    if (isAdmin) {
+      host.innerHTML = aiMode ? "Mode admin · tanpa biaya." : "Mode admin · pencarian & AI tanpa biaya.";
+      return;
     }
     if (aiMode) {
       host.innerHTML =

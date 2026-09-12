@@ -124,7 +124,8 @@
       return;
     }
     const balance = account.body?.balance_idr ?? 0;
-    if (balance <= 0) {
+    const isAdmin = Boolean(account.body?.is_admin);
+    if (balance <= 0 && !isAdmin) {
       status.innerHTML = `<span class="muted">Sisa saldo <strong>${esc(C.formatIdr(balance))}</strong>.</span>`;
       ask.innerHTML = `
         <div class="locked">
@@ -138,8 +139,10 @@
       return;
     }
 
-    // Info biaya cukup dari sisa saldo (tanpa estimasi di muka).
-    status.innerHTML = `<span class="muted">Sisa saldo <strong>${esc(C.formatIdr(balance))}</strong>.</span>`;
+    // Info biaya cukup dari sisa saldo (tanpa estimasi di muka); admin tanpa biaya.
+    status.innerHTML = isAdmin
+      ? '<span class="muted">Mode admin · tanpa biaya.</span>'
+      : `<span class="muted">Sisa saldo <strong>${esc(C.formatIdr(balance))}</strong>.</span>`;
     ask.innerHTML = `
       <p class="actions">
         <button class="btn" id="ai-run" type="button">Tanya AI</button>
