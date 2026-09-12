@@ -283,8 +283,8 @@ async function dispatchHash(hash) {
   results.push(["home renders hero", home.includes("Literatur medis dunia")]);
   results.push(["home topics dari JSON (fallback aman)", home.includes("Tuberkulosis (TB)") || home.includes("topics") || home.includes("topic")]);
   results.push([
-    "home: segmented AI tampil (bukan hanya di hasil)",
-    home.includes('data-home-mode="ai"') && home.includes("Tanya AI"),
+    "home: tombol mode AI tampil (pola Google)",
+    home.includes('id="ai-mode"') && home.includes("✦ AI"),
   ]);
   results.push(["home: status AI tampil (ai-hint)", home.includes("ai-hint")]);
   const homeHint = registry.get("ai-hint")?.innerHTML || "";
@@ -323,7 +323,7 @@ async function dispatchHash(hash) {
   await dispatchHash("#/search?q=dengue&mode=ai");
   const view = registry.get("view").innerHTML;
   results.push(
-    ["mode: segmented gratis vs AI", view.includes("data-mode=\"search\"") && view.includes("data-mode=\"ai\"")],
+    ["mode: kontrol AI di bar (bukan segmented terpisah)", view.includes('id="ai-mode"') && view.includes('aria-pressed="true"')],
   );
   results.push(["mode AI: panel tampil", view.includes('id="ai-panel"')]);
   const aiAsk = registry.get("ai-ask")?.innerHTML || "";
@@ -370,6 +370,11 @@ async function dispatchHash(hash) {
     "ai: tombol Tanya AI siap saat saldo cukup",
     Boolean(runBtn) && (registry.get("ai-ask")?.innerHTML || "").includes("Tanya AI"),
     registry.get("ai-ask")?.innerHTML || "",
+  ]);
+  results.push([
+    "ai: tanpa estimasi harga di UI (info = sisa saldo)",
+    !(registry.get("ai-ask")?.innerHTML || "").includes("≈") && (registry.get("ai-status")?.innerHTML || "").includes("Sisa saldo"),
+    (registry.get("ai-status")?.innerHTML || "").slice(0, 90),
   ]);
   runBtn?.trigger("click", {});
   await new Promise((resolve) => setTimeout(resolve, 30));
@@ -498,8 +503,8 @@ async function dispatchHash(hash) {
   await new Promise((resolve) => setTimeout(resolve, 40));
   const homeFunded = registry.get("ai-hint")?.innerHTML || registry.get("view").innerHTML;
   results.push([
-    "home: saldo tersedia → tawarkan Tanya AI",
-    homeFunded.includes("Tanya AI") || homeFunded.includes("pakai Tanya AI"),
+    "home: saldo tersedia → tampilkan saldo",
+    (homeFunded.includes("saldo") || homeFunded.includes("Sisa saldo")) && registry.get("view").innerHTML.includes('id="ai-mode"'),
     homeFunded.slice(0, 90),
   ]);
   sandbox.__setBalance(null);

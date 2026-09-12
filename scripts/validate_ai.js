@@ -96,15 +96,19 @@ if (!estimate.includes("estimatePayload") || !estimate.includes("401")) {
 // --- 1b. Titik masuk AI di UI (beranda & halaman hasil) ---------------------
 const app = fs.readFileSync(path.join(ROOT, "web", "js", "app.js"), "utf8");
 const ai = fs.readFileSync(path.join(ROOT, "web", "js", "ai.js"), "utf8");
-if (!app.includes("data-home-mode")) fail("app.js: beranda harus punya segmented mode AI (data-home-mode)");
+if (!app.includes('id="ai-mode"')) fail("app.js: beranda harus punya kontrol mode AI di bar (id=ai-mode)");
 if (!app.includes("ai-hint")) fail("app.js: beranda harus menampilkan status AI (ai-hint)");
 if (!app.includes("Tanya AI")) fail("app.js: label 'Tanya AI' tidak ditemukan di UI");
 if (!app.includes("function updateAiHint")) fail("app.js: harus ada updateAiHint (status saldo/AI)");
 if (!app.includes("Isi saldo")) fail("app.js: status saldo kosong harus mengarahkan 'Isi saldo'");
 if (!ai.includes("#/masuk")) fail("ai.js: panel AI terkunci harus menautkan ke #/masuk (login)");
 if (!ai.includes("#/saldo")) fail("ai.js: panel AI harus menautkan ke #/saldo (isi saldo)");
-for (const marker of ["Tanya AI terkunci", "Saldo Anda"]) {
-  if (!ai.includes(marker)) fail(`ai.js: pesan saldo tidak jelas ("${marker}")`);
+for (const marker of ["Tanya AI terkunci", "Sisa saldo"]) {
+  if (!ai.includes(marker)) fail(`ai.js: pesan biaya tidak jelas ("${marker}")`);
+}
+// Keputusan produk: tanpa estimasi di muka — info biaya cukup sisa saldo.
+if (ai.includes("Perkiraan biaya") || ai.includes("Tanya AI ≈")) {
+  fail("ai.js: estimasi di muka harus dihapus (info biaya cukup sisa saldo)");
 }
 
 // --- 2. Uji live mock (butuh service role) ---------------------------------

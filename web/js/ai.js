@@ -107,23 +107,11 @@
             <a class="btn small" href="#/masuk">Masuk</a>
             <a class="btn small ghost" href="#/saldo">Lihat paket saldo</a>
           </p>
-          <p class="muted">Pencarian, jawaban PICO, dan kartu obat tetap gratis tanpa akun.</p>
+          <p class="muted">Pencarian, pedoman lokal, dan kartu obat tetap gratis tanpa akun.</p>
         </div>`;
       return;
     }
 
-    const result = await C.estimate(question, 1024);
-    if (result.status === 401) {
-      status.innerHTML = "";
-      ask.innerHTML = `<div class="locked"><p>Sesi berakhir. Silakan masuk kembali untuk memakai Tanya AI.</p></div>`;
-      return;
-    }
-    if (!result.ok) {
-      status.textContent = "Estimasi tidak tersedia saat ini.";
-      return;
-    }
-
-    const estimateIdr = result.body?.estimate_idr || 0;
     const account = await C.me();
     if (account.status === 401) {
       status.innerHTML = "";
@@ -136,27 +124,26 @@
       return;
     }
     const balance = account.body?.balance_idr ?? 0;
-
-    if (balance < estimateIdr) {
-      status.innerHTML = `<span class="muted">Saldo Anda <strong>${esc(C.formatIdr(balance))}</strong> — kurang dari estimasi.</span>`;
+    if (balance <= 0) {
+      status.innerHTML = `<span class="muted">Sisa saldo <strong>${esc(C.formatIdr(balance))}</strong>.</span>`;
       ask.innerHTML = `
         <div class="locked">
-          <p><strong>Tanya AI terkunci.</strong> Butuh sekitar ${esc(C.formatIdr(estimateIdr))} untuk pertanyaan ini,
-             sedangkan saldo Anda ${esc(C.formatIdr(balance))}.</p>
+          <p><strong>Tanya AI terkunci.</strong> Isi saldo untuk memakai jawaban AI bersitasi.</p>
           <p class="actions">
             <a class="btn small" href="#/saldo">Isi saldo</a>
             <a class="btn small ghost" href="#/saldo">Lihat paket &amp; riwayat</a>
           </p>
-          <p class="muted">Pencarian gratis tetap tersedia — cukup ganti ke mode "Cari bukti".</p>
+          <p class="muted">Pencarian, pedoman lokal, dan kartu obat tetap gratis.</p>
         </div>`;
       return;
     }
 
-    status.innerHTML = `<span class="muted">Perkiraan biaya: <strong>${esc(C.formatIdr(estimateIdr))}</strong> · saldo ${esc(C.formatIdr(balance))}</span>`;
+    // Info biaya cukup dari sisa saldo (tanpa estimasi di muka).
+    status.innerHTML = `<span class="muted">Sisa saldo <strong>${esc(C.formatIdr(balance))}</strong>.</span>`;
     ask.innerHTML = `
       <p class="actions">
-        <button class="btn" id="ai-run" type="button">Tanya AI ≈ ${esc(C.formatIdr(estimateIdr))}</button>
-        <span class="muted">Jawaban bersitasi dari bukti yang ditemukan.</span>
+        <button class="btn" id="ai-run" type="button">Tanya AI</button>
+        <span class="muted">Jawaban bersitasi dari bukti &amp; pedoman lokal.</span>
       </p>`;
     document.getElementById("ai-run")?.addEventListener("click", () => run(question));
   }

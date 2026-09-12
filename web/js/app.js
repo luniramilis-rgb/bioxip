@@ -5,6 +5,7 @@
   const MAX_PAGES = 5;
 
   const nav = { key: null, pages: [], cursors: null, upstream: 0 };
+  let aiMode = false;
 
   function brand() {
     document.querySelectorAll("[data-brand]").forEach((el) => {
@@ -17,21 +18,13 @@
     return `
       <section class="hero">
         <h1>Literatur medis dunia,<br/>untuk peneliti Indonesia.</h1>
-        <p class="muted">Pencarian langsung ke Europe PMC (PubMed, preprint), ClinicalTrials.gov, PubChem, ChEMBL &amp; Open Targets.</p>
-        <div class="segmented" id="home-mode" role="tablist" aria-label="Mode pencarian">
-          <button role="tab" data-home-mode="search" class="active" aria-selected="true">Cari bukti · gratis</button>
-          <button role="tab" data-home-mode="ai" aria-selected="false">Tanya AI · saldo</button>
-        </div>
-        <form id="search-form" class="searchbox">
-          <input id="q" name="q" type="search" autocomplete="off"
-                 placeholder="mis. obat diabetes untuk PCOS" aria-label="Pertanyaan riset" />
-          <button type="submit">Cari</button>
-        </form>
-        <p id="ai-hint" class="ai-hint muted" role="status" aria-live="polite">Pencarian gratis untuk semua pengguna.</p>
+        <p class="muted">Satu kotak untuk bukti, pedoman lokal, dan kartu obat. Mode AI opsional.</p>
+        ${searchBarHTML(false)}
+        <p id="ai-hint" class="ai-hint muted" role="status" aria-live="polite"></p>
         <div class="quick">
           <label class="check"><input type="checkbox" id="f-oa" /> Open Access saja</label>
           <label class="check"><input type="checkbox" id="f-indonesia" /> Penelitian Indonesia</label>
-          <a class="muted" href="#/answer">Atau buat jawaban klinis (PICO) →</a>
+          <a class="muted" href="#/answer">Panduan PICO →</a>
         </div>
         ${patternsHTML()}
       </section>
@@ -45,68 +38,79 @@
       </section>`;
   }
 
-  function homeMode() {
-    const active = document.querySelector("[data-home-mode].active");
-    return active?.dataset.homeMode === "ai" ? "ai" : "search";
+  function searchBarHTML(ai) {
+    const placeholder = ai ? "mis. metformin vs insulin untuk DM tipe 2" : "mis. obat diabetes untuk PCOS";
+    return `
+      <form id="search-form" class="searchbox unified">
+        <input id="q" name="q" type="search" autocomplete="off" placeholder="${placeholder}" aria-label="Pertanyaan" />
+        <button type="submit" id="search-submit">${ai ? "Tanya AI" : "Cari"}</button>
+        <button type="button" id="ai-mode" class="ai-mode${ai ? " active" : ""}" aria-pressed="${ai}" title="Mode AI memakai saldo">✦ AI</button>
+      </form>`;
   }
 
-  function initHomeMode() {
-    const host = document.getElementById("home-mode");
-    if (!host) return;
-    host.querySelectorAll("[data-home-mode]").forEach((button) => {
-      button.addEventListener("click", () => {
-        host.querySelectorAll("[data-home-mode]").forEach((item) => {
-          const isActive = item === button;
-          item.classList.toggle("active", isActive);
-          item.setAttribute("aria-selected", String(isActive));
-        });
-        const submit = document.querySelector("#search-form button[type=submit]");
-        if (submit) submit.textContent = homeMode() === "ai" ? "Siapkan AI" : "Cari";
-        const input = document.getElementById("q");
-        if (input) {
-          input.placeholder =
-            homeMode() === "ai" ? "mis. metformin vs insulin untuk DM tipe 2" : "mis. obat diabetes untuk PCOS";
+  function bindSearchBar(ai) {
+    aiMode = Boolean(ai);
+    const toggle = document.getElementById("ai-mode");
+    if (toggle) {
+      toggle.addEventListener("click", async () => {
+        const A = window.BIOXIP_AUTH;
+        const C = window.BIOXIP_CREDITS;
+        const loggedIn = Boolean(A?.getAccessToken?.() || A?.getUser?.());
+        if (!loggedIn) {
+          location.hash = "#/masuk";
+          return;
         }
+        let balance = 0;
+        try {
+          balance = (await C.me()).body?.balance_idr ?? 0;
+        } catch {
+          balance = 0;
+        }
+        if (balance <= 0) {
+          location.hash = "#/saldo";
+          return;
+        }
+        aiMode = !aiMode;
+        const submit = document.getElementById("search-submit");
+        const input = document.getElementById("q");
+        if (submit) submit.textContent = aiMode ? "Tanya AI" : "Cari";
+        if (input) input.placeholder = aiMode ? "mis. metformin vs insulin untuk DM tipe 2" : "mis. obat diabetes untuk PCOS";
+        toggle.classList.toggle("active", aiMode);
+        toggle.setAttribute("aria-pressed", String(aiMode));
         updateAiHint();
       });
-    });
+    }
     updateAiHint();
   }
 
   async function updateAiHint() {
     const host = document.getElementById("ai-hint");
     if (!host) return;
-    const mode = homeMode();
     const C = window.BIOXIP_CREDITS;
     const A = window.BIOXIP_AUTH;
     const loggedIn = Boolean(A?.getAccessToken?.() || A?.getUser?.());
-
     if (!loggedIn) {
-      host.innerHTML =
-        mode === "ai"
-          ? 'Tanya AI memerlukan akun. <a href="#/masuk">Masuk</a> dulu (Google atau kode email) — pencarian tetap gratis.'
-          : 'Pencarian gratis. <a href="#/masuk">Masuk</a> untuk memakai Tanya AI bersitasi.';
+      host.innerHTML = aiMode
+        ? 'Tanya AI memerlukan akun. <a href="#/masuk">Masuk</a> dulu — pencarian tetap gratis.'
+        : 'Pencarian gratis. <a href="#/masuk">Masuk</a> untuk memakai mode AI.';
       return;
     }
-
     let balance = 0;
     try {
-      const me = await C.me();
-      balance = me.body?.balance_idr ?? 0;
+      balance = (await C.me()).body?.balance_idr ?? 0;
     } catch {
       balance = 0;
     }
-
-    if (mode === "ai") {
+    if (aiMode) {
       host.innerHTML =
         balance > 0
-          ? `Tanya AI aktif · saldo <strong>${esc(C.formatIdr(balance))}</strong>.`
-          : `Saldo Anda <strong>Rp 0</strong> — Tanya AI terkunci. <a href="#/saldo">Isi saldo</a> lalu coba lagi.`;
+          ? `Mode AI · sisa saldo <strong>${esc(C.formatIdr(balance))}</strong>.`
+          : `Saldo <strong>Rp 0</strong> — mode AI terkunci. <a href="#/saldo">Isi saldo</a>.`;
     } else {
       host.innerHTML =
         balance > 0
-          ? `Saldo <strong>${esc(C.formatIdr(balance))}</strong> · <a href="#/search?mode=ai">pakai Tanya AI</a>.`
-          : 'Pencarian gratis. <a href="#/saldo">Isi saldo</a> untuk membuka Tanya AI.';
+          ? `Pencarian gratis · saldo <strong>${esc(C.formatIdr(balance))}</strong>.`
+          : 'Pencarian gratis. <a href="#/saldo">Isi saldo</a> untuk mode AI.';
     }
   }
 
@@ -196,12 +200,9 @@
       event.preventDefault();
       const q = document.getElementById("q").value.trim();
       if (!q) return;
-      const current = new URLSearchParams(location.hash.split("?")[1] || "");
       const params = new URLSearchParams();
       params.set("q", q);
-      // Mode AI: dari segmented beranda atau dari hash hasil yang sudah ada.
-      const mode = homeMode() === "ai" || current.get("mode") === "ai" ? "ai" : null;
-      if (mode) params.set("mode", "ai");
+      if (aiMode) params.set("mode", "ai");
       if (document.getElementById("f-oa")?.checked) params.set("oa", "true");
       if (document.getElementById("f-indonesia")?.checked) params.set("indonesia", "true");
       if (document.getElementById("f-clinical")?.checked) params.set("clinical", "true");
@@ -221,14 +222,7 @@
     const q = url.get("q") || "";
     const mode = url.get("mode") === "ai" ? "ai" : "search";
     return `
-      <div class="segmented" role="tablist" aria-label="Mode">
-        <button role="tab" class="${mode === "search" ? "active" : ""}" data-mode="search">Cari bukti · gratis</button>
-        <button role="tab" class="${mode === "ai" ? "active" : ""}" data-mode="ai">Tanya AI · saldo</button>
-      </div>
-      <form id="search-form" class="searchbox compact">
-        <input id="q" name="q" type="search" value="${S.escape(q)}" autocomplete="off" />
-        <button type="submit">${mode === "ai" ? "Siapkan AI" : "Cari"}</button>
-      </form>
+      ${searchBarHTML(mode === "ai").replace(`id="q" name="q" type="search"`, `id="q" name="q" type="search" value="${S.escape(q)}"`)}
       <div class="quick">
         <label class="check"><input type="checkbox" id="f-oa" ${url.get("oa") === "true" ? "checked" : ""} /> OA</label>
         <label class="check"><input type="checkbox" id="f-indonesia" ${url.get("indonesia") === "true" ? "checked" : ""} /> Indonesia</label>
@@ -313,13 +307,35 @@
         : `${upstream.toLocaleString("id-ID")} hasil di sumber.`;
 
     host.innerHTML = `<p class="muted">${S.escape(shownText)}</p>`;
-    host.insertAdjacentHTML(
-      "beforeend",
-      items.map((doc) => S.renderResult(doc)).join("") ||
-        '<p class="muted">Tidak ada hasil. Coba kata lain atau filter lebih sedikit.</p>'
-    );
+    // Hasil adaptif: obat (bila terdeteksi) → pedoman lokal → bukti.
+    const drug = await drugInlineHTML(q);
+    const guidelines = items.filter((doc) => doc.source === "guideline");
+    const others = items.filter((doc) => doc.source !== "guideline");
+    const blocks = [
+      drug,
+      guidelines.length ? `<h2 class="muted">Pedoman lokal</h2>${guidelines.map((doc) => S.renderResult(doc)).join("")}` : "",
+      others.map((doc) => S.renderResult(doc)).join(""),
+    ].join("");
+    host.insertAdjacentHTML("beforeend", blocks || '<p class="muted">Tidak ada hasil. Coba kata lain atau filter lebih sedikit.</p>');
     host.insertAdjacentHTML("beforeend", S.renderNote(current));
     renderPager(q, filters, page);
+  }
+
+  async function drugInlineHTML(query) {
+    const term = String(query || "").trim();
+    // Hindari panggilan untuk pertanyaan panjang (bukan nama obat).
+    if (!term || term.split(/\s+/).length > 4) return "";
+    try {
+      const resp = await fetch(`/api/drug?q=${encodeURIComponent(term)}`);
+      if (!resp.ok) return "";
+      const data = await resp.json();
+      const drug = data.drug;
+      if (!data.matched || !drug) return "";
+      const bits = [drug.inn, drug.atc, drug.kelas].filter(Boolean).map((value) => esc(value)).join(" · ");
+      return `<section class="card drug-inline"><h2>${esc(drug.name)}</h2><p class="muted">${bits}</p><p><a href="#/drug?q=${encodeURIComponent(drug.slug || term)}">Lihat kartu obat lengkap →</a></p></section>`;
+    } catch {
+      return "";
+    }
   }
 
   function renderPager(q, filters, page) {
@@ -393,10 +409,11 @@
       topicChips();
       stats();
       searchFormHandler();
-      initHomeMode();
+      bindSearchBar(false);
     } else if (path[0] === "search") {
       view.innerHTML = resultsHTML();
       searchFormHandler();
+      bindSearchBar(currentMode() === "ai");
       if (currentMode() === "ai") {
         const q = new URLSearchParams(queryPart || "").get("q") || "";
         window.BIOXIP_AI.prepare(q, view);
