@@ -7,6 +7,7 @@ window.BIOXIP_SEARCH = {
     if (filters.types && filters.types.length) params.set("types", filters.types.join(","));
     if (filters.oa) params.set("oa", "true");
     if (filters.indonesia) params.set("indonesia", "true");
+    if (filters.clinical) params.set("clinical", "1");
     if (filters.sort && filters.sort !== "relevance") params.set("sort", filters.sort);
     if (filters.perPage && filters.perPage !== 20) params.set("per_page", String(filters.perPage));
     params.set("page", String(page));
@@ -41,9 +42,24 @@ window.BIOXIP_SEARCH = {
           ${doc.oa && doc.oa.pdf_url ? `<a class="btn small" target="_blank" rel="noopener" href="${this.safeUrl(doc.oa.pdf_url)}">PDF</a>` : ""}
           ${doc.url ? `<a class="btn small ghost" target="_blank" rel="noopener" href="${this.safeUrl(doc.url)}">Buka sumber</a>` : ""}
           ${doc.url ? `<button class="btn small ghost" data-copy-link="${this.escape(doc.url)}">Salin tautan</button>` : ""}
-          <button class="btn small ghost" data-copy="${this.escape(citeOf(doc))}">Salin sitasi</button>
+          <button class="btn small ghost" data-copy="${this.escape(this.formatCitation(doc, "vancouver"))}">Sitasi Vancouver</button>
+          <button class="btn small ghost" data-copy="${this.escape(this.formatCitation(doc, "apa"))}">Sitasi APA</button>
         </p>
       </article>`;
+  },
+
+  formatCitation(doc, format = "vancouver") {
+    const families = (doc.authors || []).map((a) => a.family || a.given || "").filter(Boolean).slice(0, 6);
+    const authors = families.join(", ") || doc.source || "Anonim";
+    const year = doc.year || "n.d.";
+    const title = doc.title || "(tanpa judul)";
+    const journal = doc.journal || doc.source || "";
+    const url = doc.url || "";
+    if (format === "apa") {
+      return `${authors}. (${year}). ${title}. ${journal}. ${url}`.replace(/\s+\./g, ".").replace(/\.\.+/g, ".").trim();
+    }
+    // Vancouver (ringkas, sesuai metadata yang tersedia).
+    return `${authors}. ${title}. ${journal}. ${year}. ${url}`.replace(/\s+\./g, ".").replace(/\.\.+/g, ".").trim();
   },
 
   renderNote(data) {
@@ -65,6 +81,11 @@ window.BIOXIP_SEARCH = {
         europepmc: "Europe PMC",
         pubmed: "PubMed",
         clinicaltrials: "ClinicalTrials.gov",
+        crossref: "Crossref",
+        doaj: "DOAJ",
+        neliti: "Neliti",
+        onesearch: "Indonesia OneSearch",
+        garuda: "Garuda",
       }[source] || source
     );
   },
@@ -73,8 +94,3 @@ window.BIOXIP_SEARCH = {
     return this.escape(value || "#").replaceAll("&amp;", "&");
   },
 };
-
-function citeOf(doc) {
-  const authors = (doc.authors || []).slice(0, 6).map((a) => `${a.family || a.given || ""}`.trim()).join(", ");
-  return `${authors || doc.source}. (${doc.year || "n.d."}). ${doc.title}. ${doc.journal || doc.source}. ${doc.url || ""}`;
-}

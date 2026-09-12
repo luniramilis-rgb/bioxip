@@ -172,6 +172,7 @@
 
     let text = "";
     let unsupported = [];
+    let keyClaims = [];
     let markedClaims = new Set();
     const citations = new Map();
 
@@ -224,6 +225,7 @@
         onCitations(data) {
           // Hilangkan klaim duplikat agar hitungan "ditandai" konsisten.
           unsupported = [...new Set(data.unsupported || [])];
+          keyClaims = Array.isArray(data.claims) ? data.claims : [];
           // Teks sudah lengkap di titik ini → render ulang agar klaim tanpa sitasi
           // benar-benar ditandai di dalam jawaban, bukan hanya dilaporkan persen.
           renderAnswer(document.getElementById("ai-text"), text, false);
@@ -232,7 +234,7 @@
           const list = [...citations.values()]
             .map(
               (item) =>
-                `<li value="${item.n}"><a href="${esc(item.url || "#")}" target="_blank" rel="noopener">${esc(item.title)}</a> <span class="muted">(${esc(item.source)})</span></li>`
+                `<li id="cite-${item.n}" value="${item.n}"><a href="${esc(item.url || "#")}" target="_blank" rel="noopener">${esc(item.title)}</a> <span class="muted">(${esc(item.source)})</span></li>`
             )
             .join("");
           // Klaim yang tidak berhasil dipetakan ke teks (mis. terlalu pendek atau
@@ -247,8 +249,23 @@
                 : ` · ${unsupported.length} klaim tanpa sitasi`;
           }
           const fallback = unmarked.length ? uncitedList(unmarked) : "";
+          const bullets = keyClaims.length
+            ? `<h3>Klaim kunci</h3><ul class="answer-list ai-claims">${keyClaims
+                .map((claim) => {
+                  const cites = (claim.citations || []).map((n) => `<a class="cite-link" href="#cite-${n}">[${n}]</a>`).join(" ");
+                  return `<li class="${claim.supported ? "" : "unsupported-item"}">${esc(claim.text)} ${cites}</li>`;
+                })
+                .join("")}</ul>`
+            : "";
+          const exportText = [...citations.values()]
+            .map((item) => `[${item.n}] ${item.title} (${item.source}) ${item.url || ""}`.trim())
+            .join("\n");
+          const exportBtn = exportText
+            ? `<p class="actions"><button class="btn small ghost" data-copy="${esc(exportText)}">Salin daftar sumber</button></p>`
+            : "";
           host.innerHTML = `
-            ${list ? `<h3>Sumber</h3><ol class="answer-list ai-cites">${list}</ol>` : ""}
+            ${bullets}
+            ${list ? `<h3>Sumber</h3><ol class="answer-list ai-cites">${list}</ol>${exportBtn}` : ""}
             <p class="muted">Dukungan sitasi: ${Math.round((data.support_rate || 0) * 100)}%${uncited}</p>
             ${fallback}`;
         },

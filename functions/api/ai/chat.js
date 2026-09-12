@@ -466,6 +466,12 @@ export async function onRequestPost(context) {
         send("citation_summary", {
           support_rate: supportRate,
           unsupported: verified.unsupported,
+          // Klaim kunci (untuk bullet di UI); payload kecil & sudah tersedia di server.
+          claims: verified.claims.map((claim) => ({
+            text: claim.text,
+            citations: claim.citations,
+            supported: claim.supported,
+          })),
         });
         if (redFlags.length) send("red_flag", { notice: redFlagNotice(), flags: redFlags });
 

@@ -75,6 +75,9 @@ jobs:
       - name: Unit test pola pertanyaan (guardrail)
         run: node tests/patterns_unit.js
 
+      - name: Unit test format sitasi (Vancouver/APA)
+        run: node tests/format_unit.js
+
       - name: Unit test adapter literatur (Crossref/DOAJ/Neliti/linkout)
         run: node tests/literature_unit.js
 

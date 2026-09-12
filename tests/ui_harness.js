@@ -182,8 +182,16 @@ async function fetchStub(url, options) {
       ["delta", { text: "Klaim tambahan tanpa sumber ini perlu ditandai." }],
       ["citation", { n: 1, title: "Study one", source: "europepmc", url: "https://example.org/1" }],
       [
-        "citation_summary",
-        { support_rate: 0.5, unsupported: ["Klaim tambahan tanpa sumber ini perlu ditandai", "Singkat"] },
+      "citation_summary",
+      {
+        support_rate: 0.5,
+        unsupported: ["Klaim tambahan tanpa sumber ini perlu ditandai", "Singkat"],
+        claims: [
+          { text: "Metformin menurunkan HbA1c pada diabetes tipe 2", citations: [1], supported: true },
+          { text: "Klaim tambahan tanpa sumber ini perlu ditandai", citations: [], supported: false },
+        ],
+      },
+
       ],
       ["done", { charged_idr: 100, balance_idr: 49900, mode: "llm", abstain: false }],
     ]);
@@ -376,6 +384,12 @@ async function dispatchHash(hash) {
     streamedCites.includes("1 dari 2 klaim tanpa sitasi ditandai") && streamedCites.includes("Singkat"),
     streamedCites.slice(0, 160),
   ]);
+  results.push([
+    "ai: bullet klaim kunci tampil dari claims[]",
+    streamedCites.includes("Klaim kunci") && streamedCites.includes("Metformin menurunkan HbA1c") && streamedCites.includes("cite-1"),
+    streamedCites.slice(0, 200),
+  ]);
+  results.push(["ai: tombol salin daftar sumber tampil", streamedCites.includes("Salin daftar sumber")]);
 
   // Klaim sama di dua paragraf tidak boleh menghasilkan hitungan mustahil ("2 dari 1").
   await dispatchHash("#/search?q=duplikat&mode=ai");
@@ -390,6 +404,11 @@ async function dispatchHash(hash) {
   ]);
   storageMap.delete("bioxip-access-token");
   sandbox.__setBalance(null);
+
+  // N3: filter "Bukti klinis" tersedia di halaman hasil.
+  await dispatchHash("#/search?q=tuberkulosis");
+  const viewHtml = sandbox.document.getElementById("view")?.innerHTML || "";
+  results.push(["search: chip filter 'Bukti klinis (RCT/SR)' tersedia", viewHtml.includes("f-clinical"), viewHtml.slice(0, 120)]);
 
   // Uji nyata: submit dari mode AI harus mempertahankan mode + filter.
   const formStub = registry.get("search-form");

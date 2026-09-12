@@ -204,6 +204,7 @@
       if (mode) params.set("mode", "ai");
       if (document.getElementById("f-oa")?.checked) params.set("oa", "true");
       if (document.getElementById("f-indonesia")?.checked) params.set("indonesia", "true");
+      if (document.getElementById("f-clinical")?.checked) params.set("clinical", "true");
       if (document.getElementById("f-paper")?.checked) params.set("f-paper", "true");
       if (document.getElementById("f-preprint")?.checked) params.set("f-preprint", "true");
       if (document.getElementById("f-trial")?.checked) params.set("f-trial", "true");
@@ -231,6 +232,7 @@
       <div class="quick">
         <label class="check"><input type="checkbox" id="f-oa" ${url.get("oa") === "true" ? "checked" : ""} /> OA</label>
         <label class="check"><input type="checkbox" id="f-indonesia" ${url.get("indonesia") === "true" ? "checked" : ""} /> Indonesia</label>
+        <label class="check"><input type="checkbox" id="f-clinical" ${url.get("clinical") === "true" ? "checked" : ""} /> Bukti klinis (RCT/SR)</label>
         <label class="check"><input type="checkbox" id="f-paper" ${url.get("f-paper") === "true" ? "checked" : ""} /> paper</label>
         <label class="check"><input type="checkbox" id="f-preprint" ${url.get("f-preprint") === "true" ? "checked" : ""} /> preprint</label>
         <label class="check"><input type="checkbox" id="f-trial" ${url.get("f-trial") === "true" ? "checked" : ""} /> trial</label>
@@ -258,6 +260,7 @@
     const filters = {
       oa: url.get("oa") === "true",
       indonesia: url.get("indonesia") === "true",
+      clinical: url.get("clinical") === "true",
       sort: url.get("sort") || "relevance",
       perPage: Number(url.get("per_page")) || 20,
       types: [],
@@ -269,7 +272,7 @@
   }
 
   function navKey(q, filters) {
-    return `${q}|${filters.types.join(",")}|${filters.oa}|${filters.indonesia}|${filters.sort}|${filters.perPage}`;
+    return `${q}|${filters.types.join(",")}|${filters.oa}|${filters.indonesia}|${filters.clinical}|${filters.sort}|${filters.perPage}`;
   }
 
   async function runSearch() {
@@ -337,6 +340,7 @@
     params.set("q", q);
     if (filters.oa) params.set("oa", "true");
     if (filters.indonesia) params.set("indonesia", "true");
+    if (filters.clinical) params.set("clinical", "true");
     if (filters.sort && filters.sort !== "relevance") params.set("sort", filters.sort);
     if (filters.types && filters.types.length) filters.types.forEach((t) => params.set(`f-${t}`, "true"));
     if (filters.perPage && filters.perPage !== 20) params.set("per_page", String(filters.perPage));

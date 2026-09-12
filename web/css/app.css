@@ -364,6 +364,10 @@ mark.unsupported {
   font-size: 0.9rem;
 }
 
+/* Klaim kunci (N3) */
+.ai-claims .unsupported-item { border-left: 3px solid #c0392b; padding-left: 0.5rem; }
+.ai-claims .cite-link { text-decoration: none; color: var(--accent); }
+
 .chip.sev-high { background: #f7d9d5; color: #9b2c1f; }
 .chip.sev-moderate { background: #fbeccb; color: #8a5a00; }
 .chip.sev-low { background: var(--chip); color: var(--muted); }
