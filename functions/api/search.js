@@ -243,8 +243,9 @@ async function produceSearch(env, request) {
     }
 
     // Link-out sumber lokal (tanpa scraping) DIPASTIKAN tampil dengan mereservasi slot,
-    // sehingga tidak terpotong saat hasil inti sudah memenuhi `per_page`.
-    const linkouts = needLit && litSources.includes("linkout") ? linkoutEntries(raw, env) : [];
+    // dibatasi `per_page` agar invariant `results.length <= per_page` tetap terjaga.
+    const allLinkouts = needLit && litSources.includes("linkout") ? linkoutEntries(raw, env) : [];
+    const linkouts = allLinkouts.slice(0, perPage);
     const room = Math.max(0, perPage - linkouts.length);
     const paged = results.slice(0, room);
     paged.push(...linkouts);

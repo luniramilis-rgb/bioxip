@@ -32,7 +32,9 @@ def clean_text(value: str, limit: int = MAX_RINGKASAN) -> str:
     text = re.sub(r"\s+", " ", text).strip()
     if len(text) <= limit:
         return text
-    return text[:limit].rsplit(" ", 1)[0] + "…"
+    # Sisakan 1 karakter untuk elipsis agar hasil selalu ≤ limit (kontrak ringkasan).
+    head = text[: max(1, limit - 1)].rsplit(" ", 1)[0] or text[: max(1, limit - 1)]
+    return head + "…"
 
 
 def topics_for(text: str) -> list[str]:

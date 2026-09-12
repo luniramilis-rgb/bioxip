@@ -7,7 +7,7 @@ def test_clean_text_strips_html_and_caps():
     out = guideline.clean_text("<p>Halo <b>dunia</b></p>", 300)
     assert out == "Halo dunia"
     long = guideline.clean_text("kata " * 200, 300)
-    assert len(long) <= 301 and long.endswith("…")
+    assert len(long) <= 300 and long.endswith("…")
 
 
 def test_topics_for():
@@ -59,6 +59,7 @@ def test_whogho_records(monkeypatch):
     assert len(recs) >= 1
     assert recs[0]["tier"] == "epidemiologi" and recs[0]["topik"] == "tb"
     assert "301" in recs[0]["ringkasan"] and recs[0]["url"].startswith("https://ghoapi")
+    assert recs[0]["locator"] == "indikator MDG_0000000020"
 
 
 def test_regulasi_load(tmp_path):
@@ -67,15 +68,19 @@ def test_regulasi_load(tmp_path):
         json.dumps(
             [
                 {"judul": "PNPK Tuberkulosis", "nomor": "HK.01", "tahun": "2024", "topik": "tb,hiv", "url": "https://kemkes.go.id/pnpk-tb", "tier": "pnk", "locator": "hal. 10"},
+                {"judul": "PNPK TB Anak", "nomor": "HK.02", "topik": "tb", "url": "https://kemkes.go.id/pnpk-tb-anak"},
                 {"judul": "Tanpa URL", "topik": "tb"},
             ]
         ),
         encoding="utf-8",
     )
     recs = regulasi.load_records(path)
-    assert len(recs) == 2  # satu dokumen dua topik
+    assert len(recs) == 3  # satu dokumen dua topik + satu dokumen satu topik
     assert {r["topik"] for r in recs} == {"tb", "hiv"}
     assert all(r["source_id"] == "regulasi" and r["tier"] == "pnk" for r in recs)
+    # locator unik per dokumen → tidak saling menimpa pada unique (source_id, topik, locator)
+    tb_keys = [guideline.key_of(r) for r in recs if r["topik"] == "tb"]
+    assert len(tb_keys) == len(set(tb_keys))
 
 
 def test_fact_source_payloads():

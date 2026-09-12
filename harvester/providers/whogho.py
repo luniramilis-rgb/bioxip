@@ -56,7 +56,7 @@ def records(topik: str, names: dict[str, str] | None = None, timeout: float = 20
                 tier="epidemiologi",
                 topik=topik,
                 ringkasan=summary,
-                locator="indikator global (WHO GHO)",
+                locator=f"indikator {code}",
                 url=f"{ENDPOINT}/{code}",
                 keywords=guideline.clean_text(name, 120),
             )

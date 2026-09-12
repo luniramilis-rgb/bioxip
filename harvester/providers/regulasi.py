@@ -37,7 +37,8 @@ def _row_to_records(row: dict) -> list[dict]:
     tahun = str(row.get("tahun") or "").strip()
     keywords = " ".join(part for part in [judul, nomor, tahun] if part)
     ringkasan = str(row.get("ringkasan") or judul).strip()
-    locator = str(row.get("locator") or "dokumen").strip()
+    # Locator unik per dokumen (hindari tabrakan unique (source_id, topik, locator)).
+    locator = str(row.get("locator") or f"dokumen: {judul}" + (f" ({nomor})" if nomor else "")).strip()
     tier = str(row.get("tier") or "pnk").strip()
     return [
         guideline.normalize_rec(

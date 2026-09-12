@@ -207,6 +207,14 @@ async function main() {
     JSON.stringify((litBody.results || []).map((row) => row.source)),
   );
   check("lit: hasil tidak melebihi per_page", (litBody.results || []).length <= litBody.limit, `${litBody.results?.length}/${litBody.limit}`);
+
+  // per_page kecil: link-out dibatasi agar tidak melebihi per_page.
+  const tiny = await sandbox.onRequestGet({
+    request: { url: "https://bioxip.pages.dev/api/search?q=tuberkulosis&per_page=1&no_cache=1" },
+    env: { LIT_SOURCES: "linkout" },
+  });
+  const tinyBody = await tiny.json();
+  check("lit: per_page=1 tetap <= 1", (tinyBody.results || []).length <= 1, `${tinyBody.results?.length}`);
   check("lit: kegagalan sumber opsional tidak menandai degraded", (litBody.notes || []).length === 0, JSON.stringify(litBody.notes || []));
 
   // L2: pedoman lokal (GUIDELINE_DB) — opt-in, diprioritaskan di depan.

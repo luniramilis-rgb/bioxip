@@ -20,8 +20,8 @@ const MAX_TOKENS_LIMIT = 2048;
 // Cache jawaban AI: memotong biaya token berulang (pertanyaan populer) secara signifikan.
 const ANSWER_CACHE_TTL = 7 * 24 * 3600;
 const ANSWER_CACHE_NAMESPACE = "answer:v2";
-// Naikkan bila prompt/skema berubah, agar jawaban lama tidak tersaji.
-const PROMPT_VERSION = "2026-09-11d";
+// Naikkan bila prompt/skema/evidence berubah, agar jawaban lama tidak tersaji.
+const PROMPT_VERSION = "2026-09-12a";
 
 function citationSnapshot(evidence) {
   return evidence.map((item) => ({
@@ -203,10 +203,15 @@ export async function onRequestPost(context) {
     }).catch(() => []);
     if (guidelineRows.length) {
       const gEvidence = toEvidence(guidelineRows);
-      evidence = [
-        ...gEvidence,
-        ...evidence.map((item, index) => ({ ...item, n: gEvidence.length + index + 1 })),
-      ].slice(0, 12);
+      const seen = new Set();
+      const merged = [];
+      for (const item of [...gEvidence, ...evidence]) {
+        const key = item.id || `${item.source}|${item.title}`;
+        if (seen.has(key)) continue; // /api/search sudah menyertakan pedoman → hindari duplikat
+        seen.add(key);
+        merged.push(item);
+      }
+      evidence = merged.slice(0, 12).map((item, index) => ({ ...item, n: index + 1 }));
     }
   }
   const providerOk = useProvider && providerReady(env);
