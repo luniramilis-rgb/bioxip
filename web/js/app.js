@@ -33,6 +33,7 @@
           <label class="check"><input type="checkbox" id="f-indonesia" /> Penelitian Indonesia</label>
           <a class="muted" href="#/answer">Atau buat jawaban klinis (PICO) →</a>
         </div>
+        ${patternsHTML()}
       </section>
       <section>
         <h2>Telusuri berdasarkan topik</h2>
@@ -107,6 +108,23 @@
           ? `Saldo <strong>${esc(C.formatIdr(balance))}</strong> · <a href="#/search?mode=ai">pakai Tanya AI</a>.`
           : 'Pencarian gratis. <a href="#/saldo">Isi saldo</a> untuk membuka Tanya AI.';
     }
+  }
+
+  function patternsHTML() {
+    const list = window.BIOXIP_PATTERNS || [];
+    if (!list.length) return "";
+    const chips = list
+      .map((p) => {
+        const params = new URLSearchParams();
+        params.set("q", p.query || "");
+        (p.filters?.types || []).forEach((t) => params.set(`f-${t}`, "true"));
+        if (p.filters?.oa) params.set("oa", "true");
+        if (p.filters?.indonesia) params.set("indonesia", "true");
+        const title = `${p.desc || ""}${p.role ? ` · ${p.role}` : ""}`;
+        return `<a class="pattern" href="#/search?${params.toString()}" title="${esc(title)}"><strong>${esc(p.label)}</strong><small>${esc(p.desc || "")}</small></a>`;
+      })
+      .join("");
+    return `<div class="patterns" aria-label="Pola pertanyaan siap pakai"><p class="muted">Pola siap pakai:</p>${chips}<p class="muted">${esc(window.BIOXIP_PATTERNS_NOTE || "")}</p></div>`;
   }
 
   function topicChips() {
@@ -225,6 +243,7 @@
           ${[20, 50, 100].map((n) => `<option value="${n}" ${Number(url.get("per_page")) === n ? "selected" : ""}>${n}</option>`).join("")}
         </select></label>
       </div>
+      ${patternsHTML()}
       ${mode === "ai" ? window.BIOXIP_AI.panelHTML() : ""}
       <div id="results"></div>
       <div id="pager"></div>`;

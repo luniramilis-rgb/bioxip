@@ -69,6 +69,12 @@ jobs:
       - name: Unit test formulary (baca DB + fallback)
         run: node tests/formulary_unit.js
 
+      - name: Unit test throttle & query PubMed
+        run: node tests/pubmed_unit.js
+
+      - name: Unit test pola pertanyaan (guardrail)
+        run: node tests/patterns_unit.js
+
       - name: Unit test adapter literatur (Crossref/DOAJ/Neliti/linkout)
         run: node tests/literature_unit.js
 

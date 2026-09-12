@@ -117,6 +117,22 @@ h2 { margin-top: 1.6rem; font-size: 1.2rem; }
 .topic:active { border-color: var(--accent); }
 .topic small { display: block; color: var(--muted); margin-top: 0.2rem; }
 
+/* Chips pola pertanyaan siap pakai (N2) */
+.patterns { margin-top: 0.8rem; }
+.patterns .pattern {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  margin: 0.2rem 0.3rem 0.2rem 0;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--surface);
+}
+.patterns .pattern strong { font-weight: 600; }
+.patterns .pattern small { color: var(--muted); margin-left: 0.4rem; }
+.patterns .pattern:active, .patterns .pattern:hover { border-color: var(--accent); }
+
 .result, .study {
   border: 1px solid var(--line);
   border-radius: 12px;

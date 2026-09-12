@@ -15,7 +15,7 @@ const CATEGORY_FILTERS = {
   etiology: '(etiology[sh] OR risk factors[MeSH Terms] OR causality[MeSH Terms])',
 };
 
-function minInterval(env) {
+export function minInterval(env) {
   return env?.NCBI_API_KEY ? MIN_INTERVAL_WITH_KEY_MS : MIN_INTERVAL_NO_KEY_MS;
 }
 

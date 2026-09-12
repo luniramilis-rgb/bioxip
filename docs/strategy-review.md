@@ -4,6 +4,8 @@ Dokumen hidup. Turunan dari `docs/blueprint.md` (arsitektur) dan rekonsiliasi te
 
 Tujuan: memisahkan **yang sudah selesai**, **yang parsial**, dan **roadmap** dalam materi strategi (prompt patterns, local-first, daftar upgrade, unifikasi medis–farmasi), lalu menetapkan **rencana eksekusi tervalidasi** berikutnya.
 
+**Progres (2026-09-12):** N0 selesai (dokumen + guardrail `AGENTS.md`). **N1 sebagian** — kode/test selesai (`minInterval` diekspor, `tests/pubmed_unit.js`), `NCBI_EMAIL` diset di produksi; `NCBI_API_KEY` **menunggu kunci dari akun NCBI**. **N2 selesai** — `web/js/patterns.js` (5 pola, guardrail) + chips di beranda/hasil + `tests/patterns_unit.js` + precache `sw.js` (v6). N3–N5 belum.
+
 ---
 
 ## 1. Status matrix (verifikasi terhadap repo, 2026-09-12)
