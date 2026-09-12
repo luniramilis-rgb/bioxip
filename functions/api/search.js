@@ -121,6 +121,9 @@ async function produceSearch(env, request) {
 
 
     const calls = [];
+    // Label per panggilan: kegagalan sumber "core" memengaruhi kesehatan cache,
+    // kegagalan sumber "optional" (literatur opt-in) tidak boleh memblokir cache.
+    const callKinds = [];
     if (needLit) {
       calls.push(
         fetchEpmc(litQuery, {
@@ -134,9 +137,11 @@ async function produceSearch(env, request) {
           filter: clinicalFilter,
         }),
       );
+      callKinds.push("core");
     }
     if (needTrial) {
       calls.push(fetchTrials(litQuery, { oa, indonesia, types, sort, limit: perPage, token: ctToken, withAbstract }));
+      callKinds.push("core");
     }
     if (needPubmed) {
       const pubmedQuery = conceptClause || expandQueryEnglish(raw);
@@ -148,12 +153,15 @@ async function produceSearch(env, request) {
           countsTowardTotal: false,
         })),
       );
+      callKinds.push("core");
     }
     if (needLit && litSources.includes("crossref")) {
       calls.push(searchCrossref(litQuery, { limit: perPage, indonesia, mailto: env?.CROSSREF_MAILTO || env?.OPENALEX_MAIL }));
+      callKinds.push("optional");
     }
     if (needLit && litSources.includes("doaj")) {
       calls.push(searchDoaj(litQuery, { limit: perPage, indonesia }));
+      callKinds.push("optional");
     }
 
     const settled = await Promise.allSettled(calls.map((p) => withTimeout(p, TIMEOUT_MS)));
@@ -161,14 +169,19 @@ async function produceSearch(env, request) {
     const collected = [];
     let total = 0;
     const notes = [];
+    const optionalNotes = [];
     const pagination = {};
-    for (const item of settled) {
+    for (let index = 0; index < settled.length; index += 1) {
+      const item = settled[index];
       if (item.status === "fulfilled") {
         collected.push(...item.value.results);
         if (item.value.countsTowardTotal !== false) total += item.value.total;
         Object.assign(pagination, item.value.pagination);
       } else {
-        notes.push(item.reason instanceof Error ? item.reason.message : "sumber tidak merespons");
+        const message = item.reason instanceof Error ? item.reason.message : "sumber tidak merespons";
+        // Sumber literatur opt-in tidak boleh menandai respons "degraded" (memblokir cache).
+        if (callKinds[index] === "optional") optionalNotes.push(message);
+        else notes.push(message);
       }
     }
 
@@ -216,12 +229,13 @@ async function produceSearch(env, request) {
       }
     }
 
-    const paged = results.slice(0, perPage);
-
-    // Link-out ke sumber lokal (tanpa scraping) — ditambahkan di akhir, tidak menggeser hasil inti.
-    if (litSources.includes("linkout")) {
-      paged.push(...linkoutEntries(raw, env));
+    // Link-out ke sumber lokal (tanpa scraping) dimasukkan SEBELUM pemotongan halaman
+    // agar `results.length <= per_page` dan facet tetap konsisten; hanya untuk literatur.
+    if (needLit && litSources.includes("linkout")) {
+      results.push(...linkoutEntries(raw, env));
     }
+
+    const paged = results.slice(0, perPage);
 
     // Sembunyikan abstrak dari respons kecuali diminta eksplisit (abstrak hanya untuk skoring/grounded).
     if (!withAbstract) {
@@ -235,6 +249,7 @@ async function produceSearch(env, request) {
       page,
       limit: perPage,
       notes,
+      optional_notes: optionalNotes,
       pagination,
       source_counts: countBySource(collected),
       facets: facetsOf(paged),

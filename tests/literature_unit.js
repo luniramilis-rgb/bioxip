@@ -33,6 +33,10 @@ function loadLit(relative, exports, extra = {}) {
     });
     check("crossref: map fields", row && row.doi === "10.1000/ABC.1" && row.source === "crossref" && row.year === 2024 && row.oa.is_oa === true);
     check("crossref: title kosong → null", api.mapCrossrefItem({ URL: "https://x.test" }) === null);
+    const tdm = api.mapCrossrefItem({ DOI: "10.9/tdm", title: ["T"], URL: "https://doi.org/10.9/tdm", license: [{ URL: "http://www.springer.com/tdm" }] });
+    check("crossref: lisensi TDM bukan OA", tdm && tdm.oa.is_oa === false && tdm.oa.license === "http://www.springer.com/tdm");
+    const cc = api.mapCrossrefItem({ DOI: "10.9/cc", title: ["T"], URL: "https://doi.org/10.9/cc", license: [{ URL: "https://creativecommons.org/licenses/by/4.0/" }] });
+    check("crossref: lisensi CC = OA", cc && cc.oa.is_oa === true);
 
     let called = "";
     const { api: api2 } = loadLit("crossref.js", ["searchCrossref"], {

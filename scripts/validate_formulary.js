@@ -46,6 +46,15 @@ for (const file of ["crossref.js", "doaj.js", "neliti_oai.js", "linkout.js"]) {
 const search = read("functions/api/search.js");
 if (!search.includes("parseLitSources")) problems.push("api/search.js: parseLitSources tidak ada");
 if (!/LIT_SOURCES/.test(search)) problems.push("api/search.js: flag LIT_SOURCES tidak ada");
+// Guard wajib: sumber/link-out harus opt-in (flag OFF → perilaku tak berubah).
+for (const source of ["crossref", "doaj", "linkout"]) {
+  if (!search.includes(`litSources.includes("${source}")`)) {
+    problems.push(`api/search.js: guard litSources.includes("${source}") tidak ditemukan`);
+  }
+}
+if (!/new Set\(\["crossref",\s*"doaj",\s*"linkout"\]\)/.test(search)) {
+  problems.push("api/search.js: daftar sumber LIT_SOURCES yang diizinkan tidak sesuai");
+}
 const linkout = read("functions/_literature/linkout.js");
 if (/garuda\.kemdikbud\.go\.id/i.test(linkout)) problems.push("linkout.js: URL Garuda tidak boleh di-hardcode (belum terverifikasi)");
 if (!linkout.includes("GARUDA_SEARCH_URL")) problems.push("linkout.js: Garuda harus opt-in via GARUDA_SEARCH_URL");

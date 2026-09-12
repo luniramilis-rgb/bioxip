@@ -183,6 +183,8 @@ async function main() {
     (litBody.results || []).some((row) => row.source === "onesearch" && row.linkout === true),
     JSON.stringify((litBody.results || []).map((row) => row.source)),
   );
+  check("lit: hasil tidak melebihi per_page", (litBody.results || []).length <= litBody.limit, `${litBody.results?.length}/${litBody.limit}`);
+  check("lit: kegagalan sumber opsional tidak menandai degraded", (litBody.notes || []).length === 0, JSON.stringify(litBody.notes || []));
 
   // Cache: permintaan identik kedua harus dilayani cache (tanpa memanggil upstream lagi).
   sandbox.resetMemoryCache();

@@ -20,6 +20,8 @@ export function mapCrossrefItem(item) {
   const issued = item.issued?.["date-parts"]?.[0];
   const year = Array.isArray(issued) && issued[0] ? Number(issued[0]) || null : null;
   const license = item.license?.[0]?.URL || null;
+  // OA hanya bila lisensinya benar-benar terbuka (mis. Creative Commons); lisensi TDM eksklusif bukan OA.
+  const isOa = /creativecommons\.org|\bcc[ -]?by|\bcc0\b|\bpublicdomain\b/i.test(license || "");
   const authors = (item.author || []).map((a) => ({ given: a.given || "", family: a.family || "" }));
   return {
     id: `crossref|${doi ? `doi:${doi}` : url}`,
@@ -32,7 +34,7 @@ export function mapCrossrefItem(item) {
     doi: item.DOI || null,
     url,
     source: SOURCE,
-    oa: { is_oa: Boolean(license), license, provider: SOURCE },
+    oa: { is_oa: isOa, license, provider: SOURCE },
     citation_count: Number(item["is-referenced-by-count"]) || 0,
     external_ids: { doi: item.DOI || null, issn: item.ISSN?.[0] || null },
     abstract: clean(item.abstract, 900),
