@@ -49,3 +49,4 @@ Repo bioXip. Baca `docs/blueprint.md` sebelum mengubah arsitektur.
 - Harvester menulis via `service_role`; database tulis tidak pernah dari edge.
 - Jangan commit file `.env*` atau key.
 - Migration baru: tambahkan `supabase/migrations/NNN_*.sql` (jangan edit file lama).
+- Guardrail jawaban AI: red flag = arahan gawat darurat (bukan daftar diagnosis); AI tetap menolak diagnosis/peresepan; setiap keluaran wajib mencantumkan `sources[]` + disclaimer.
