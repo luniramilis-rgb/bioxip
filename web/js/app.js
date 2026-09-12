@@ -476,13 +476,14 @@
     });
 
     document.addEventListener("change", (event) => {
-      const ids = ["f-oa", "f-indonesia", "f-paper", "f-preprint", "f-trial", "f-sort", "f-per"];
+      const ids = ["f-oa", "f-indonesia", "f-clinical", "f-paper", "f-preprint", "f-trial", "f-sort", "f-per"];
       if (!ids.includes(event.target.id)) return;
       const current = new URLSearchParams(location.hash.split("?")[1] || "");
       const q = current.get("q");
       if (!q) return;
       current.delete("oa");
       current.delete("indonesia");
+      current.delete("clinical");
       current.delete("f-paper");
       current.delete("f-preprint");
       current.delete("f-trial");
@@ -490,6 +491,7 @@
       const values = {
         "f-oa": "oa",
         "f-indonesia": "indonesia",
+        "f-clinical": "clinical",
         "f-paper": "f-paper",
         "f-preprint": "f-preprint",
         "f-trial": "f-trial",
