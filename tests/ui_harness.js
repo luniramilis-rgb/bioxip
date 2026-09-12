@@ -181,6 +181,7 @@ async function fetchStub(url, options) {
       ["delta", { text: "Metformin menurunkan HbA1c pada diabetes tipe 2. " }],
       ["delta", { text: "Klaim tambahan tanpa sumber ini perlu ditandai." }],
       ["citation", { n: 1, title: "Study one", source: "europepmc", url: "https://example.org/1" }],
+      ["citation", { n: 2, title: "PNPK TB: paduan berbasis resistensi", source: "guideline", url: "https://kemkes.go.id/pnpk-tb", guideline: { tier: "pnk", label: "PNPK", edisi: "2024", locator: "hal. 12" } }],
       [
       "citation_summary",
       {
@@ -390,6 +391,11 @@ async function dispatchHash(hash) {
     streamedCites.slice(0, 200),
   ]);
   results.push(["ai: tombol salin daftar sumber tampil", streamedCites.includes("Salin daftar sumber")]);
+  results.push([
+    "ai: badge pedoman lokal tampil di sumber",
+    streamedCites.includes("PNPK") && streamedCites.includes("hal. 12"),
+    streamedCites.slice(0, 200),
+  ]);
   results.push(["ai: indikator kekuatan bukti tampil", streamedCites.includes("Kekuatan bukti")]);
 
   // Klaim sama di dua paragraf tidak boleh menghasilkan hitungan mustahil ("2 dari 1").

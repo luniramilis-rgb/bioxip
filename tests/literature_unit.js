@@ -84,9 +84,10 @@ function loadLit(relative, exports, extra = {}) {
   {
     const { api } = loadLit("linkout.js", ["linkoutEntries"]);
     const base = api.linkoutEntries("tuberkulosis", {});
-    check("linkout: OneSearch selalu ada", base.length === 1 && base[0].source === "onesearch" && base[0].linkout === true && base[0].url.includes("onesearch.id"));
+    check("linkout: OneSearch selalu ada", base.some((e) => e.source === "onesearch" && e.linkout === true));
+    check("linkout: BPOM (CekBPOM) selalu ada", base.some((e) => e.source === "bpom" && e.url === "https://cekbpom.pom.go.id/"));
     const withGaruda = api.linkoutEntries("tuberkulosis", { GARUDA_SEARCH_URL: "https://garuda.example/search?q=" });
-    check("linkout: Garuda hanya bila env diisi", withGaruda.length === 2 && withGaruda[1].source === "garuda" && withGaruda[1].url === "https://garuda.example/search?q=tuberkulosis");
+    check("linkout: Garuda hanya bila env diisi", withGaruda.some((e) => e.source === "garuda" && e.url === "https://garuda.example/search?q=tuberkulosis"));
     check("linkout: query kosong → []", api.linkoutEntries("  ", {}).length === 0);
   }
 

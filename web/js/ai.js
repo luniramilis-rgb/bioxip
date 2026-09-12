@@ -232,10 +232,12 @@
           const host = document.getElementById("ai-cites");
           if (!host) return;
           const list = [...citations.values()]
-            .map(
-              (item) =>
-                `<li id="cite-${item.n}" value="${item.n}"><a href="${esc(item.url || "#")}" target="_blank" rel="noopener">${esc(item.title)}</a> <span class="muted">(${esc(item.source)})</span></li>`
-            )
+            .map((item) => {
+              const meta = item.guideline
+                ? [item.guideline.label || item.guideline.tier, item.guideline.edisi, item.guideline.locator].filter(Boolean).join(" · ")
+                : item.source;
+              return `<li id="cite-${item.n}" value="${item.n}"><a href="${esc(item.url || "#")}" target="_blank" rel="noopener">${esc(item.title)}</a> <span class="muted">(${esc(meta)})</span></li>`;
+            })
             .join("");
           // Klaim yang tidak berhasil dipetakan ke teks (mis. terlalu pendek atau
           // terpotong antar-paragraf) tetap didaftarkan agar tidak ada yang hilang.

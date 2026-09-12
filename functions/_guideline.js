@@ -62,6 +62,21 @@ export function mapGuidelineRow(row) {
   };
 }
 
+/** Ubah baris guideline hasil pencarian → item evidence untuk grounding AI. */
+export function toEvidence(rows, offset = 0) {
+  return (rows || []).map((row, index) => ({
+    n: offset + index + 1,
+    id: row.id,
+    title: row.title,
+    source: "guideline",
+    journal: row.guideline?.sumber || row.journal || "Pedoman",
+    year: row.year || null,
+    url: row.url || null,
+    snippet: row.title,
+    guideline: row.guideline || null,
+  }));
+}
+
 export async function searchGuidelines(env, query, origin, { topik = null, limit = 5 } = {}) {
   if (!guidelineEnabled(env)) return [];
   const q = String(query || "").trim();

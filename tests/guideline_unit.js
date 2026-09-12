@@ -8,7 +8,7 @@ function loadGuideline() {
   const state = { rpcImpl: async () => [], cache: new Map(), calls: [] };
   let source = fs.readFileSync(path.join(ROOT, "functions", "_guideline.js"), "utf8");
   source = source.replace(/^import\s+.*?;\s*$/gm, "").replace(/export /g, "");
-  source += "\nglobalThis.__g = { guidelineEnabled, detectGuidelineTopic, mapGuidelineRow, searchGuidelines };\n";
+  source += "\nglobalThis.__g = { guidelineEnabled, detectGuidelineTopic, mapGuidelineRow, searchGuidelines, toEvidence };\n";
   const sandbox = {
     console, JSON, String, Number, Boolean, Object, Array, Math, RegExp, Promise,
     rpc: async (env, name, args) => {
@@ -91,6 +91,14 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
     const inst = loadGuideline();
     const empty = await inst.api.searchGuidelines({ GUIDELINE_DB: "on" }, "   ", "https://x.test");
     check("search: query kosong tanpa topik → []", empty.length === 0 && inst.state.calls.length === 0);
+  }
+
+  {
+    const { api } = loadGuideline();
+    const rows = [api.mapGuidelineRow(row)];
+    const ev = api.toEvidence(rows, 2);
+    check("evidence: bentuk item grounding", ev.length === 1 && ev[0].n === 3 && ev[0].source === "guideline" && ev[0].snippet === row.ringkasan);
+    check("evidence: meta badge diteruskan", ev[0].guideline && ev[0].guideline.locator === "hal. 12");
   }
 
   let failed = 0;

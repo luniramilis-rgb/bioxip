@@ -59,6 +59,15 @@ const search = read("functions/api/search.js");
 for (const marker of ["guidelineEnabled(env)", "searchGuidelines(env", "guidelineRows"]) {
   if (!search.includes(marker)) problems.push(`api/search.js: integrasi guideline "${marker}" tidak ditemukan`);
 }
+// L3: konteks pedoman dialirkan ke jawaban AI.
+if (!exists("functions/api/ai/chat.js")) {
+  problems.push("fungsi hilang: functions/api/ai/chat.js");
+} else {
+  const chat = read("functions/api/ai/chat.js");
+  for (const marker of ["searchGuidelines(env, question", "toEvidence(guidelineRows)"]) {
+    if (!chat.includes(marker)) problems.push(`api/ai/chat.js: konteks guideline "${marker}" tidak ditemukan`);
+  }
+}
 
 // 024: p_query diberi default agar pencarian bisa dipanggil hanya dengan p_topik.
 const MIGRATION_DEFAULT = "supabase/migrations/024_guideline_search_default.sql";

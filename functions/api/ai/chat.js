@@ -14,6 +14,7 @@ import {
 import { classifyInput, mergeRedFlags, redFlagNotice } from "../../_safety.js";
 import { cacheGetJson, cacheKey, cachePutJson } from "../../_cache.js";
 import { answerCacheGet, answerCachePut, answerHash } from "../../_answercache.js";
+import { detectGuidelineTopic, guidelineEnabled, searchGuidelines, toEvidence } from "../../_guideline.js";
 
 const MAX_TOKENS_LIMIT = 2048;
 // Cache jawaban AI: memotong biaya token berulang (pertanyaan populer) secara signifikan.
@@ -31,6 +32,7 @@ function citationSnapshot(evidence) {
     url: item.url,
     journal: item.journal,
     year: item.year,
+    guideline: item.guideline || null,
   }));
 }
 
@@ -193,6 +195,20 @@ export async function onRequestPost(context) {
 
   const origin = new URL(request.url).origin;
   let evidence = await gatherEvidence(origin, question, { limit: 8 });
+  // Local-first: pedoman lokal dimasukkan sebagai evidence terdepan agar ikut disitasi AI.
+  if (guidelineEnabled(env)) {
+    const guidelineRows = await searchGuidelines(env, question, origin, {
+      topik: detectGuidelineTopic(question),
+      limit: 3,
+    }).catch(() => []);
+    if (guidelineRows.length) {
+      const gEvidence = toEvidence(guidelineRows);
+      evidence = [
+        ...gEvidence,
+        ...evidence.map((item, index) => ({ ...item, n: gEvidence.length + index + 1 })),
+      ].slice(0, 12);
+    }
+  }
   const providerOk = useProvider && providerReady(env);
   const estimate = estimateMicroIdr({
     inputTokens: estimateInputTokens(question, evidence),
@@ -431,7 +447,7 @@ export async function onRequestPost(context) {
         abstain = resolveAbstain(abstain, verified);
 
         for (const item of evidence) {
-          send("citation", { n: item.n, title: item.title, source: item.source, url: item.url });
+          send("citation", { n: item.n, title: item.title, source: item.source, url: item.url, guideline: item.guideline || null });
         }
 
         const cost = costMicroIdr({

@@ -27,6 +27,24 @@ export function linkoutEntries(query, env = {}) {
       abstract: "",
     },
   ];
+  // BPOM CekBPOM (aturan/izin edar) — link-out ke portal resmi (root terverifikasi).
+  entries.push({
+    id: `linkout|bpom|${q.toLowerCase()}`,
+    doc_type: "link",
+    linkout: true,
+    title: `Cek izin edar/registrasi produk di BPOM (CekBPOM)`,
+    authors: [],
+    journal: null,
+    year: null,
+    published_on: null,
+    doi: null,
+    url: "https://cekbpom.pom.go.id/",
+    source: "bpom",
+    oa: { is_oa: false, provider: "bpom" },
+    citation_count: 0,
+    external_ids: {},
+    abstract: "",
+  });
   const garuda = env?.GARUDA_SEARCH_URL;
   if (garuda) {
     entries.push({
