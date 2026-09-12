@@ -81,7 +81,8 @@ export async function searchGuidelines(env, query, origin, { topik = null, limit
   if (!guidelineEnabled(env)) return [];
   const q = String(query || "").trim();
   if (!q && !topik) return [];
-  const key = cacheKey("guideline", { q: q.toLowerCase(), topik: topik || "", limit }, origin);
+  // Naikkan versi namespace saat data pedoman berubah (publish) agar cache lama tidak tersaji.
+  const key = cacheKey("guideline:v2", { q: q.toLowerCase(), topik: topik || "", limit }, origin);
   const cached = await cacheGetJson(key).catch(() => null);
   if (cached) return cached.items || [];
   let rows = null;
