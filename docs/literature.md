@@ -49,7 +49,7 @@ Setiap adapter mengekspor:
 
 ## 8. Status implementasi (2026-09-11)
 - **Aktif** (opt-in via env `LIT_SOURCES`, default **kosong/OFF** → perilaku produksi tidak berubah): adapter `functions/_literature/crossref.js` (REST, `query.bibliographic`; `query.affiliation=Indonesia` bila `indonesia=true`; `mailto` polite) dan `doaj.js` (REST `/api/search/articles`; filter `bibjson.journal.country:"Indonesia"`), plus `linkout.js`.
-- **Link-out**: OneSearch (`https://onesearch.id/Search/Results?lookfor=`, terverifikasi 200) selalu ada saat `linkout` aktif. **Garuda tidak disertakan default** karena URL pencariannya belum terverifikasi — aktifkan hanya bila `GARUDA_SEARCH_URL` (prefix) sudah dipastikan.
+- **Link-out**: OneSearch (`https://onesearch.id/Search/Results?lookfor=`, terverifikasi 200) **aktif di produksi** (`LIT_SOURCES=crossref,doaj,linkout`) dan ditampilkan lewat reservasi slot (selalu tampil walau halaman penuh). **Garuda tidak disertakan default** karena URL pencariannya belum terverifikasi — aktifkan hanya bila `GARUDA_SEARCH_URL` (prefix) sudah dipastikan.
 - **Neliti OAI** (`neliti_oai.js`): **harvest metadata** (`ListRecords`, `oai_dc`, resumption token) — OAI tidak mendukung pencarian per-kata-kunci, jadi **bukan** bagian fan-out live; dipakai untuk batch harvest ke indeks lokal di masa depan.
 - Cache pencarian dinaikkan ke `search:v8`; sumber baru diberi prioritas dedupe di bawah Europe PMC/PubMed/ClinicalTrials.
 - Diuji: `tests/literature_unit.js` (pemetaan, URL permintaan, link-out, parsing OAI) + 2 kasus smoke (linkout OFF/ON).
