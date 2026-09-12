@@ -78,6 +78,9 @@ jobs:
       - name: Unit test pola pertanyaan (guardrail)
         run: node tests/patterns_unit.js
 
+      - name: Unit test intent classifier (R2)
+        run: node tests/intent_unit.js
+
       - name: Unit test format sitasi (Vancouver/APA)
         run: node tests/format_unit.js
 

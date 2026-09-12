@@ -263,7 +263,7 @@ sandbox.__setBalance = (value) => {
 
 vm.createContext(sandbox);
 
-const files = ["js/brand.js", "js/config.js", "js/auth.js", "js/topics.js", "js/search.js", "js/answer.js", "js/drug.js", "js/interactions.js", "js/credits.js", "js/ai.js", "js/saldo.js", "js/masuk.js", "js/app.js"];
+const files = ["js/brand.js", "js/config.js", "js/auth.js", "js/topics.js", "js/patterns.js", "js/intent.js", "js/search.js", "js/answer.js", "js/drug.js", "js/interactions.js", "js/credits.js", "js/ai.js", "js/saldo.js", "js/masuk.js", "js/app.js"];
 for (const file of files) {
   const code = fs.readFileSync(path.join(ROOT, file), "utf8");
   vm.runInContext(code, sandbox, { filename: file });
@@ -287,6 +287,20 @@ async function dispatchHash(hash) {
     home.includes('id="ai-mode"') && home.includes("✦ AI"),
   ]);
   results.push(["home: status AI tampil (ai-hint)", home.includes("ai-hint")]);
+  results.push(["home: wadah saran pola", home.includes('id="pattern-suggest"')]);
+  const intentApi = sandbox.BIOXIP_INTENT;
+  results.push([
+    "R2: intent classifier tersedia",
+    Boolean(intentApi) && intentApi.classifyIntent("interaksi warfarin dan amiodaron").type === "interaction" && intentApi.classifyIntent("parasetamol").type === "drug",
+  ]);
+  const qHome = registry.get("q");
+  if (qHome) {
+    qHome.value = "interaksi warfarin dan amiodaron";
+    qHome.trigger("input", {});
+  }
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  const sugg = registry.get("pattern-suggest")?.innerHTML || "";
+  results.push(["R3: saran pola mengikuti intent", sugg.includes("Cek interaksi obat"), sugg.slice(0, 120)]);
   const homeHint = registry.get("ai-hint")?.innerHTML || "";
   results.push([
     "home: pengguna belum masuk diarahkan ke #/masuk",
@@ -303,8 +317,11 @@ async function dispatchHash(hash) {
   results.push(["answer: bottom sheet button", answer.includes("data-study")]);
 
   await dispatchHash("#/search?q=dengue&per_page=100");
+  await new Promise((resolve) => setTimeout(resolve, 80));
   const search = registry.get("results")?.innerHTML || "";
   results.push(["search renders results", search.includes("Dengue paper")]);
+  results.push(["R1: blok 'Bukti ilmiah' berlabel", search.includes("Bukti ilmiah")]);
+  results.push(["R1: CTA buat jawaban AI", search.includes("Buat jawaban AI"), search.slice(0, 120)]);
 
   await dispatchHash("#/drug?q=parasetamol");
   const drug = registry.get("drug-body")?.innerHTML || "";

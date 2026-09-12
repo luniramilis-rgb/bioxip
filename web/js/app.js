@@ -45,7 +45,25 @@
         <input id="q" name="q" type="search" autocomplete="off" placeholder="${placeholder}" aria-label="Pertanyaan" />
         <button type="submit" id="search-submit">${ai ? "Tanya AI" : "Cari"}</button>
         <button type="button" id="ai-mode" class="ai-mode${ai ? " active" : ""}" aria-pressed="${ai}" title="Mode AI memakai saldo">✦ AI</button>
-      </form>`;
+      </form>
+      <div id="pattern-suggest" class="patterns suggestions" aria-live="polite"></div>`;
+  }
+
+  function renderSuggestions(value) {
+    const host = document.getElementById("pattern-suggest");
+    if (!host) return;
+    const I = window.BIOXIP_INTENT;
+    const patterns = I?.suggestPatterns ? I.suggestPatterns(value, 3) : [];
+    host.innerHTML = patterns
+      .map((p) => {
+        const params = new URLSearchParams();
+        params.set("q", p.query || "");
+        (p.filters?.types || []).forEach((t) => params.set(`f-${t}`, "true"));
+        if (p.filters?.oa) params.set("oa", "true");
+        if (p.filters?.indonesia) params.set("indonesia", "true");
+        return `<a class="pattern" href="#/search?${params.toString()}" title="${esc(p.desc || "")}"><strong>${esc(p.label)}</strong><small>${esc(p.desc || "")}</small></a>`;
+      })
+      .join("");
   }
 
   function bindSearchBar(ai) {
@@ -80,6 +98,15 @@
         updateAiHint();
       });
     }
+    const input = document.getElementById("q");
+    if (input) {
+      let timer = null;
+      input.addEventListener("input", () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => renderSuggestions(input.value), 150);
+      });
+    }
+    renderSuggestions(document.getElementById("q")?.value || "");
     updateAiHint();
   }
 
@@ -309,12 +336,18 @@
     host.innerHTML = `<p class="muted">${S.escape(shownText)}</p>`;
     // Hasil adaptif: obat (bila terdeteksi) → pedoman lokal → bukti.
     const drug = await drugInlineHTML(q);
+    const links = items.filter((doc) => doc.doc_type === "link");
     const guidelines = items.filter((doc) => doc.source === "guideline");
-    const others = items.filter((doc) => doc.source !== "guideline");
+    const papers = items.filter((doc) => doc.source !== "guideline" && doc.doc_type !== "link");
+    const section = (title, rows) =>
+      rows.length ? `<h2 class="muted">${title} (${rows.length})</h2>${rows.map((doc) => S.renderResult(doc)).join("")}` : "";
+    const aiCta = `<p class="actions"><a class="btn small ghost" href="${aiHash(q)}">Buat jawaban AI →</a></p>`;
     const blocks = [
+      aiCta,
       drug,
-      guidelines.length ? `<h2 class="muted">Pedoman lokal</h2>${guidelines.map((doc) => S.renderResult(doc)).join("")}` : "",
-      others.map((doc) => S.renderResult(doc)).join(""),
+      section("Pedoman lokal", guidelines),
+      section("Bukti ilmiah", papers),
+      section("Tautan sumber", links),
     ].join("");
     host.insertAdjacentHTML("beforeend", blocks || '<p class="muted">Tidak ada hasil. Coba kata lain atau filter lebih sedikit.</p>');
     host.insertAdjacentHTML("beforeend", S.renderNote(current));
@@ -349,6 +382,13 @@
       out += `<span class="muted"> (batas demo 500 hasil)</span>`;
     }
     host.innerHTML = out;
+  }
+
+  function aiHash(q) {
+    const params = new URLSearchParams();
+    params.set("q", q);
+    params.set("mode", "ai");
+    return `#/search?${params.toString()}`;
   }
 
   function hashFor(q, filters, page) {
