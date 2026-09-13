@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
     const result = await groundAnswer(env, question, {
       origin,
       limit: Math.min(Math.max(Number(body.limit) || 8, 3), 12),
-      maxTokens: Math.min(Math.max(Number(body.max_tokens) || 1024, 256), 2048),
+      maxTokens: Math.min(Math.max(Number(body.max_tokens) || 2048, 256), 2048),
       useProvider: body.use_provider !== false,
     });
 

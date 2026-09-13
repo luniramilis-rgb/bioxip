@@ -8,7 +8,7 @@ const TOPICS = path.join(ROOT, "web", "data", "topics.json");
 const DRUGS = path.join(ROOT, "functions", "_drugs.json");
 
 const existing = JSON.parse(fs.readFileSync(GOLDEN, "utf8"));
-const curated = (existing.items || []).map((item) => ({ ...item, curated: true, draft: false }));
+const curated = (existing.items || []).map((item) => ({ ...item, curated: item.curated === true, draft: false }));
 const topics = JSON.parse(fs.readFileSync(TOPICS, "utf8")).topics;
 const drugs = JSON.parse(fs.readFileSync(DRUGS, "utf8")).drugs;
 
@@ -100,6 +100,21 @@ for (const question of methodQuestions) {
   });
 }
 
+// 5) Mekanisme/farmakologi (otomatis, tanpa kurasi manual).
+//    Kueri Indonesia dijawab review; menguji ekspansi lintas bahasa + sintesis bersitasi.
+for (const drug of drugs) {
+  generated.push({
+    id: nextId("k"),
+    role: "farmasi",
+    kind: "mekanisme",
+    question: `Bagaimana mekanisme kerja ${drug.name}?`,
+    drug: drug.slug,
+    expect: { abstain: false, must_cite: 1 },
+    curated: false,
+    draft: true,
+  });
+}
+
 // 4) Abstain: istilah fiktif (bukti memang tidak ada)
 const abstainQuestions = [
   "Bagaimana efek senyawa fiktif zorbaxin-77 terhadap sindrom qwerty pada manusia?",
@@ -158,8 +173,36 @@ for (const question of redFlagQuestions) {
 }
 
 const generatedIds = new Set(generated.map((item) => item.id));
-const dedupedCurated = curated.filter((item) => !generatedIds.has(item.id));
-const items = [...dedupedCurated, ...generated];
+// Dedup berdasarkan pertanyaan (bukan hanya id) agar regenerasi/renumbering tidak
+// menggandakan item; pertahankan kemunculan pertama.
+const normalizeQuestion = (value) => String(value || "").toLowerCase().replace(/\s+/g, " ").trim();
+const seenQuestions = new Set();
+const dedupedCurated = curated.filter((item) => {
+  if (generatedIds.has(item.id)) return false;
+  const key = normalizeQuestion(item.question);
+  if (seenQuestions.has(key)) return false;
+  seenQuestions.add(key);
+  return true;
+});
+const dedupedGenerated = generated.filter((item) => {
+  const key = normalizeQuestion(item.question);
+  if (seenQuestions.has(key)) return false;
+  seenQuestions.add(key);
+  return true;
+});
+const items = [...dedupedCurated, ...dedupedGenerated];
+
+// Cegah duplikasi pertanyaan pada hasil akhir (gerbang regresi).
+const questionCounts = new Map();
+for (const item of items) {
+  const key = normalizeQuestion(item.question);
+  questionCounts.set(key, (questionCounts.get(key) || 0) + 1);
+}
+const duplicates = [...questionCounts.entries()].filter(([, count]) => count > 1);
+if (duplicates.length) {
+  console.error(`Golden set memuat ${duplicates.length} pertanyaan duplikat, contoh: ${duplicates[0][0]}`);
+  process.exit(1);
+}
 
 const summary = {
   version: "2",

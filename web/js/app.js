@@ -376,8 +376,8 @@
 
   async function drugInlineHTML(query) {
     const term = String(query || "").trim();
-    // Hindari panggilan untuk pertanyaan panjang (bukan nama obat).
-    if (!term || term.split(/\s+/).length > 4) return "";
+    // Batasi pertanyaan panjang, tetapi izinkan kalimat pendek yang memuat nama obat.
+    if (!term || term.split(/\s+/).length > 8) return "";
     try {
       const resp = await fetch(`/api/drug?q=${encodeURIComponent(term)}`);
       if (!resp.ok) return "";

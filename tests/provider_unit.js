@@ -10,7 +10,7 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
 
 function loadProvider(fetchImpl) {
   let source = SRC.replace(/^import\s+.*?;\s*$/gm, "").replace(/export /g, "");
-  source += "\nglobalThis.__p = { extractJson, callDeepseek, shouldRetryStream, providerConfig, providerReady };\n";
+  source += "\nglobalThis.__p = { extractJson, callDeepseek, shouldRetryStream, providerConfig, providerReady, selectModel };\n";
   const sandbox = {
     console,
     fetch: fetchImpl,
@@ -114,6 +114,16 @@ async function main() {
     check("retry: finish_reason null → ulangi", p.shouldRetryStream(null, 2048, 4096) === true);
     check("retry: finish_reason=stop → jangan ulangi", p.shouldRetryStream("stop", 2048, 4096) === false);
     check("retry: anggaran sudah cap → jangan ulangi", p.shouldRetryStream("length", 4096, 4096) === false);
+  }
+
+  // --- routing model Flash/Pro -------------------------------------------
+  {
+    const p = loadProvider(noFetch);
+    const envDeep = { DEEPSEEK_MODEL: "deepseek-flash", DEEPSEEK_MODEL_DEEP: "deepseek-v4-pro" };
+    check("routing: pertanyaan mekanisme → model deep", p.selectModel(envDeep, "mekanisme parasetamol menurunkan demam") === "deepseek-v4-pro");
+    check("routing: pertanyaan PICO → model deep", p.selectModel(envDeep, "efektivitas metformin dibanding insulin") === "deepseek-v4-pro");
+    check("routing: pertanyaan sederhana → model utama", p.selectModel(envDeep, "apa itu fornas") === "deepseek-flash");
+    check("routing: tanpa model deep → fallback aman", p.selectModel({ DEEPSEEK_MODEL: "deepseek-flash" }, "mekanisme kerja aspirin") === "deepseek-flash");
   }
 
   // --- HTTP error tidak di-retry ----------------------------------------

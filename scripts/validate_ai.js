@@ -60,6 +60,32 @@ for (const marker of ["runProviderStream", "streamDeepseek", 'send("replace"', "
 for (const marker of ["RETRY_MAX_TOKENS", "applyLlmPayload", "fallbackExtractive", "shouldRetryStream"]) {
   if (!chat.includes(marker)) fail(`api/ai/chat.js: eskalasi token/retry tidak ada "${marker}"`);
 }
+// Hybrid: lapisan penjelasan umum (tanpa sitasi) + lapisan klaim bersitasi.
+for (const marker of ["sanitizeOverview", "hasOverview", "citedEvidence", "abstain_reason", "postProcessAnswer", "answer_mode", "synthesis"]) {
+  if (!chat.includes(marker)) fail(`api/ai/chat.js: penanda hybrid tidak ada "${marker}"`);
+}
+// Routing model Flash/Pro.
+for (const marker of ["selectModel", "chosenModel"]) {
+  if (!chat.includes(marker)) fail(`api/ai/chat.js: routing model tidak ada "${marker}"`);
+}
+// Sumber yang dikirim ke UI hanya yang benar-benar dirujuk klaim (bukan semua retrieval).
+if (!/citedEvidence\s*=\s*evidence\.filter/.test(chat)) fail("api/ai/chat.js: sitasi harus difilter ke bukti yang dirujuk klaim");
+if (!/for \(const item of citedEvidence\)/.test(chat)) fail("api/ai/chat.js: loop citation harus memakai citedEvidence");
+
+const groundedSrc = fs.readFileSync(path.join(ROOT, "functions", "_grounded.js"), "utf8");
+for (const marker of ["AnswerExtractor", "extractAnswerText", "this.emitted"]) {
+  if (!groundedSrc.includes(marker)) fail(`_grounded.js: tidak ada "${marker}" untuk streaming`);
+}
+for (const marker of ["sanitizeOverview", "hasOverviewDose", "normalizeConfidence", "isMechanismQuestion", "findDrugsInText", "overview_flagged", "SYSTEM_PROMPT_CITED", "validateSynthesis", "postProcessAnswer", "synthesisMode", "systemPromptFor"]) {
+  if (!groundedSrc.includes(marker)) fail(`_grounded.js: penanda hybrid/retrieval tidak ada "${marker}"`);
+}
+if (!/SINTESIS BERSITASI/.test(groundedSrc)) fail("_grounded.js: prompt cited harus mewajibkan sitasi per kalimat");
+if (!/AI_SYNTHESIS/.test(groundedSrc)) fail("_grounded.js: flag AI_SYNTHESIS (cited/hybrid) tidak ditemukan");
+if (!/DILARANG memuat penanda sitasi/.test(groundedSrc)) fail("_grounded.js: prompt harus melarang [n] di lapisan penjelasan umum");
+if (!/DILARANG memuat angka dosis/i.test(groundedSrc)) fail("_grounded.js: prompt harus melarang angka dosis di lapisan penjelasan umum");
+if (!/if \(!mechanism\) url\.searchParams\.set\("clinical", "1"\)/.test(groundedSrc)) {
+  fail("_grounded.js: pertanyaan mekanisme tidak boleh dipaksa filter clinical=1");
+}
 if (!/body\.max_tokens\) \|\| 2048/.test(chat)) fail("api/ai/chat.js: default max_tokens harus 2048");
 // Setiap penggantian teks (replace) harus menandai teks sudah terkirim agar tak dobel.
 {
@@ -72,10 +98,6 @@ if (!/body\.max_tokens\) \|\| 2048/.test(chat)) fail("api/ai/chat.js: default ma
 const providerSrc = fs.readFileSync(path.join(ROOT, "functions", "_provider.js"), "utf8");
 for (const marker of ["stream: true", "parseOpenAiSse", "stream_options", "STREAM_TIMEOUT_MS"]) {
   if (!providerSrc.includes(marker)) fail(`_provider.js: tidak ada penanda streaming "${marker}"`);
-}
-const groundedSrc = fs.readFileSync(path.join(ROOT, "functions", "_grounded.js"), "utf8");
-for (const marker of ["AnswerExtractor", "extractAnswerText", "this.emitted"]) {
-  if (!groundedSrc.includes(marker)) fail(`_grounded.js: tidak ada "${marker}" untuk streaming`);
 }
 const aiUi = fs.readFileSync(path.join(ROOT, "web", "js", "ai.js"), "utf8");
 if (!aiUi.includes("onReplace")) fail("ai.js: harus menangani event replace (ganti teks saat parse gagal)");

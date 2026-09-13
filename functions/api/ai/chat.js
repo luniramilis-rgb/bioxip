@@ -2,15 +2,18 @@ import { bearerToken, fetchAccount, fetchUserEmail, holdCredits, isAdminEmail, r
 
 import { chargedMicroIdr, costMicroIdr, estimateMicroIdr, microToIdr } from "../../_pricing.js";
 import { estimateInputTokens } from "../../_estimate.js";
-import { callDeepseek, extractJson, providerReady, shouldRetryStream, streamDeepseek } from "../../_provider.js";
+import { callDeepseek, extractJson, providerReady, selectModel, shouldRetryStream, streamDeepseek } from "../../_provider.js";
 import {
   AnswerExtractor,
   buildUserPrompt,
   extractiveAnswer,
   gatherEvidence,
+  postProcessAnswer,
   resolveAbstain,
+  sanitizeOverview,
+  synthesisMode,
+  systemPromptFor,
   verifyClaims,
-  SYSTEM_PROMPT,
 } from "../../_grounded.js";
 import { classifyInput, mergeRedFlags, redFlagNotice } from "../../_safety.js";
 import { cacheGetJson, cacheKey, cachePutJson } from "../../_cache.js";
@@ -22,9 +25,9 @@ const MAX_TOKENS_LIMIT = 2048;
 const RETRY_MAX_TOKENS = 4096;
 // Cache jawaban AI: memotong biaya token berulang (pertanyaan populer) secara signifikan.
 const ANSWER_CACHE_TTL = 7 * 24 * 3600;
-const ANSWER_CACHE_NAMESPACE = "answer:v2";
+const ANSWER_CACHE_NAMESPACE = "answer:v3";
 // Naikkan bila prompt/skema/evidence berubah, agar jawaban lama tidak tersaji.
-const PROMPT_VERSION = "2026-09-12a";
+const PROMPT_VERSION = "2026-09-12b";
 
 function citationSnapshot(evidence) {
   return evidence.map((item) => ({
@@ -49,7 +52,7 @@ function sse(event, data) {
  *  2) tanpa json_object (bila provider menolak opsi 1 dengan HTTP 400)
  * Potongan teks jawaban dikirim ke klien lewat onDelta selama proses berlangsung.
  */
-async function runProviderStream(env, { system, user, maxTokens, onDelta }) {
+async function runProviderStream(env, { system, user, maxTokens, model, onDelta }) {
   const attempts = [
     { jsonMode: true, includeUsage: true },
     { jsonMode: false, includeUsage: true },
@@ -59,7 +62,7 @@ async function runProviderStream(env, { system, user, maxTokens, onDelta }) {
   for (const attempt of attempts) {
     let session;
     try {
-      session = await streamDeepseek(env, { system, user, maxTokens, ...attempt });
+      session = await streamDeepseek(env, { system, user, maxTokens, model, ...attempt });
     } catch (error) {
       lastError = { error: "provider_exception", detail: String(error?.message || error) };
       continue;
@@ -265,10 +268,17 @@ export async function onRequestPost(context) {
 
       let chargedMicro = 0;
       let usage = { input_tokens: 0, output_tokens: 0, cache_hit_tokens: 0, cache_miss_tokens: 0 };
-      let answer = "";
-      let claims = [];
-      let supportRate = 1;
-      let abstain = false;
+        let answer = "";
+        let claims = [];
+        let supportRate = 1;
+        let abstain = false;
+        let abstainReason = null;
+        let overviewConfidence = null;
+        let overviewFlagged = false;
+        let hasOverview = false;
+        let answerMode = "extractive";
+        let unknownCites = 0;
+
       let mode = "mock";
       let model = "mock";
 
@@ -281,6 +291,8 @@ export async function onRequestPost(context) {
         });
 
         const providerIsReady = providerOk;
+        const synthesis = synthesisMode(env);
+        const chosenModel = providerIsReady ? selectModel(env, question) : "mock";
         let providerError = null;
         let cacheSaved = null;
         let providerAnswered = false;
@@ -294,18 +306,51 @@ export async function onRequestPost(context) {
         const cacheId = cacheKey(ANSWER_CACHE_NAMESPACE, {
           q: question.toLowerCase().replace(/\s+/g, " ").trim(),
           max: maxTokens,
-          model: providerIsReady ? env.DEEPSEEK_MODEL || "deepseek-flash" : "mock",
+          model: chosenModel,
+          synthesis,
           v: PROMPT_VERSION,
         }, origin);
 
         // Terapkan payload JSON provider sebagai jawaban LLM + simpan cache.
+        // Lapisan A (`answer`) dibersihkan dari penanda sitasi dan angka dosis.
         const applyLlmPayload = async (payload, fallbackText = "") => {
-          answer = String(payload.answer || fallbackText || "");
-          claims = payload.claims || [];
-          abstain = Boolean(payload.abstain);
+          // Fallback hanya boleh teks jawaban, bukan JSON mentah (kalau tidak, JSON
+          // akan tampil sebagai "penjelasan umum" saat field answer kosong).
+          const fallback = String(fallbackText || "").trim();
+          const rawText = String(payload.answer || "").trim() || (/^[[{]/.test(fallback) ? "" : fallback);
+          const processed = postProcessAnswer({
+            mode: synthesis,
+            answer: rawText,
+            claims: payload.claims,
+            evidenceCount: evidence.length,
+            confidence: payload.overview_confidence,
+            requestedAbstain: Boolean(payload.abstain),
+          });
+          answer = processed.answer;
+          answerMode = processed.answer_mode;
+          hasOverview = processed.overview;
+          overviewConfidence = processed.confidence;
+          overviewFlagged = processed.overview_flagged;
+          unknownCites = processed.unknown_cites;
+          abstainReason = null;
+          claims = processed.claims;
+          abstain = processed.abstain;
           redFlags = mergeRedFlags(safetyRedFlags, payload.red_flags);
           mode = "llm";
-          const cachePayload = { answer, claims, abstain, model, evidence: citationSnapshot(evidence), question };
+          // Bila sanitasi/validasi mengubah teks yang sudah tampil, ganti agar layar = tersimpan.
+          if (deltasSent && answer !== rawText) send("replace", { text: answer });
+          const cachePayload = {
+            answer,
+            claims,
+            abstain,
+            answer_mode: answerMode,
+            overview: hasOverview,
+            overview_confidence: overviewConfidence,
+            overview_flagged: overviewFlagged,
+            model,
+            evidence: citationSnapshot(evidence),
+            question,
+          };
           cacheSaved = await cachePutJson(cacheId, cachePayload, ANSWER_CACHE_TTL);
           await answerCachePut(env, answerHash(cacheId), cachePayload, ANSWER_CACHE_TTL);
         };
@@ -315,7 +360,13 @@ export async function onRequestPost(context) {
           answer = extractive.answer;
           claims = extractive.claims;
           abstain = Boolean(extractive.abstain);
+          abstainReason = extractive.reason || null;
           mode = "extractive";
+          hasOverview = false;
+          overviewConfidence = null;
+          overviewFlagged = false;
+          answerMode = "extractive";
+          unknownCites = 0;
           deltasSent = true; // teks sudah dikirim lewat replace → jangan kirim ulang di loop akhir
           send("replace", { text: answer });
           providerError = { error: "provider_parse_failed", ...extra };
@@ -335,6 +386,19 @@ export async function onRequestPost(context) {
             answer = String(cachedAnswer.answer);
             claims = cachedAnswer.claims || [];
             abstain = Boolean(cachedAnswer.abstain);
+            // Cache lama (tanpa answer_mode) → anggap lapisan umum dan sanitasi ulang.
+            if (!cachedAnswer.answer_mode) {
+              const legacy = sanitizeOverview(answer);
+              answer = legacy.text;
+              overviewFlagged = legacy.flagged;
+              answerMode = "overview";
+              hasOverview = Boolean(answer);
+            } else {
+              answerMode = cachedAnswer.answer_mode;
+              hasOverview = cachedAnswer.answer_mode === "overview" && Boolean(answer);
+              overviewFlagged = Boolean(cachedAnswer.overview_flagged);
+            }
+            overviewConfidence = cachedAnswer.overview_confidence || null;
             model = cachedAnswer.model || model;
             mode = "cache";
             cacheSaved = cacheLayer;
@@ -348,9 +412,10 @@ export async function onRequestPost(context) {
 
         if (mode !== "cache" && providerIsReady) {
           const streamed = await runProviderStream(env, {
-            system: SYSTEM_PROMPT,
+            system: systemPromptFor(synthesis),
             user: buildUserPrompt(question, evidence),
             maxTokens,
+            model: chosenModel,
             onDelta: (text) => {
               deltasSent = true;
               send("delta", { text });
@@ -389,13 +454,14 @@ export async function onRequestPost(context) {
               const retryable = shouldRetryStream(streamed.finish_reason, maxTokens, RETRY_MAX_TOKENS);
               const retry = retryable
                 ? await callDeepseek(env, {
-                    system: SYSTEM_PROMPT,
+                    system: systemPromptFor(synthesis),
                     user: buildUserPrompt(question, evidence),
                     maxTokens: RETRY_MAX_TOKENS,
+                    model: chosenModel,
                   })
                 : null;
               if (retry?.ok && retry.parsed) {
-                await applyLlmPayload(retry.parsed, retry.raw);
+                await applyLlmPayload(retry.parsed);
                 model = retry.model || model;
                 usage = {
                   input_tokens: retry.usage.input_tokens,
@@ -423,9 +489,10 @@ export async function onRequestPost(context) {
             // Streaming gagal total → fallback ke panggilan non-streaming yang sudah terbukti.
             console.warn("bioxip: streaming gagal, fallback non-stream", JSON.stringify(streamed));
             const result = await callDeepseek(env, {
-              system: SYSTEM_PROMPT,
+              system: systemPromptFor(synthesis),
               user: buildUserPrompt(question, evidence),
               maxTokens,
+              model: chosenModel,
             });
             if (result.ok) {
               providerAnswered = true;
@@ -437,7 +504,7 @@ export async function onRequestPost(context) {
                 cache_miss_tokens: result.usage.cache_miss_tokens,
               };
               if (result.parsed) {
-                await applyLlmPayload(result.parsed, result.raw);
+                await applyLlmPayload(result.parsed);
               } else {
                 fallbackExtractive({
                   finish_reason: result.finish_reason || null,
@@ -458,6 +525,12 @@ export async function onRequestPost(context) {
           answer = extractive.answer;
           claims = extractive.claims;
           abstain = Boolean(extractive.abstain);
+          abstainReason = extractive.reason || null;
+          hasOverview = false;
+          overviewConfidence = null;
+          overviewFlagged = false;
+          answerMode = "extractive";
+          unknownCites = 0;
           const hit = Math.round(estimateInputTokens(question, evidence) * 0.7);
           usage = {
             input_tokens: estimateInputTokens(question, evidence),
@@ -477,11 +550,15 @@ export async function onRequestPost(context) {
 
         const verified = verifyClaims(claims, evidence.length);
         supportRate = verified.support_rate;
-        // Abstain hanya bila tak ada klaim bersitasi — permintaan abstain LLM tidak
-        // boleh menyembunyikan jawaban yang sudah didukung bukti.
-        abstain = resolveAbstain(abstain, verified);
+        // Abstain hanya bila tak ada klaim bersitasi DAN tak ada teks jawaban (cited/overview).
+        abstain = resolveAbstain(abstain, verified, answerMode === "extractive" ? "" : answer);
+        if (abstain) abstainReason = abstainReason || "no_supported_content";
 
-        for (const item of evidence) {
+        // Kirim HANYA sumber yang benar-benar dirujuk klaim, agar daftar sumber tidak
+        // menampilkan hasil retrieval yang tidak mendukung jawaban.
+        const usedNumbers = new Set(verified.claims.flatMap((claim) => claim.citations || []));
+        const citedEvidence = evidence.filter((item) => usedNumbers.has(item.n));
+        for (const item of citedEvidence) {
           send("citation", { n: item.n, title: item.title, source: item.source, url: item.url, guideline: item.guideline || null });
         }
 
@@ -514,12 +591,20 @@ export async function onRequestPost(context) {
           feature,
           messages,
           answer,
-          citations: evidence.map((item) => ({ n: item.n, title: item.title, url: item.url })),
+          citations: citedEvidence.map((item) => ({ n: item.n, title: item.title, url: item.url })),
         });
 
         send("citation_summary", {
           support_rate: supportRate,
           unsupported: verified.unsupported,
+          // Lapisan jawaban: sintesis bersitasi (cited) atau penjelasan umum (overview).
+          overview: hasOverview,
+          answer_mode: answerMode,
+          synthesis,
+          unknown_cites: unknownCites,
+          overview_confidence: overviewConfidence,
+          overview_flagged: overviewFlagged,
+          abstain_reason: abstain ? abstainReason : null,
           // Klaim kunci (untuk bullet di UI); payload kecil & sudah tersedia di server.
           claims: verified.claims.map((claim) => ({
             text: claim.text,
@@ -535,6 +620,10 @@ export async function onRequestPost(context) {
           balance_idr: microToIdr(Number(after?.balance_micro_idr || 0)),
           tokens: { in: usage.input_tokens, out: usage.output_tokens },
           abstain,
+          answer_mode: answerMode,
+          synthesis,
+          overview: hasOverview,
+          overview_confidence: overviewConfidence,
           mode,
           model,
           support_rate: supportRate,

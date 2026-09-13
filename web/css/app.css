@@ -378,6 +378,17 @@ mark.unsupported {
   font-size: 0.9rem;
 }
 
+/* Lapisan A hybrid: penjelasan umum tanpa sitasi */
+.overview-label { margin: 0.6rem 0 0.2rem; font-size: 1rem; }
+.overview-badge {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
 /* Klaim kunci (N3) */
 .ai-claims .unsupported-item { border-left: 3px solid #c0392b; padding-left: 0.5rem; }
 .cite-link {
@@ -402,6 +413,20 @@ mark.unsupported {
 .claim-ref:hover,
 .claim-ref:focus-visible { text-decoration: underline; }
 .cite-refs { color: var(--muted); font-size: 0.85rem; }
+.answer-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+.answer-table th,
+.answer-table td {
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+.answer-table th { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .cite-flash { animation: citeFlash 1.2s ease; }
 @keyframes citeFlash {
   0% { background: color-mix(in srgb, var(--accent) 22%, transparent); }

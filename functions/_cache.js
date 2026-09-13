@@ -22,7 +22,8 @@ export function cacheKey(namespace, params = {}, origin, version = VERSION) {
     if (value === undefined || value === null || value === "") continue;
     url.searchParams.set(key, String(value));
   }
-  url.searchParams.set("v", version);
+  // Hormati versi eksplisit dari pemanggil (mis. versi prompt); default hanya bila kosong.
+  if (!url.searchParams.has("v")) url.searchParams.set("v", version);
   return url.toString();
 }
 

@@ -168,11 +168,12 @@ async function fetchStub(url, options) {
     }
     // Fixture khusus: klaim yang sama muncul di DUA paragraf (uji dedup footer).
     if (question.includes("duplikat")) {
-      return sseResponse([
+    return sseResponse([
+
         ["meta", { estimate_idr: 200, evidence_count: 1 }],
         ["delta", { text: "Kalimat sama tanpa sumber ini muncul lagi di sini.\n\n" }],
         ["delta", { text: "Kalimat sama tanpa sumber ini muncul lagi di sini." }],
-        ["citation_summary", { support_rate: 0, unsupported: ["Kalimat sama tanpa sumber ini muncul lagi di sini"] }],
+        ["citation_summary", { support_rate: 0, unsupported: ["Kalimat sama tanpa sumber ini muncul lagi di sini"], overview: true, answer_mode: "overview", unknown_cites: 0, overview_confidence: "rendah", overview_flagged: false }],
         ["done", { charged_idr: 100, balance_idr: 49900, mode: "extractive", abstain: false }],
       ]);
     }
@@ -187,6 +188,9 @@ async function fetchStub(url, options) {
       {
         support_rate: 0.5,
         unsupported: ["Klaim tambahan tanpa sumber ini perlu ditandai", "Singkat"],
+        overview: true,
+        overview_confidence: "sedang",
+        overview_flagged: false,
         claims: [
           { text: "Metformin menurunkan HbA1c pada diabetes tipe 2", citations: [1], supported: true },
           { text: "Klaim tambahan tanpa sumber ini perlu ditandai", citations: [], supported: false },
@@ -408,9 +412,20 @@ async function dispatchHash(hash) {
     streamedCites.slice(0, 160),
   ]);
   results.push([
-    "ai: bullet klaim kunci tampil dari claims[]",
-    streamedCites.includes("Klaim kunci") && streamedCites.includes("Metformin menurunkan HbA1c") && streamedCites.includes("cite-1"),
+    "ai: lapisan didukung sumber tampil dari claims[]",
+    streamedCites.includes("Didukung sumber") && streamedCites.includes("Metformin menurunkan HbA1c") && streamedCites.includes("cite-1"),
     streamedCites.slice(0, 200),
+  ]);
+  results.push([
+    "ai: label penjelasan umum + badge keyakinan (hybrid)",
+    (registry.get("ai-overview")?.innerHTML || "").includes("Penjelasan umum") &&
+      (registry.get("ai-overview")?.innerHTML || "").includes("sedang") &&
+      (registry.get("ai-overview")?.innerHTML || "").includes("tanpa sitasi"),
+    registry.get("ai-overview")?.innerHTML || "",
+  ]);
+  results.push([
+    "ai: catatan lapisan umum tidak bersitasi tampil",
+    streamedCites.includes("Penjelasan umum tidak bersitasi"),
   ]);
   results.push(["ai: tombol salin daftar sumber tampil", streamedCites.includes("Salin daftar sumber")]);
   results.push([
@@ -442,7 +457,20 @@ async function dispatchHash(hash) {
       !streamedText.includes('data-cite="'),
   ]);
 
-  // Klaim sama di dua paragraf tidak boleh menghasilkan hitungan mustahil ("2 dari 1").
+  // Render markdown terbatas untuk sintesis bersitasi (uji langsung, tanpa run kedua).
+  const md = sandbox.BIOXIP_AI?.renderMarkdown || (() => "");
+  const mdOut = md("## Ringkasan\n\n- PGE2 turun [1]\n\n| Aspek | Bukti |\n|---|---|\n| Target | COX-2 [1] |\n\n**tebal** <script>alert(1)</script>");
+  results.push([
+    "ai: markdown heading, list, tabel dirender",
+    mdOut.includes("<h3>") && mdOut.includes("<ul class=\"answer-list\">") && mdOut.includes('class="answer-table"') && mdOut.includes("<strong>tebal</strong>"),
+    mdOut.slice(0, 220),
+  ]);
+  results.push([
+    "ai: markdown meng-escape HTML tak dipercaya",
+    mdOut.includes("&lt;script&gt;") && !mdOut.includes("<script>"),
+    mdOut.slice(-120),
+  ]);
+
   await dispatchHash("#/search?q=duplikat&mode=ai");
   await new Promise((resolve) => setTimeout(resolve, 10));
   registry.get("ai-run")?.trigger("click", {});

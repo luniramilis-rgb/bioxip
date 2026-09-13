@@ -106,6 +106,69 @@
     return target && typeof target.closest === "function" ? target : null;
   }
 
+  function boldInline(text) {
+    return text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  }
+
+  // Markdown terbatas (heading, list, tabel, bold). Teks sudah di-escape lebih dulu,
+  // jadi hanya tag yang kita hasilkan sendiri yang muncul.
+  function renderMarkdown(value) {
+    const lines = esc(value).split(/\n/);
+    const out = [];
+    let list = null;
+    let table = null;
+    const flushList = () => {
+      if (list) {
+        out.push(`<ul class="answer-list">${list.join("")}</ul>`);
+        list = null;
+      }
+    };
+    const flushTable = () => {
+      if (table) {
+        out.push(`<table class="answer-table">${table.join("")}</table>`);
+        table = null;
+      }
+    };
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) {
+        flushList();
+        flushTable();
+        continue;
+      }
+      const heading = line.match(/^(#{1,3})\s+(.*)$/);
+      if (heading) {
+        flushList();
+        flushTable();
+        const level = Math.min(3, heading[1].length) + 1;
+        out.push(`<h${level}>${boldInline(heading[2])}</h${level}>`);
+        continue;
+      }
+      if (line.startsWith("|")) {
+        const cells = line.replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+        if (cells.every((cell) => /^:?-{2,}:?$/.test(cell))) continue;
+        flushList();
+        table = table || [];
+        const tag = table.length === 0 ? "th" : "td";
+        table.push(`<tr>${cells.map((cell) => `<${tag}>${boldInline(cell)}</${tag}>`).join("")}</tr>`);
+        continue;
+      }
+      const bullet = line.match(/^[-*]\s+(.*)$/);
+      if (bullet) {
+        flushTable();
+        list = list || [];
+        list.push(`<li>${boldInline(bullet[1])}</li>`);
+        continue;
+      }
+      flushList();
+      flushTable();
+      out.push(`<p>${boldInline(line)}</p>`);
+    }
+    flushList();
+    flushTable();
+    return out.join("");
+  }
+
   document.addEventListener("click", (event) => {
     const el = targetEl(event);
     const cite = el?.closest("[data-ai-cite]");
@@ -286,28 +349,39 @@
     if (!answerHost) return;
     if (ask) ask.innerHTML = "";
     answerHost.hidden = false;
-    answerHost.innerHTML = '<p class="muted" id="ai-stream">Menyusun jawaban…</p><div id="ai-text"></div><div id="ai-cites"></div><div id="ai-foot"></div>';
+    answerHost.innerHTML = '<p class="muted" id="ai-stream">Menyusun jawaban…</p><div id="ai-overview"></div><div id="ai-text"></div><div id="ai-cites"></div><div id="ai-foot"></div>';
 
     let text = "";
+    let hasOverview = false;
+    let overviewConfidence = null;
+    let overviewFlagged = false;
+    let answerMode = "extractive";
+    let unknownCites = 0;
     let unsupported = [];
     let keyClaims = [];
     let markedClaims = new Set();
     const citations = new Map();
     activeCites = citations;
 
-    // Render jawaban sebagai paragraf (LLM memakai \n\n) + kursor saat menulis.
+    // Render jawaban: sintesis bersitasi memakai markdown terbatas; lapisan umum
+    // (hybrid) tetap menandai klaim tanpa sitasi.
     function renderAnswer(host, value, writing) {
       if (!host) return;
-      const paragraphs = String(value || "")
-        .split(/\n{2,}/)
-        .map((part) => part.trim())
-        .filter(Boolean);
       const caret = writing ? '<span class="caret" aria-hidden="true"></span>' : "";
       markedClaims = new Set();
-      if (!paragraphs.length) {
+      const raw = String(value || "");
+      if (!raw.trim()) {
         host.innerHTML = writing ? `<p>${caret}</p>` : "";
         return;
       }
+      if (!hasOverview) {
+        host.innerHTML = `${linkifyCites(renderMarkdown(raw), citations)}${caret}`;
+        return;
+      }
+      const paragraphs = raw
+        .split(/\n{2,}/)
+        .map((part) => part.trim())
+        .filter(Boolean);
       host.innerHTML = paragraphs
         .map((part, index) => {
           const { html, matched } = markUnsupported(part, unsupported);
@@ -315,6 +389,21 @@
           return `<p>${linkifyCites(html, citations)}${index === paragraphs.length - 1 ? caret : ""}</p>`;
         })
         .join("");
+    }
+
+    let renderScheduled = false;
+    // Koalesensi delta → render sekali per frame (hindari re-parse seluruh jawaban tiap chunk).
+    function scheduleAnswerRender() {
+      if (typeof requestAnimationFrame !== "function") {
+        renderAnswer(document.getElementById("ai-text"), text, true);
+        return;
+      }
+      if (renderScheduled) return;
+      renderScheduled = true;
+      requestAnimationFrame(() => {
+        renderScheduled = false;
+        renderAnswer(document.getElementById("ai-text"), text, true);
+      });
     }
 
     C.streamChat(
@@ -327,10 +416,11 @@
         },
         onDelta(data) {
           text += data.text || "";
-          renderAnswer(document.getElementById("ai-text"), text, true);
+          scheduleAnswerRender();
           const stream = document.getElementById("ai-stream");
           if (stream) stream.textContent = "Menulis jawaban…";
         },
+
         onReplace(data) {
           // Provider gagal memenuhi struktur klaim → teks yang tampil diganti jawaban ekstraktif.
           text = data.text || "";
@@ -343,6 +433,33 @@
           // Hilangkan klaim duplikat agar hitungan "ditandai" konsisten.
           unsupported = [...new Set(data.unsupported || [])];
           keyClaims = Array.isArray(data.claims) ? data.claims : [];
+          hasOverview = Boolean(data.overview);
+          answerMode = data.answer_mode || (hasOverview ? "overview" : "extractive");
+          unknownCites = Number(data.unknown_cites || 0);
+          overviewConfidence = data.overview_confidence || null;
+          overviewFlagged = Boolean(data.overview_flagged);
+          const abstainReason = data.abstain_reason || null;
+          const overviewHost = document.getElementById("ai-overview");
+          if (overviewHost) {
+            const confidence = overviewConfidence
+              ? ` <span class="overview-badge">${esc(overviewConfidence)}</span>`
+              : "";
+            if (answerMode === "cited") {
+              overviewHost.innerHTML = `<h3 class="overview-label">Sintesis bersitasi <span class="muted">· klaim mengikuti sumber</span>${confidence}</h3>${
+                unknownCites > 0
+                  ? `<p class="muted">${unknownCites} penanda sitasi tidak dikenali dan dihapus.</p>`
+                  : ""
+              }`;
+            } else if (hasOverview) {
+              overviewHost.innerHTML = `<h3 class="overview-label">Penjelasan umum <span class="muted">· tanpa sitasi</span>${confidence}</h3>${
+                overviewFlagged
+                  ? '<p class="muted">Sebagian kalimat dosis/angka dihapus; untuk dosis rujuk label resmi/Fornas.</p>'
+                  : ""
+              }`;
+            } else {
+              overviewHost.innerHTML = "";
+            }
+          }
           // Teks sudah lengkap di titik ini → render ulang agar klaim tanpa sitasi
           // benar-benar ditandai di dalam jawaban, bukan hanya dilaporkan persen.
           renderAnswer(document.getElementById("ai-text"), text, false);
@@ -381,7 +498,7 @@
           }
           const fallback = unmarked.length ? uncitedList(unmarked) : "";
           const bullets = keyClaims.length
-            ? `<h3>Klaim kunci</h3><ol class="answer-list ai-claims">${keyClaims
+            ? `<h3>Didukung sumber</h3><ol class="answer-list ai-claims">${keyClaims
                 .map((claim, index) => {
                   const cites = (claim.citations || []).map((n) => citeLink(n, citations)).join(" ");
                   return `<li id="claim-${index + 1}" class="${claim.supported ? "" : "unsupported-item"}">${esc(claim.text)} ${cites}</li>`;
@@ -397,11 +514,24 @@
           // Indikator kekuatan bukti (bukan "dukungan sitasi" mentah): jawaban tanpa
           // klaim tidak boleh tampil 100%.
           const sourceCount = citations.size;
+          const noEvidence =
+            abstainReason === "retrieval_empty"
+              ? "Tidak ada bukti lokal yang ditemukan untuk pertanyaan ini."
+              : abstainReason === "evidence_unsupported"
+                ? "Bukti lokal ditemukan, tetapi tidak ada yang mendukung klaim spesifik ini."
+                : "Bukti belum cukup untuk diringkas";
           const strength =
             keyClaims.length === 0
-              ? "Bukti belum cukup untuk diringkas"
+              ? noEvidence
               : `Kekuatan bukti: ${sourceCount} sumber · ${Math.round((data.support_rate || 0) * 100)}% klaim bersitasi`;
+          const layerNote = hasOverview
+            ? `<p class="muted">${esc(
+                (window.BIOXIP && window.BIOXIP.overviewNote) ||
+                  "Penjelasan umum tidak bersitasi; klaim spesifik mengikuti sumber terverifikasi di bawah."
+              )}${hasOverview && sourceCount === 0 ? " Tidak ada sumber lokal yang dirujuk untuk bagian ini." : ""}</p>`
+            : "";
           host.innerHTML = `
+            ${layerNote}
             ${bullets}
             ${list ? `<h3>Sumber</h3><ol class="answer-list ai-cites">${list}</ol>${exportBtn}` : ""}
             <p class="muted">${esc(strength)}${uncited}</p>
@@ -457,5 +587,5 @@
     );
   }
 
-  window.BIOXIP_AI = { panelHTML, prepare, markUnsupported };
+  window.BIOXIP_AI = { panelHTML, prepare, markUnsupported, renderMarkdown };
 })();

@@ -16,7 +16,7 @@ function loadCommonJs(relative, expose, globals = {}) {
 }
 
 const dict = loadCommonJs("functions/_dictionary.js", "DICTIONARY");
-const term = loadCommonJs("functions/_terminology.js", "expandTerms, expansionClause, expansionSearchText, containsTerm, detectQuestionType", {
+const term = loadCommonJs("functions/_terminology.js", "expandTerms, expansionClause, expansionSearchText, containsTerm, detectQuestionType, epmcFilterFor", {
   DICTIONARY: dict.DICTIONARY,
 });
 
@@ -103,6 +103,16 @@ check("term: expansionSearchText fallback ke teks asli", term.expansionSearchTex
 check("term: terapi terdeteksi", term.detectQuestionType("Apa efektivitas obat X?") === "therapy");
 check("term: diagnosis terdeteksi", term.detectQuestionType("Apa akurasi USG untuk kolesistitis?") === "diagnosis");
 check("term: prognosis terdeteksi", term.detectQuestionType("Bagaimana luaran jangka panjang?") === "prognosis");
+
+// --- mekanisme & nama obat (kueri Indonesia) -------------------------------
+const mech = term.expansionClause("mekanisme parasetamol menurunkan demam");
+check("term: mekanisme terpetakan", /mechanism|pharmacodynamics/i.test(mech), mech);
+check("term: parasetamol terpetakan", /paracetamol|acetaminophen/i.test(mech), mech);
+check("term: demam terpetakan", /fever/i.test(mech), mech);
+check("term: cara kerja terpetakan", /mechanism|pharmacodynamics/i.test(term.expansionClause("bagaimana cara kerja ibuprofen")), term.expansionClause("bagaimana cara kerja ibuprofen"));
+check("term: tipe mekanisme dideteksi", term.detectQuestionType("mekanisme parasetamol menurunkan demam") === "mechanism", term.detectQuestionType("mekanisme parasetamol menurunkan demam"));
+check("term: mekanisme tidak dipaksa filter RCT", !/randomized controlled trial/i.test(term.epmcFilterFor("mechanism")), term.epmcFilterFor("mechanism"));
+check("term: terapi tetap filter RCT", /randomized controlled trial/i.test(term.epmcFilterFor("therapy")), term.epmcFilterFor("therapy"));
 
 let failed = 0;
 for (const item of results) {

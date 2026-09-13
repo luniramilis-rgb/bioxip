@@ -97,6 +97,47 @@ const EXTRA = [
   { id_term: "number needed to treat", en_terms: '"numbers needed to treat"', mesh: ["Numbers Needed To Treat"] },
   { id_term: "dosis", en_terms: '"dose" OR "dosage" OR "dose adjustment"', mesh: [] },
   { id_term: "pemeriksaan penunjang", en_terms: '"diagnostic techniques and procedures" OR "diagnostic tests"', mesh: ["Diagnostic Techniques and Procedures"] },
+  // Mekanisme/farmakologi: pertanyaan "cara kerja" sering dijawab review, bukan RCT.
+  { id_term: "mekanisme kerja", en_terms: '"mechanism of action" OR "pharmacodynamics"', mesh: ["Pharmacodynamics"] },
+  { id_term: "mekanisme", en_terms: '"mechanism" OR "mechanism of action"', mesh: [] },
+  { id_term: "cara kerja", en_terms: '"mechanism of action" OR "pharmacodynamics"', mesh: ["Pharmacodynamics"] },
+  { id_term: "farmakodinamik", en_terms: '"pharmacodynamics"', mesh: ["Pharmacodynamics"] },
+  { id_term: "farmakokinetik", en_terms: '"pharmacokinetics"', mesh: ["Pharmacokinetics"] },
+  { id_term: "patofisiologi", en_terms: '"pathophysiology"', mesh: [] },
+  { id_term: "antipiretik", en_terms: '"antipyretics" OR "antipyretic"', mesh: ["Antipyretics"] },
+  // Nama obat umum (INN) agar kueri Indonesia ikut terpetakan ke literatur Inggris.
+  { id_term: "parasetamol", en_terms: '"paracetamol" OR "acetaminophen"', mesh: ["Acetaminophen"] },
+  { id_term: "paracetamol", en_terms: '"paracetamol" OR "acetaminophen"', mesh: ["Acetaminophen"] },
+  { id_term: "amoksisilin", en_terms: '"amoxicillin"', mesh: ["Amoxicillin"] },
+  { id_term: "metformin", en_terms: '"metformin"', mesh: ["Metformin"] },
+  { id_term: "ibuprofen", en_terms: '"ibuprofen"', mesh: ["Ibuprofen"] },
+  { id_term: "omeprazol", en_terms: '"omeprazole"', mesh: ["Omeprazole"] },
+  { id_term: "amlodipin", en_terms: '"amlodipine"', mesh: ["Amlodipine"] },
+  { id_term: "simvastatin", en_terms: '"simvastatin"', mesh: ["Simvastatin"] },
+  // Sisa katalog obat (INN) agar pertanyaan mekanisme/dosis ikut terpetakan.
+  { id_term: "ampisilin", en_terms: '"ampicillin"', mesh: [] },
+  { id_term: "kotrimoksazol", en_terms: '"cotrimoxazole" OR "trimethoprim sulfamethoxazole"', mesh: [] },
+  { id_term: "metronidazol", en_terms: '"metronidazole"', mesh: [] },
+  { id_term: "siprofloksasin", en_terms: '"ciprofloxacin"', mesh: [] },
+  { id_term: "seftriakson", en_terms: '"ceftriaxone"', mesh: [] },
+  { id_term: "rifampisin", en_terms: '"rifampicin" OR "rifampin"', mesh: [] },
+  { id_term: "isoniazid", en_terms: '"isoniazid"', mesh: [] },
+  { id_term: "pirazinamid", en_terms: '"pyrazinamide"', mesh: [] },
+  { id_term: "etambutol", en_terms: '"ethambutol"', mesh: [] },
+  { id_term: "glibenklamid", en_terms: '"glyburide" OR "glibenclamide"', mesh: [] },
+  { id_term: "kaptopril", en_terms: '"captopril"', mesh: [] },
+  { id_term: "hidroklorotiazid", en_terms: '"hydrochlorothiazide"', mesh: [] },
+  { id_term: "furosemid", en_terms: '"furosemide"', mesh: [] },
+  { id_term: "setirizin", en_terms: '"cetirizine"', mesh: [] },
+  { id_term: "klorfeniramin", en_terms: '"chlorpheniramine"', mesh: [] },
+  { id_term: "salbutamol", en_terms: '"salbutamol" OR "albuterol"', mesh: [] },
+  { id_term: "deksametason", en_terms: '"dexamethasone"', mesh: [] },
+  { id_term: "prednison", en_terms: '"prednisone"', mesh: [] },
+  { id_term: "diazepam", en_terms: '"diazepam"', mesh: [] },
+  { id_term: "alopurinol", en_terms: '"allopurinol"', mesh: [] },
+  { id_term: "oralit", en_terms: '"oral rehydration salts" OR "oral rehydration solution"', mesh: [] },
+  { id_term: "seng sulfat", en_terms: '"zinc sulfate"', mesh: [] },
+  { id_term: "ferro sulfat", en_terms: '"ferrous sulfate"', mesh: [] },
 ];
 
 export const TERMINOLOGY = [...DICTIONARY, ...EXTRA];
@@ -113,6 +154,12 @@ const QUESTION_TYPES = {
   ],
   prognosis: [/\b(prognosis|luaran|outcome|mortalitas|kematian|kelangsungan hidup|survival|progression)\b/i],
   etiology: [/\b(penyebab|etiologi|faktor risiko|risk factor|kausalitas|causality)\b/i],
+  // Mekanisme lebih dahulu dari therapy agar "mekanisme X menurunkan Y" tidak
+  // diklasifikasikan sebagai uji terapi (yang memaksa filter RCT).
+  mechanism: [
+    /\b(mekanisme|cara kerja|patofisiologi|farmakodinamik|pharmacodynamic|pharmacokinetic|pathophysiolog|mechanism of action|moa)\b/i,
+    /\bhow (does|do) .* work\b/i,
+  ],
   therapy: [
     /\b(terapi|pengobatan|efektivitas|efikasi|manfaat|tatalaksana|treatment|therapy|efficacy|effectiveness|dibanding|vs|versus)\b/i,
     /\b(apakah|apakah lebih|mana yang lebih)\b.*\b(lebih baik|efektif|menurunkan|meningkatkan)\b/i,
@@ -209,6 +256,8 @@ export function epmcFilterFor(type) {
       return '(MESH:"Risk Factors" OR MESH:"Etiology")';
     case "harm":
       return '(MESH:"Drug-Related Side Effects and Adverse Reactions" OR PUB_TYPE:"clinical trial")';
+    case "mechanism":
+      return '(MESH:"Pharmacodynamics" OR MESH:"Pharmacokinetics" OR PUB_TYPE:"review" OR PUB_TYPE:"systematic review" OR PUB_TYPE:"meta-analysis")';
     default:
       return '(PUB_TYPE:"randomized controlled trial" OR PUB_TYPE:"meta-analysis" OR PUB_TYPE:"systematic review")';
   }

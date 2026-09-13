@@ -11,7 +11,22 @@ export function providerConfig(env) {
     apiKey: env.DEEPSEEK_API_KEY || "",
     baseUrl: (env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, ""),
     model: env.DEEPSEEK_MODEL || DEFAULT_MODEL,
+    // Model "dalam" untuk pertanyaan kompleks. Default mengikuti model utama agar aman
+    // bila akun belum mengaktifkan model Pro; set DEEPSEEK_MODEL_DEEP untuk mengaktifkan.
+    deepModel: env.DEEPSEEK_MODEL_DEEP || env.DEEPSEEK_MODEL || DEFAULT_MODEL,
   };
+}
+
+// Sinyal pertanyaan kompleks → pakai model "deep" (mis. deepseek-v4-pro).
+const DEEP_HINTS =
+  /\b(mekanisme|patofisiologi|farmakodinamik|farmakokinetik|dibanding|bandingkan|versus|vs\.?|meta-analisis|sistematik|systematic|pico|tatalaksana|interaksi|efektivitas|keamanan jangka panjang)\b/i;
+
+/** Pilih model sesuai kompleksitas pertanyaan (deterministik, tanpa LLM). */
+export function selectModel(env, question) {
+  const config = providerConfig(env);
+  const text = String(question || "");
+  const complex = DEEP_HINTS.test(text) || text.split(/\s+/).filter(Boolean).length > 12;
+  return complex ? config.deepModel : config.model;
 }
 
 export function providerReady(env) {
@@ -158,8 +173,9 @@ async function requestCompletion(config, { system, user, maxTokens, temperature,
   };
 }
 
-export async function callDeepseek(env, { system, user, maxTokens = 1024, temperature = 0.2 }) {
-  const config = providerConfig(env);
+export async function callDeepseek(env, { system, user, maxTokens = 1024, temperature = 0.2, model }) {
+  const settings = providerConfig(env);
+  const config = model ? { ...settings, model } : settings;
   if (!config.apiKey) return { ok: false, error: "provider_not_configured" };
 
   const MAX_TOKENS_CAP = 4096;
@@ -263,8 +279,9 @@ export async function* parseOpenAiSse(body) {
  * Bila permintaan ditolak karena opsi tidak didukung, kembalikan error agar
  * pemanggil dapat menurunkan mode (mis. tanpa json_object) atau fallback.
  */
-export async function streamDeepseek(env, { system, user, maxTokens = 1024, temperature = 0.2, jsonMode = true, includeUsage = true }) {
-  const config = providerConfig(env);
+export async function streamDeepseek(env, { system, user, maxTokens = 1024, temperature = 0.2, jsonMode = true, includeUsage = true, model }) {
+  const settings = providerConfig(env);
+  const config = model ? { ...settings, model } : settings;
   if (!config.apiKey) return { ok: false, error: "provider_not_configured" };
 
   const body = {
