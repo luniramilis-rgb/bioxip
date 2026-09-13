@@ -75,6 +75,20 @@ const check = (name, ok, detail = "") => results.push({ name, ok, detail });
     check("map: fields", mapped.slug === "parasetamol" && mapped.name === "Parasetamol" && mapped.inn === "paracetamol" && mapped.atc === "N02BE01");
     check("map: source_tier + status", mapped.source_tier === "official" && mapped.status_fornas === true);
     check("map: row tanpa slug → null", api.mapFormularyRow({ nama: "x" }) === null);
+    check("map: default variants/flags", Array.isArray(mapped.variants) && mapped.variants.length === 0 && mapped.flags.fpktp === false && mapped.restriksi_kelas.length === 0);
+
+    const rich = api.mapFormularyRow({
+      ...row,
+      fornas_id_obat: "556",
+      satuan: "MILIGRAM",
+      komposisi: "bisacodyl 10 mg",
+      status_fpktp: true,
+      status_oen: true,
+      peresepan_maksimal: "3 sup/kasus.",
+      restriksi_kelas: ["KATARTIK"],
+      variants: [{ sediaan: "SUPOSITORIA", kekuatan: "10", satuan: "MILIGRAM" }],
+    });
+    check("map: katalog fornas passthrough", rich.fornas_id_obat === "556" && rich.flags.fpktp === true && rich.flags.oen === true && rich.variants.length === 1 && rich.restriksi_kelas[0] === "KATARTIK");
   }
 
   // --- find: flag OFF tidak menyentuh DB ---
