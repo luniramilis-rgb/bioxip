@@ -72,6 +72,41 @@ def build_staging_rows(kind: str, records: list[dict]) -> list[dict]:
     return rows
 
 
+def preserve_existing_drug_fields(store: Store, rows: list[dict]) -> int:
+    """Bawa fakta DB yang TIDAK disediakan API Fornas sebelum upsert.
+
+    Upsert `on_conflict=slug` menimpa seluruh kolom yang ada di payload, sehingga
+    `atc` hasil `enrich_atc.py` akan terhapus oleh `atc: null` dari API Fornas, dan
+    provenance `curated` obat hasil kurasi akan berubah menjadi `official`.
+    Field isian API (variants, flag, restriksi) tetap dipakai.
+    """
+    if not rows:
+        return 0
+    try:
+        existing = {
+            row["slug"]: row
+            for row in store.select_rows(
+                "drug_products",
+                {"select": "slug,atc,source_id,source_tier", "limit": "2000"},
+            )
+        }
+    except Exception as exc:  # DB gagal dibaca → jangan gagalkan publish, tapi catat
+        print(f"  ! pelestarian field lama dilewati (select gagal: {exc})")
+        return 0
+    kept = 0
+    for row in rows:
+        prior = existing.get(row.get("slug"))
+        if not prior:
+            continue
+        if not row.get("atc") and prior.get("atc"):
+            row["atc"] = prior["atc"]
+            kept += 1
+        if prior.get("source_tier") == "curated":
+            row["source_id"] = prior.get("source_id") or row.get("source_id")
+            row["source_tier"] = "curated"
+    return kept
+
+
 @app.command()
 def run(
     kind: str = typer.Option("all", help="drugs|interactions|monitoring|all"),
@@ -132,6 +167,10 @@ def run(
                     payload = dict(item.get("payload") or {})
                     payload["checksum"] = item.get("checksum")
                     rows.append(payload)
+                if k == "drugs":
+                    preserved = preserve_existing_drug_fields(store, rows)
+                    if preserved:
+                        print(f"publish drugs: {preserved} ATC/provenance lama dipertahankan")
                 errors = formulary.validate_records(k, rows)
                 if errors and not allow_invalid:
                     print(f"publish {k}: DIBATALKAN — {len(errors)} masalah validasi (contoh: {errors[0]})")

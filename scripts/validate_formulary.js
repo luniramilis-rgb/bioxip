@@ -14,6 +14,7 @@ const migrations = [
   "020_formulary_remove_review_gate.sql",
   "021_drug_search.sql",
   "022_drug_search_hardening.sql",
+  "025_fornas_catalog.sql",
 ];
 for (const file of migrations) {
   if (!exists(`supabase/migrations/${file}`)) problems.push(`migrasi hilang: ${file}`);
@@ -33,12 +34,36 @@ for (const marker of ["drug_products_inn_trgm_idx", "starts_with(lower(v.nama), 
 }
 if (/like\s+p\.low\s*\|\|\s*'%'/i.test(m022)) problems.push("022: prefix masih memakai LIKE (rawan wildcard)");
 
+// 3b. Katalog Fornas diperluas (025): field publik penuh + variants.
+const m025 = read("supabase/migrations/025_fornas_catalog.sql");
+for (const marker of ["variants jsonb", "fornas_id_obat", "status_fpktp", "restriksi_kelas", "peresepan_maksimal"]) {
+  if (!m025.includes(marker)) problems.push(`025: tidak ada "${marker}"`);
+}
+if (!/create view public\.drug_products_public/i.test(m025)) problems.push("025: view drug_products_public tidak dibuat ulang");
+
+const provider = read("harvester/providers/formulary.py");
+for (const marker of ["map_fornas_catalog", "FORNAS_FLAG_FIELDS", '"variants"']) {
+  if (!provider.includes(marker)) problems.push(`formulary.py: tidak ada "${marker}"`);
+}
+
 // 4. Modul formulary + adapter literatur.
 const formulary = read("functions/_formulary.js");
 for (const marker of ["formularyEnabled", "mapFormularyRow", "findFormularyDrug", "suggestFormularyDrugs", "searchFormularyDrugs", "filterSafe"]) {
   if (!formulary.includes(marker)) problems.push(`_formulary.js: tidak ada "${marker}"`);
 }
-for (const file of ["crossref.js", "doaj.js", "neliti_oai.js", "linkout.js"]) {
+
+// Flag formularium harus identik antara penulis (Python) dan pembaca (JS) — cegah drift.
+const flagMatch = provider.match(/FORNAS_FLAG_FIELDS\s*=\s*\(([^)]*)\)/);
+const pyFlags = flagMatch ? [...flagMatch[1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]) : [];
+const jsFlagsBlock = (formulary.match(/flags:\s*\{([\s\S]*?)\}/) || [])[1] || "";
+const jsFlags = [...jsFlagsBlock.matchAll(/status_([a-z]+)\s*\)/g)].map((m) => m[1]);
+if (!pyFlags.length || !jsFlags.length) {
+  problems.push("flag formularium: daftar Python/JS tidak terbaca");
+} else if (pyFlags.join(",") !== jsFlags.join(",")) {
+  problems.push(`flag formularium drift: Python [${pyFlags.join(",")}] vs JS [${jsFlags.join(",")}]`);
+}
+  for (const file of ["crossref.js", "doaj.js", "openalex.js", "neliti_oai.js", "linkout.js"]) {
+
   if (!exists(`functions/_literature/${file}`)) problems.push(`adapter literatur hilang: ${file}`);
 }
 
@@ -47,12 +72,14 @@ const search = read("functions/api/search.js");
 if (!search.includes("parseLitSources")) problems.push("api/search.js: parseLitSources tidak ada");
 if (!/LIT_SOURCES/.test(search)) problems.push("api/search.js: flag LIT_SOURCES tidak ada");
 // Guard wajib: sumber/link-out harus opt-in (flag OFF → perilaku tak berubah).
-for (const source of ["crossref", "doaj", "linkout"]) {
+  for (const source of ["crossref", "doaj", "openalex", "linkout"]) {
+
   if (!search.includes(`litSources.includes("${source}")`)) {
     problems.push(`api/search.js: guard litSources.includes("${source}") tidak ditemukan`);
   }
 }
-if (!/new Set\(\["crossref",\s*"doaj",\s*"linkout"\]\)/.test(search)) {
+  if (!/new Set\(\["crossref",\s*"doaj",\s*"openalex",\s*"linkout"\]\)/.test(search)) {
+
   problems.push("api/search.js: daftar sumber LIT_SOURCES yang diizinkan tidak sesuai");
 }
 const linkout = read("functions/_literature/linkout.js");

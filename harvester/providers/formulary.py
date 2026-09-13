@@ -25,6 +25,8 @@ KURASI_SOURCE_ID = "kurasi-bioxip"
 # Katalog 30 obat adalah SAMPEL kurasi manual, bukan hasil ekstraksi Fornas terverifikasi.
 SAMPLE_SOURCE_ID = "kurasi-bioxip-sampel"
 FORNAS_API_URL = "https://e-fornas.kemkes.go.id/api/daftar-obat"
+# Flag formularium pada API e-Fornas (dipakai UI: FPKTP/FPKTL/PRB/PP/OEN).
+FORNAS_FLAG_FIELDS = ("fpktp", "fpktl", "prb", "pp", "oen", "program", "kanker")
 
 KINDS = ("drugs", "interactions", "monitoring")
 
@@ -110,6 +112,47 @@ def _search_text(*parts: Any) -> str:
     return " ".join(out)
 
 
+def _text_or_none(value: Any) -> str | None:
+    text = str(value).strip() if value is not None else ""
+    return None if not text or text.upper() == "N/A" else text
+
+
+def _kekuatan_label(row: dict) -> str:
+    kekuatan = _text_or_none(row.get("kekuatan")) or ""
+    satuan = _text_or_none(row.get("satuan")) or ""
+    return f"{kekuatan} {satuan}".strip()
+
+
+def _join_unique(parts: Iterable[Any]) -> str | None:
+    """Gabung nilai unik (case-insensitive) dengan ', '; buang kosong/'N/A'."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for part in parts:
+        text = str(part).strip() if part is not None else ""
+        if not text or text.upper() == "N/A":
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+    return ", ".join(out) or None
+
+
+def _variant_terms(variants: Any) -> list[str]:
+    if not isinstance(variants, list):
+        return []
+    terms: list[str] = []
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        for field in ("sediaan", "kekuatan", "satuan"):
+            text = _text_or_none(variant.get(field))
+            if text:
+                terms.append(text)
+    return terms
+
+
 def normalize_drug(raw: dict, source_id: str = FORNAS_SOURCE_ID, reviewed: bool = True, source_tier: str = "official") -> dict:
     nama = str(raw.get("nama") or raw.get("name") or "").strip()
     inn = str(raw.get("inn") or "").strip() or None
@@ -118,7 +161,9 @@ def normalize_drug(raw: dict, source_id: str = FORNAS_SOURCE_ID, reviewed: bool 
     aliases = _as_list(raw.get("aliases"))
     atc = str(raw.get("atc") or "").strip() or None
     kelas = str(raw.get("kelas") or "").strip() or None
-    search_text = _search_text(nama, inn, us_name, aliases, kelas, atc)
+    variants = raw.get("variants") if isinstance(raw.get("variants"), list) else []
+    restriksi_kelas = _as_list(raw.get("restriksi_kelas"))
+    search_text = _search_text(nama, inn, us_name, aliases, kelas, atc, _variant_terms(variants))
     return {
         "slug": slug,
         "nama": nama,
@@ -129,7 +174,22 @@ def normalize_drug(raw: dict, source_id: str = FORNAS_SOURCE_ID, reviewed: bool 
         "rute": str(raw.get("rute") or "").strip() or None,
         "bentuk_sediaan": str(raw.get("bentuk_sediaan") or "").strip() or None,
         "kekuatan": str(raw.get("kekuatan") or "").strip() or None,
+        "satuan": str(raw.get("satuan") or "").strip() or None,
+        "komposisi": str(raw.get("komposisi") or "").strip() or None,
         "status_fornas": _as_bool(raw.get("status_fornas"), True),
+        "status_fpktp": _as_bool(raw.get("status_fpktp"), False),
+        "status_fpktl": _as_bool(raw.get("status_fpktl"), False),
+        "status_prb": _as_bool(raw.get("status_prb"), False),
+        "status_pp": _as_bool(raw.get("status_pp"), False),
+        "status_oen": _as_bool(raw.get("status_oen"), False),
+        "status_program": _as_bool(raw.get("status_program"), False),
+        "status_kanker": _as_bool(raw.get("status_kanker"), False),
+        "fornas_id_obat": str(raw.get("fornas_id_obat") or "").strip() or None,
+        "peresepan_maksimal": str(raw.get("peresepan_maksimal") or "").strip() or None,
+        "restriksi_obat": str(raw.get("restriksi_obat") or "").strip() or None,
+        "restriksi_sediaan": str(raw.get("restriksi_sediaan") or "").strip() or None,
+        "restriksi_kelas": restriksi_kelas,
+        "variants": variants,
         "nie": str(raw.get("nie") or "").strip() or None,
         "aliases": aliases,
         "search_text": search_text,
@@ -222,6 +282,8 @@ def validate_records(kind: str, records: Iterable[dict]) -> list[str]:
                 errors.append("drug tanpa slug")
             elif not record.get("nama"):
                 errors.append(f"drug tanpa nama: {record['slug']}")
+            if record.get("variants") is not None and not isinstance(record.get("variants"), list):
+                errors.append(f"drug variants bukan list: {record.get('slug')}")
         elif kind == "interactions":
             a, b = record.get("a_slug"), record.get("b_slug")
             if not a or not b:
@@ -271,31 +333,94 @@ def bundled_records(kind: str, functions_dir: Path = FUNCTIONS) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Sumber resmi: API e-Fornas (dipakai frontend Kemenkes).
 # ---------------------------------------------------------------------------
-def map_fornas_row(row: dict) -> dict:
-    """Peta satu baris API e-Fornas → payload `drug_products` (reviewed=False)."""
-    kelas_parts = [row.get("nama_kelas_terapi"), row.get("nama_kelas_terapi_sub1")]
-    kelas = " / ".join(part.strip() for part in kelas_parts if part and part.strip()) or None
-    rute_parts = [row.get("nama_rute1"), row.get("nama_rute2"), row.get("nama_rute3")]
-    rute = ", ".join(part.strip() for part in rute_parts if part and part.strip()) or None
-    satuan = str(row.get("satuan") or "").strip()
-    kekuatan = str(row.get("kekuatan") or "").strip()
-    ukuran = " ".join(p for p in [kekuatan, satuan] if p and p.upper() != "N/A") or None
-    inn = str(row.get("nama_obat_internasional") or "").strip() or None
-    return normalize_drug(
-        {
-            "nama": row.get("nama_obat") or "",
-            "inn": inn,
-            "kelas": kelas,
-            "rute": rute,
-            "bentuk_sediaan": str(row.get("sediaan") or "").strip() or None,
-            "kekuatan": ukuran,
-            "aliases": [inn] if inn and inn.lower() != str(row.get("nama_obat") or "").strip().lower() else [],
-            "status_fornas": True,
-            "reviewed": False,
-        },
-        source_id=FORNAS_API_SOURCE_ID,
-        source_tier="official",
-    )
+def _fornas_variant(row: dict) -> dict:
+    """Satu baris SKU API e-Fornas → entri `variants` (tanpa kunci kosong)."""
+    variant: dict[str, Any] = {
+        "kode_sediaan": _text_or_none(row.get("kode_sediaan")),
+        "sediaan": _text_or_none(row.get("sediaan")),
+        "kekuatan": _text_or_none(row.get("kekuatan")),
+        "satuan": _text_or_none(row.get("satuan")),
+        "kode_satuan": _text_or_none(row.get("kode_satuan")),
+        "peresepan_maksimal": _text_or_none(row.get("peresepan_maksimal")),
+        "restriksi_sediaan": _text_or_none(row.get("restriksi_sediaan")),
+    }
+    restriksi_kelas = [text for text in (_text_or_none(row.get(f"rkt{i}")) for i in range(4)) if text]
+    if restriksi_kelas:
+        variant["restriksi_kelas"] = restriksi_kelas
+    return {key: value for key, value in variant.items() if value is not None}
+
+
+def map_fornas_catalog(rows: Iterable[dict]) -> list[dict]:
+    """Kelompokkan baris SKU API e-Fornas → satu record obat per `id_obat`.
+
+    Menyimpan seluruh atribut publik: flag formularium, komposisi, restriksi,
+    peresepan maksimal, dan daftar `variants` (sediaan × kekuatan × satuan).
+    """
+    groups: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for index, row in enumerate(rows):
+        key = _text_or_none(row.get("id_obat")) or _text_or_none(row.get("id")) or f"row-{index}"
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(row)
+
+    records: list[dict] = []
+    for key in order:
+        group = groups[key]
+        first = group[0]
+        variants: list[dict] = []
+        seen_variants: set[str] = set()
+        for row in group:
+            variant = _fornas_variant(row)
+            stamp = json.dumps(variant, sort_keys=True, ensure_ascii=False)
+            if stamp in seen_variants:
+                continue
+            seen_variants.add(stamp)
+            variants.append(variant)
+        variants.sort(key=lambda item: (item.get("sediaan") or "", item.get("kekuatan") or "", item.get("kode_sediaan") or ""))
+
+        nama = _text_or_none(first.get("nama_obat")) or key
+        inn = _text_or_none(first.get("nama_obat_internasional"))
+        kelas = _join_unique(first.get(field) for field in (
+            "nama_kelas_terapi", "nama_kelas_terapi_sub1", "nama_kelas_terapi_sub2", "nama_kelas_terapi_sub3",
+        ))
+        rute = _join_unique(first.get(field) for field in ("nama_rute1", "nama_rute2", "nama_rute3"))
+        restriksi_kelas: list[str] = []
+        for row in group:
+            for index in range(4):
+                text = _text_or_none(row.get(f"rkt{index}"))
+                if text and text not in restriksi_kelas:
+                    restriksi_kelas.append(text)
+        flags = {field: any(_as_bool(row.get(field), False) for row in group) for field in FORNAS_FLAG_FIELDS}
+
+        records.append(
+            normalize_drug(
+                {
+                    "nama": nama,
+                    "inn": inn,
+                    "kelas": kelas,
+                    "rute": rute,
+                    "bentuk_sediaan": _join_unique(row.get("sediaan") for row in group),
+                    "kekuatan": _join_unique(_kekuatan_label(row) for row in group),
+                    "satuan": _join_unique(row.get("satuan") for row in group),
+                    "komposisi": _join_unique(row.get("komposisi") for row in group),
+                    "aliases": [inn] if inn and inn.lower() != nama.lower() else [],
+                    "status_fornas": True,
+                    "reviewed": False,
+                    "fornas_id_obat": key,
+                    "peresepan_maksimal": _join_unique(row.get("peresepan_maksimal") for row in group),
+                    "restriksi_obat": _join_unique(row.get("restriksi_obat") for row in group),
+                    "restriksi_sediaan": _join_unique(row.get("restriksi_sediaan") for row in group),
+                    "restriksi_kelas": restriksi_kelas,
+                    "variants": variants,
+                    **{f"status_{field}": flags[field] for field in FORNAS_FLAG_FIELDS},
+                },
+                source_id=FORNAS_API_SOURCE_ID,
+                source_tier="official",
+            )
+        )
+    return records
 
 
 def fetch_fornas_api(url: str = FORNAS_API_URL, timeout: float = 60.0) -> list[dict]:
@@ -313,8 +438,8 @@ def fetch_fornas_api(url: str = FORNAS_API_URL, timeout: float = 60.0) -> list[d
 
 
 def fornas_api_records(url: str = FORNAS_API_URL) -> list[dict]:
-    records = [map_fornas_row(row) for row in fetch_fornas_api(url)]
-    # buang slug kosong, jaga unik (satu obat bisa punya beberapa sediaan)
+    records = map_fornas_catalog(fetch_fornas_api(url))
+    # buang slug kosong, jaga unik (defensif: satu id_obat bisa berbagi slug).
     seen: set[str] = set()
     unique: list[dict] = []
     for record in records:
@@ -401,7 +526,7 @@ def fact_source_payloads(functions_dir: Path = FUNCTIONS) -> list[dict]:
             "berlaku_dari": None,
             "url": FORNAS_API_URL,
             "lisensi": "Data pemerintah (atribusi wajib)",
-            "catatan": "Diambil dari endpoint JSON publik e-Fornas; simpan fakta ringkas + tautan, bukan dokumen penuh.",
+            "catatan": "Seluruh field publik API e-Fornas (1.254 baris SKU, 663 obat): identitas, flag formularium (FPKTP/FPKTL/PRB/PP/OEN/program/kanker), komposisi, restriksi, peresepan maksimal, dan `variants` sediaan/kekuatan. Simpan fakta ringkas + tautan, bukan dokumen penuh.",
         },
         {
             "id": KURASI_SOURCE_ID,

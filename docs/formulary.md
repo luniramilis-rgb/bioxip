@@ -12,7 +12,7 @@ Dokumen hidup. Turunan dari `docs/formulary-plan.md` (Fase 0) dan pelengkap `doc
 | Tabel | Isi | Kunci |
 |---|---|---|
 | `fact_sources` | Registri sumber + edisi + lisensi | `id` |
-| `drug_products` | Identitas & status obat | `slug` |
+| `drug_products` | Identitas & status obat + katalog Fornas (flag, restriksi, `variants`) | `slug` |
 | `drug_doses` | Dosis per populasi/indikasi | `id` (FK `drug_slug`) |
 | `drug_interactions` | Pasangan interaksi | `id`, unik `(a_slug,b_slug)` |
 | `drug_monitoring` | Parameter pemantauan | `id` (FK `drug_slug`) |
@@ -30,6 +30,13 @@ Dokumen hidup. Turunan dari `docs/formulary-plan.md` (Fase 0) dan pelengkap `doc
 - `search_text` = gabungan nama + INN + us_name + alias + kelas + ATC (diisi importer) → diturunkan ke `search_tsv` (generated, `to_tsvector('simple', …)`).
 - Kekuatan & sediaan disimpan sebagai teks terstruktur ringkas (`kekuatan`, `bentuk_sediaan`, `rute`); jangan menyimpan tabel konversi.
 - Satuan mengikuti sumber; konversi khusus (mis. besi elemental vs garam) ditulis di `catatan`.
+
+## 4b. Katalog Fornas diperluas (025)
+- Sumber resmi: `GET https://e-fornas.kemkes.go.id/api/daftar-obat` (JSON publik, **1.254 baris SKU → 663 obat unik**). Halaman `guest/daftar-obat` adalah SPA Next.js yang membaca endpoint yang sama, jadi integrasi memakai API (bukan parse HTML) — setara "scraping" tanpa rapuh.
+- Importer `map_fornas_catalog` mengelompokkan baris per `id_obat` dan menyimpan **seluruh atribut publik**: `fornas_id_obat`, `komposisi`, `satuan`, flag `status_fpktp/fpktl/prb/pp/oen/program/kanker`, `peresepan_maksimal`, `restriksi_obat`/`restriksi_sediaan`/`restriksi_kelas[]`, dan **`variants`** (daftar sediaan × kekuatan × satuan per SKU).
+- `variants` hanya menyimpan kunci yang terisi (tanpa nilai `null`/`N/A`), diurut deterministik `(sediaan, kekuatan, kode_sediaan)`, duplikat dibuang agar `checksum` stabil.
+- Sumber ATC/NIE/harga **tidak** ada di API ini; ATC tetap via RxClass (`enrich_atc.py`), NIE/harga dibiarkan kosong (semantik "tidak ditemukan" = valid).
+- **Publish aman**: upsert `on_conflict=slug` menimpa semua kolom payload, jadi `ingest_formulary` memanggil `preserve_existing_drug_fields` untuk membawa `atc` lama dan mempertahankan provenance `curated` pada slug yang beririsan — API Fornas tidak boleh menghapus fakta yang tidak disediakannya.
 
 ## 5. Kebijakan konflik & kelengkapan
 - Prioritas: **Fornas/BPOM > label asing (openFDA/DailyMed)**.
