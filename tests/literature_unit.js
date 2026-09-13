@@ -114,6 +114,49 @@ function loadLit(relative, exports, extra = {}) {
     check("neliti: parse resumptionToken", parsed.resumptionToken === "tok123");
   }
 
+  // --- OpenAlex ---
+  {
+    const { api } = loadLit("openalex.js", ["mapOpenAlexWork", "reconstructAbstract", "searchOpenAlex"]);
+    const abstract = api.reconstructAbstract({ Paracetamol: [0], reduces: [1], fever: [2], by: [3], PGE2: [4] });
+    check("openalex: rekonstruksi abstrak terbalik", abstract === "Paracetamol reduces fever by PGE2", abstract);
+
+    const row = api.mapOpenAlexWork({
+      id: "https://openalex.org/W1",
+      doi: "https://doi.org/10.1/ABC",
+      title: "Paracetamol mechanism",
+      publication_year: 2024,
+      publication_date: "2024-03-01",
+      cited_by_count: 12,
+      authorships: [{ author: { display_name: "Budi A" } }],
+      primary_location: { landing_page_url: "https://example.org/x", source: { display_name: "Jurnal" } },
+      open_access: { is_oa: true, license: "cc-by" },
+      abstract_inverted_index: { Paracetamol: [0], lowers: [1], fever: [2] },
+    });
+    check(
+      "openalex: map fields",
+      row &&
+        row.source === "openalex" &&
+        row.doi === "10.1/abc" &&
+        row.year === 2024 &&
+        row.citation_count === 12 &&
+        row.oa.is_oa === true &&
+        row.abstract.includes("lowers"),
+      JSON.stringify(row).slice(0, 120),
+    );
+    check("openalex: judul kosong → null", api.mapOpenAlexWork({ id: "https://openalex.org/W2" }) === null);
+
+    let called = "";
+    const { api: api2 } = loadLit("openalex.js", ["searchOpenAlex"], {
+      fetch: async (url) => {
+        called = String(url);
+        return { ok: true, status: 200, json: async () => ({ meta: { count: 1 }, results: [{ id: "https://openalex.org/W3", title: "T", primary_location: { landing_page_url: "https://x.test/1" } }] }) };
+      },
+    });
+    const found = await api2.searchOpenAlex("demam parasetamol", { limit: 5, indonesia: true, mailto: "a@b.id" });
+    check("openalex: query filter Indonesia + mailto", called.includes("country_code%3AID") && called.includes("mailto=a%40b.id"), called);
+    check("openalex: hasil terpetakan", found.results.length === 1 && found.results[0].source === "openalex");
+  }
+
   let failed = 0;
   for (const item of results) {
     if (!item.ok) failed++;

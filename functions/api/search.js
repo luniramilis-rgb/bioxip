@@ -6,6 +6,7 @@ import { rankResults } from "../_rank.js";
 import { cacheGetJson, cacheKey, cachePutJson } from "../_cache.js";
 import { searchCrossref } from "../_literature/crossref.js";
 import { searchDoaj } from "../_literature/doaj.js";
+import { searchOpenAlex } from "../_literature/openalex.js";
 import { linkoutEntries } from "../_literature/linkout.js";
 import { detectGuidelineTopic, guidelineEnabled, searchGuidelines } from "../_guideline.js";
 
@@ -167,6 +168,10 @@ async function produceSearch(env, request) {
     }
     if (needLit && litSources.includes("doaj")) {
       calls.push(searchDoaj(litQuery, { limit: perPage, indonesia }));
+      callKinds.push("optional");
+    }
+    if (needLit && litSources.includes("openalex")) {
+      calls.push(searchOpenAlex(litQuery, { limit: perPage, indonesia, mailto: env?.OPENALEX_MAIL || env?.CROSSREF_MAILTO }));
       callKinds.push("optional");
     }
 
@@ -412,11 +417,11 @@ function mapTrial(study, withAbstract = false) {
   return row;
 }
 
-const SOURCE_PRIORITY = { guideline: -1, europepmc: 0, pubmed: 1, clinicaltrials: 2, crossref: 3, doaj: 4, neliti: 5, onesearch: 9, garuda: 9 };
+const SOURCE_PRIORITY = { guideline: -1, europepmc: 0, pubmed: 1, clinicaltrials: 2, openalex: 3, crossref: 3, doaj: 4, neliti: 5, onesearch: 9, garuda: 9 };
 
 function parseLitSources(value) {
   if (!value) return [];
-  const allowed = new Set(["crossref", "doaj", "linkout"]);
+  const allowed = new Set(["crossref", "doaj", "openalex", "linkout"]);
   return String(value)
     .split(",")
     .map((s) => s.trim().toLowerCase())

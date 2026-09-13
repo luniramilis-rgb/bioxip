@@ -88,6 +88,7 @@ window.BIOXIP_SEARCH = {
         clinicaltrials: "ClinicalTrials.gov",
         crossref: "Crossref",
         doaj: "DOAJ",
+        openalex: "OpenAlex",
         neliti: "Neliti",
         guideline: "Pedoman",
         onesearch: "Indonesia OneSearch",
