@@ -15,6 +15,7 @@ export function formularyEnabled(env) {
 
 export function mapFormularyRow(row) {
   if (!row || !row.slug) return null;
+  const variants = Array.isArray(row.variants) ? row.variants : [];
   return {
     slug: row.slug,
     name: row.nama || row.slug,
@@ -25,7 +26,24 @@ export function mapFormularyRow(row) {
     rute: row.rute || null,
     bentuk_sediaan: row.bentuk_sediaan || null,
     kekuatan: row.kekuatan || null,
+    satuan: row.satuan || null,
+    komposisi: row.komposisi || null,
     status_fornas: Boolean(row.status_fornas),
+    fornas_id_obat: row.fornas_id_obat || null,
+    flags: {
+      fpktp: Boolean(row.status_fpktp),
+      fpktl: Boolean(row.status_fpktl),
+      prb: Boolean(row.status_prb),
+      pp: Boolean(row.status_pp),
+      oen: Boolean(row.status_oen),
+      program: Boolean(row.status_program),
+      kanker: Boolean(row.status_kanker),
+    },
+    peresepan_maksimal: row.peresepan_maksimal || null,
+    restriksi_obat: row.restriksi_obat || null,
+    restriksi_sediaan: row.restriksi_sediaan || null,
+    restriksi_kelas: Array.isArray(row.restriksi_kelas) ? row.restriksi_kelas : [],
+    variants,
     source_tier: row.source_tier || null,
     aliases: [],
   };

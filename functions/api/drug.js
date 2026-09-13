@@ -1,4 +1,4 @@
-import { findDrug, suggestDrugs, FORNAS } from "../_drugs.js";
+import { findDrug, findDrugsInText, suggestDrugs, FORNAS } from "../_drugs.js";
 import { findFormularyDrug, formularyEnabled } from "../_formulary.js";
 import monitoring from "../_monitoring.json";
 
@@ -29,8 +29,9 @@ export async function onRequestGet(context) {
     if (!q) return json({ error: "param q wajib" }, 400);
 
     // Katalog JSON (30 kurasi) diutamakan: ia punya ATC + catatan keselamatan (watchouts/lasa).
+    // Bila kueri berupa kalimat ("mekanisme parasetamol …"), deteksi nama obat di dalam teks.
     // Postgres (Fornas penuh) menjadi sumber untuk obat di luar katalog, bila flag aktif.
-    const jsonDrug = findDrug(q);
+    const jsonDrug = findDrug(q) || findDrugsInText(q, 1)[0] || null;
     let dbDrug = null;
     if (!jsonDrug && formularyEnabled(context.env)) {
       dbDrug = await findFormularyDrug(context.env, q, url.origin).catch(() => null);
@@ -82,6 +83,19 @@ export async function onRequestGet(context) {
           ? { edition: `Fornas — API resmi (${dbDrug.source_tier || "official"})`, source_url: FORNAS.source_url, source_tier: dbDrug.source_tier || null }
           : FORNAS,
       source_tier: dbDrug ? dbDrug.source_tier : "curated",
+      fornas_detail: dbDrug
+        ? {
+            fornas_id_obat: dbDrug.fornas_id_obat || null,
+            komposisi: dbDrug.komposisi || null,
+            satuan: dbDrug.satuan || null,
+            flags: dbDrug.flags || null,
+            peresepan_maksimal: dbDrug.peresepan_maksimal || null,
+            restriksi_obat: dbDrug.restriksi_obat || null,
+            restriksi_sediaan: dbDrug.restriksi_sediaan || null,
+            restriksi_kelas: dbDrug.restriksi_kelas || [],
+            variants: dbDrug.variants || [],
+          }
+        : null,
       rxnorm,
       retrieved_at: new Date().toISOString(),
       chemistry,
